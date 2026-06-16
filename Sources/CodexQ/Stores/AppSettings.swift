@@ -1,0 +1,74 @@
+import Foundation
+import ServiceManagement
+
+@MainActor
+final class AppSettings: ObservableObject {
+    static let shared = AppSettings()
+
+    @Published var launchAtLogin: Bool {
+        didSet { updateLaunchAtLogin() }
+    }
+    @Published var notificationsEnabled: Bool {
+        didSet { defaults.set(notificationsEnabled, forKey: Keys.notificationsEnabled) }
+    }
+    @Published var notifyAt20: Bool { didSet { defaults.set(notifyAt20, forKey: Keys.notifyAt20) } }
+    @Published var notifyAt10: Bool { didSet { defaults.set(notifyAt10, forKey: Keys.notifyAt10) } }
+    @Published var notifyAt5: Bool { didSet { defaults.set(notifyAt5, forKey: Keys.notifyAt5) } }
+    var warningThresholds: [Int] {
+        [(20, notifyAt20), (10, notifyAt10), (5, notifyAt5)]
+            .compactMap { $0.1 ? $0.0 : nil }
+    }
+    private let defaults = UserDefaults.standard
+    private var isUpdatingLaunchAtLogin = false
+
+    private enum Keys {
+        static let legacySettingsMigrated = "legacySettingsMigrated"
+        static let notificationsEnabled = "notificationsEnabled"
+        static let notifyAt20 = "notifyAt20"
+        static let notifyAt10 = "notifyAt10"
+        static let notifyAt5 = "notifyAt5"
+    }
+
+    private init() {
+        Self.migrateLegacySettingsIfNeeded(to: defaults)
+        launchAtLogin = SMAppService.mainApp.status == .enabled
+        notificationsEnabled = defaults.bool(forKey: Keys.notificationsEnabled)
+        notifyAt20 = defaults.object(forKey: Keys.notifyAt20) as? Bool ?? true
+        notifyAt10 = defaults.object(forKey: Keys.notifyAt10) as? Bool ?? true
+        notifyAt5 = defaults.object(forKey: Keys.notifyAt5) as? Bool ?? true
+    }
+
+    private static func migrateLegacySettingsIfNeeded(to defaults: UserDefaults) {
+        guard !defaults.bool(forKey: Keys.legacySettingsMigrated),
+              let legacyDefaults = UserDefaults(suiteName: "com.jun.codesk") else {
+            return
+        }
+
+        for key in [
+            Keys.notificationsEnabled,
+            Keys.notifyAt20,
+            Keys.notifyAt10,
+            Keys.notifyAt5
+        ] where defaults.object(forKey: key) == nil {
+            if let value = legacyDefaults.object(forKey: key) {
+                defaults.set(value, forKey: key)
+            }
+        }
+        defaults.set(true, forKey: Keys.legacySettingsMigrated)
+    }
+
+    private func updateLaunchAtLogin() {
+        guard !isUpdatingLaunchAtLogin else { return }
+        do {
+            if launchAtLogin {
+                try SMAppService.mainApp.register()
+            } else {
+                try SMAppService.mainApp.unregister()
+            }
+        } catch {
+            isUpdatingLaunchAtLogin = true
+            launchAtLogin = SMAppService.mainApp.status == .enabled
+            isUpdatingLaunchAtLogin = false
+        }
+    }
+}
