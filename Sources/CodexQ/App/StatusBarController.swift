@@ -162,7 +162,12 @@ final class StatusBarController: NSObject {
     private func updateStatusItem() {
         let remainingPercent = store.snapshot?.fiveHour.remainingPercent
         let error = store.errorMessage
-        let isStale = store.lastUpdatedAt.map { Date().timeIntervalSince($0) > 600 } ?? true
+        let now = Date()
+        let hasFreshQuota = StatusTitleFormatter.hasFreshQuota(
+            remainingPercent: remainingPercent,
+            lastUpdatedAt: store.lastUpdatedAt,
+            now: now
+        )
 
         statusItem.button?.image = StatusIconRenderer.image(
             source: sourceIcon,
@@ -172,12 +177,12 @@ final class StatusBarController: NSObject {
             remainingPercent: remainingPercent,
             lastUpdatedAt: store.lastUpdatedAt,
             error: error,
-            now: Date()
+            now: now
         )
-        statusItem.button?.alphaValue = error == nil && !isStale ? 1 : 0.55
+        statusItem.button?.alphaValue = hasFreshQuota ? 1 : 0.55
         if let error {
             statusItem.button?.toolTip = "CodexQ · 刷新失败 · \(error)"
-        } else if isStale {
+        } else if !hasFreshQuota {
             statusItem.button?.toolTip = "CodexQ · 数据超过 10 分钟未更新"
         } else if let remainingPercent {
             statusItem.button?.toolTip =

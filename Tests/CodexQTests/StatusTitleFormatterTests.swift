@@ -25,16 +25,21 @@ struct StatusTitleFormatterTests {
         ).isEmpty)
     }
 
-    @Test("刷新失败时隐藏百分比")
-    func refreshFailureHidesTitle() {
+    @Test("刷新失败但有新鲜缓存时仍显示百分比")
+    func refreshFailureWithFreshCacheShowsTitle() {
         let now = Date()
 
+        #expect(StatusTitleFormatter.hasFreshQuota(
+            remainingPercent: 89,
+            lastUpdatedAt: now,
+            now: now
+        ))
         #expect(StatusTitleFormatter.string(
             remainingPercent: 89,
             lastUpdatedAt: now,
             error: "刷新失败",
             now: now
-        ).isEmpty)
+        ) == "89%")
     }
 
     @Test("数据超过十分钟时隐藏百分比")
