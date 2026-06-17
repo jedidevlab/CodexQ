@@ -38,6 +38,20 @@ Run tests:
 swift test
 ```
 
+## Package a Release
+
+Generate an arm64 ZIP archive for GitHub Releases:
+
+```bash
+./script/package_release.sh 1.0.0
+```
+
+The archive is written to:
+
+```text
+dist/CodexQ-1.0.0-arm64.zip
+```
+
 ## Packaging Note
 
 The helper script builds a local `.app` bundle in `dist/CodexQ.app` for
