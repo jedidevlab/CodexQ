@@ -26,10 +26,12 @@ final class QuotaStore: ObservableObject {
         refreshTask = Task {
             let clock = ContinuousClock()
             while !Task.isCancelled {
-                let nextRefresh = clock.now.advanced(by: .seconds(180))
-                await refresh()
+                let didRefresh = await refresh()
                 do {
-                    try await clock.sleep(until: nextRefresh, tolerance: .seconds(1))
+                    try await clock.sleep(
+                        for: QuotaRefreshPolicy.intervalAfterRefresh(succeeded: didRefresh),
+                        tolerance: .seconds(1)
+                    )
                 } catch {
                     return
                 }
@@ -46,9 +48,24 @@ final class QuotaStore: ObservableObject {
         isPopoverPresented = isPresented
     }
 
-    func refresh() async {
-        guard !isRefreshing else { return }
+    func refreshIfNeededOnPresentation(now: Date = Date()) async {
+        guard QuotaRefreshPolicy.shouldRefreshOnPresentation(
+            remainingPercent: snapshot?.fiveHour.remainingPercent,
+            lastUpdatedAt: lastUpdatedAt,
+            errorMessage: errorMessage,
+            isRefreshing: isRefreshing,
+            now: now
+        ) else {
+            return
+        }
+        await refresh()
+    }
+
+    @discardableResult
+    func refresh() async -> Bool {
+        guard !isRefreshing else { return false }
         isRefreshing = true
+        errorMessage = nil
         defer { isRefreshing = false }
 
         do {
@@ -57,7 +74,6 @@ final class QuotaStore: ObservableObject {
             let previousSnapshot = snapshot
             snapshot = newSnapshot
             lastUpdatedAt = updatedAt
-            errorMessage = nil
             SnapshotCache.save(CachedQuotaSnapshot(snapshot: newSnapshot, updatedAt: updatedAt))
             if settings.notificationsEnabled {
                 await notificationService.requestAuthorization()
@@ -67,8 +83,35 @@ final class QuotaStore: ObservableObject {
                     thresholds: settings.warningThresholds
                 )
             }
+            return true
         } catch {
             errorMessage = error.localizedDescription
+            return false
         }
+    }
+}
+
+enum QuotaRefreshPolicy {
+    static let successInterval: Duration = .seconds(180)
+    static let failureInterval: Duration = .seconds(15)
+
+    static func intervalAfterRefresh(succeeded: Bool) -> Duration {
+        succeeded ? successInterval : failureInterval
+    }
+
+    static func shouldRefreshOnPresentation(
+        remainingPercent: Double?,
+        lastUpdatedAt: Date?,
+        errorMessage: String?,
+        isRefreshing: Bool,
+        now: Date
+    ) -> Bool {
+        guard !isRefreshing else { return false }
+        if errorMessage != nil { return true }
+        return !StatusTitleFormatter.hasFreshQuota(
+            remainingPercent: remainingPercent,
+            lastUpdatedAt: lastUpdatedAt,
+            now: now
+        )
     }
 }

@@ -55,8 +55,13 @@ struct QuotaPopoverView: View {
             } else if store.isRefreshing {
                 ProgressView("正在读取额度...")
                     .frame(maxWidth: .infinity, minHeight: 80)
+            } else if let error = store.errorMessage {
+                Text(RefreshFailureFormatter.summary(error))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, minHeight: 80)
+                    .help(error)
             } else {
-                Text(store.errorMessage ?? "暂无额度数据")
+                Text("暂无额度数据")
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, minHeight: 80)
             }
@@ -76,6 +81,7 @@ struct QuotaPopoverView: View {
                         .font(.caption)
                         .foregroundStyle(.red)
                         .lineLimit(1)
+                        .help(error)
                 } else if let updatedAt = store.lastUpdatedAt {
                     Text(RelativeUpdateFormatter.string(
                         since: updatedAt,
@@ -128,8 +134,11 @@ struct QuotaPopoverView: View {
     }
 
     private func failureStatus(error: String) -> String {
-        guard let updatedAt = store.lastUpdatedAt else { return error }
-        return "\(RelativeUpdateFormatter.string(since: updatedAt, now: relativeTimeNow)) · 刷新失败"
+        RefreshFailureFormatter.status(
+            error: error,
+            updatedAt: store.lastUpdatedAt,
+            now: relativeTimeNow
+        )
     }
 }
 

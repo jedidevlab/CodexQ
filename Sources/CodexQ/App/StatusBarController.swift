@@ -118,6 +118,9 @@ final class StatusBarController: NSObject {
             panel.orderFrontRegardless()
             panel.makeKey()
             updateAutoClose(isRefreshing: store.isRefreshing)
+            Task { [weak store] in
+                await store?.refreshIfNeededOnPresentation()
+            }
         }
     }
 
