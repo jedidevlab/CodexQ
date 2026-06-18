@@ -17,8 +17,22 @@ run-out time, refresh status, and optional quota warnings.
 ## Requirements
 
 - macOS 13 or later
+- Apple Silicon Mac for the `arm64` release build, or Intel Mac for the
+  `x86_64` release build
 - Swift 6 toolchain
 - Codex app installed at `/Applications/Codex.app`
+
+## Download
+
+Choose the release archive that matches your Mac:
+
+- Apple Silicon Mac (M1 or later): `CodexQ-1.0.0-arm64.zip`
+- Intel Mac: `CodexQ-1.0.0-x86_64.zip`
+
+Unzip the archive, then move `CodexQ.app` to Applications.
+
+The release builds are ad-hoc signed and not notarized. On first launch, macOS
+may require right-clicking the app and choosing Open.
 
 ## Build and Run
 
@@ -40,16 +54,23 @@ swift test
 
 ## Package a Release
 
-Generate an arm64 ZIP archive for GitHub Releases:
+Generate a ZIP archive for GitHub Releases using the current Mac's architecture:
 
 ```bash
 ./script/package_release.sh 1.0.0
 ```
 
+Pass an architecture explicitly when needed:
+
+```bash
+./script/package_release.sh 1.0.0 arm64
+./script/package_release.sh 1.0.0 x86_64
+```
+
 The archive is written to:
 
 ```text
-dist/CodexQ-1.0.0-arm64.zip
+dist/CodexQ-1.0.0-<arch>.zip
 ```
 
 ## Packaging Note

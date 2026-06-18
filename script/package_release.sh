@@ -2,9 +2,19 @@
 set -euo pipefail
 
 VERSION="${1:-1.0.0}"
+ARCH="${2:-$(uname -m)}"
 APP_NAME="CodexQ"
 BUNDLE_ID="com.jun.codexq"
 MIN_SYSTEM_VERSION="13.0"
+
+case "$ARCH" in
+  arm64|x86_64)
+    ;;
+  *)
+    echo "usage: $0 [version] [arm64|x86_64]" >&2
+    exit 2
+    ;;
+esac
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIST_DIR="$ROOT_DIR/dist"
@@ -16,11 +26,11 @@ APP_RESOURCES="$APP_CONTENTS/Resources"
 APP_BINARY="$APP_MACOS/$APP_NAME"
 INFO_PLIST="$APP_CONTENTS/Info.plist"
 ICONSET="$DIST_DIR/AppIcon.iconset"
-ZIP_PATH="$DIST_DIR/CodexQ-${VERSION}-arm64.zip"
+ZIP_PATH="$DIST_DIR/CodexQ-${VERSION}-${ARCH}.zip"
 
 cd "$ROOT_DIR"
-swift build -c release
-BUILD_BINARY="$(swift build -c release --show-bin-path)/$APP_NAME"
+swift build -c release --arch "$ARCH"
+BUILD_BINARY="$(swift build -c release --arch "$ARCH" --show-bin-path)/$APP_NAME"
 
 rm -rf "$APP_BUNDLE" "$LEGACY_APP_BUNDLE" "$ICONSET" "$ZIP_PATH"
 mkdir -p "$APP_MACOS" "$APP_RESOURCES" "$ICONSET"
