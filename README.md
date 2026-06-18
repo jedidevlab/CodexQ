@@ -34,6 +34,9 @@ Unzip the archive, then move `CodexQ.app` to Applications.
 The release builds are ad-hoc signed and not notarized. On first launch, macOS
 may require right-clicking the app and choosing Open.
 
+发布版本使用 ad-hoc 签名，未经过 notarization 公证。首次启动时，macOS
+可能需要右键点击 app 并选择打开。
+
 ## Build and Run
 
 ```bash
