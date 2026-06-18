@@ -180,13 +180,11 @@ final class StatusBarController: NSObject {
             now: now
         )
         statusItem.button?.alphaValue = hasFreshQuota ? 1 : 0.55
-        if let error {
-            statusItem.button?.toolTip = "CodexQ · 刷新失败 · \(error)"
-        } else if !hasFreshQuota {
-            statusItem.button?.toolTip = "CodexQ · 数据超过 10 分钟未更新"
-        } else if let remainingPercent {
-            statusItem.button?.toolTip =
-                "CodexQ · 5 小时剩余 \(Int(remainingPercent.rounded()))%"
-        }
+        statusItem.button?.toolTip = StatusTitleFormatter.toolTip(
+            remainingPercent: remainingPercent,
+            lastUpdatedAt: store.lastUpdatedAt,
+            error: error,
+            now: now
+        )
     }
 }

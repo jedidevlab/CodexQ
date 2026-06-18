@@ -30,4 +30,29 @@ enum StatusTitleFormatter {
 
         return "\(Int(remainingPercent.rounded()))%"
     }
+
+    static func toolTip(
+        remainingPercent: Double?,
+        lastUpdatedAt: Date?,
+        error: String?,
+        now: Date
+    ) -> String {
+        if let error {
+            return "CodexQ · 刷新失败 · \(error)"
+        }
+
+        guard let remainingPercent else {
+            return "CodexQ · 暂无额度数据"
+        }
+
+        guard hasFreshQuota(
+            remainingPercent: remainingPercent,
+            lastUpdatedAt: lastUpdatedAt,
+            now: now
+        ) else {
+            return "CodexQ · 数据超过 10 分钟未更新"
+        }
+
+        return "CodexQ · 5 小时剩余 \(Int(remainingPercent.rounded()))%"
+    }
 }
