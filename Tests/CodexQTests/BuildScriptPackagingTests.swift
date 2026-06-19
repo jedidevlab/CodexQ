@@ -15,6 +15,7 @@ struct BuildScriptPackagingTests {
         let script = try String(contentsOfFile: "script/package_release.sh", encoding: .utf8)
 
         #expect(script.contains("ARCH=\"${2:-$(uname -m)}\""))
+        #expect(script.contains("[[ \"$VERSION\" =~ ^[0-9A-Za-z._-]+$ ]]"))
         #expect(script.contains("swift build -c release --arch \"$ARCH\""))
         #expect(script.contains("CodexQ-${VERSION}-${ARCH}.zip"))
         #expect(script.contains("/usr/bin/ditto -c -k --sequesterRsrc --keepParent"))

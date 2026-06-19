@@ -7,6 +7,11 @@ APP_NAME="CodexQ"
 BUNDLE_ID="com.jun.codexq"
 MIN_SYSTEM_VERSION="13.0"
 
+if ! [[ "$VERSION" =~ ^[0-9A-Za-z._-]+$ ]]; then
+  echo "usage: $0 [version] [arm64|x86_64]" >&2
+  exit 2
+fi
+
 case "$ARCH" in
   arm64|x86_64)
     ;;
