@@ -34,32 +34,38 @@ struct QuotaFormattingTests {
         #expect(formatter.string(for: reset, period: .fiveHour, now: now) == "02:15")
     }
 
-    @Test("周限额不足 24 小时且是当天时只显示绝对时间")
-    func weeklyUnder24HoursOnSameDayShowsTimeOnly() {
+    @Test("周限额小于 24 小时显示距离重置的小时分钟")
+    func weeklyUnder24HoursShowsRelativeResetTime() {
         let formatter = ResetTimeFormatter(locale: locale, timeZone: timeZone)
         let now = date(2026, 6, 15, 10, 0)
         let reset = date(2026, 6, 15, 23, 59)
 
-        #expect(formatter.string(for: reset, period: .weekly, now: now) == "23:59")
+        #expect(formatter.string(for: reset, period: .weekly, now: now) == "13h59m")
     }
 
-    @Test("周限额不足 24 小时但不是当天时仍显示日期")
-    func weeklyUnder24HoursOnFutureDayShowsDateOnly() {
+    @Test("周限额跨日但小于 24 小时仍显示距离重置的小时分钟")
+    func weeklyUnder24HoursOnFutureDayShowsRelativeResetTime() {
         let formatter = ResetTimeFormatter(locale: locale, timeZone: timeZone)
         let now = date(2026, 6, 15, 10, 0)
         let reset = date(2026, 6, 16, 9, 59)
-        let result = formatter.string(for: reset, period: .weekly, now: now)
 
-        #expect(result.contains("6"))
-        #expect(result.contains("16"))
-        #expect(!result.contains(":"))
+        #expect(formatter.string(for: reset, period: .weekly, now: now) == "23h59m")
     }
 
-    @Test("周限额达到 24 小时只显示日期")
-    func weeklyAt24HoursShowsDateOnly() {
+    @Test("周限额等于 24 小时显示距离重置的小时分钟")
+    func weeklyAt24HoursShowsRelativeResetTime() {
         let formatter = ResetTimeFormatter(locale: locale, timeZone: timeZone)
         let now = date(2026, 6, 15, 10, 0)
         let reset = date(2026, 6, 16, 10, 0)
+
+        #expect(formatter.string(for: reset, period: .weekly, now: now) == "24h0m")
+    }
+
+    @Test("周限额大于 24 小时显示绝对日期")
+    func weeklyOver24HoursShowsDateOnly() {
+        let formatter = ResetTimeFormatter(locale: locale, timeZone: timeZone)
+        let now = date(2026, 6, 15, 10, 0)
+        let reset = date(2026, 6, 16, 10, 1)
         let result = formatter.string(for: reset, period: .weekly, now: now)
 
         #expect(result.contains("6"))

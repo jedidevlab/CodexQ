@@ -33,8 +33,10 @@ struct ResetTimeFormatter {
         case .fiveHour:
             return timeFormatter.string(from: resetDate)
         case .weekly:
-            if calendar.isDate(resetDate, inSameDayAs: now) {
-                return timeFormatter.string(from: resetDate)
+            let secondsUntilReset = resetDate.timeIntervalSince(now)
+            if secondsUntilReset <= 24 * 60 * 60 {
+                let wholeMinutes = max(0, Int(secondsUntilReset) / 60)
+                return "\(wholeMinutes / 60)h\(wholeMinutes % 60)m"
             }
             return dateFormatter.string(from: resetDate)
         }
