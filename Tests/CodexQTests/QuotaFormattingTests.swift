@@ -34,13 +34,25 @@ struct QuotaFormattingTests {
         #expect(formatter.string(for: reset, period: .fiveHour, now: now) == "02:15")
     }
 
-    @Test("周限额不足 24 小时只显示绝对时间")
-    func weeklyUnder24HoursShowsTimeOnly() {
+    @Test("周限额不足 24 小时且是当天时只显示绝对时间")
+    func weeklyUnder24HoursOnSameDayShowsTimeOnly() {
+        let formatter = ResetTimeFormatter(locale: locale, timeZone: timeZone)
+        let now = date(2026, 6, 15, 10, 0)
+        let reset = date(2026, 6, 15, 23, 59)
+
+        #expect(formatter.string(for: reset, period: .weekly, now: now) == "23:59")
+    }
+
+    @Test("周限额不足 24 小时但不是当天时仍显示日期")
+    func weeklyUnder24HoursOnFutureDayShowsDateOnly() {
         let formatter = ResetTimeFormatter(locale: locale, timeZone: timeZone)
         let now = date(2026, 6, 15, 10, 0)
         let reset = date(2026, 6, 16, 9, 59)
+        let result = formatter.string(for: reset, period: .weekly, now: now)
 
-        #expect(formatter.string(for: reset, period: .weekly, now: now) == "09:59")
+        #expect(result.contains("6"))
+        #expect(result.contains("16"))
+        #expect(!result.contains(":"))
     }
 
     @Test("周限额达到 24 小时只显示日期")

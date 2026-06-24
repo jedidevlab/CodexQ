@@ -33,7 +33,7 @@ struct ResetTimeFormatter {
         case .fiveHour:
             return timeFormatter.string(from: resetDate)
         case .weekly:
-            if resetDate.timeIntervalSince(now) < 24 * 60 * 60 {
+            if calendar.isDate(resetDate, inSameDayAs: now) {
                 return timeFormatter.string(from: resetDate)
             }
             return dateFormatter.string(from: resetDate)
