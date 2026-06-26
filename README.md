@@ -1,82 +1,76 @@
 # CodexQ
 
-CodexQ is a lightweight macOS menu bar app for monitoring Codex usage quotas.
-It shows 5-hour and weekly quota progress, remaining percentage, projected
-run-out time, refresh status, and optional quota warnings.
+[English](README.en.md)
 
-## Features
+CodexQ 是一款 macOS 菜单栏工具，用于实时查看 Codex 额度使用情况，展示 5 小时与周限额进度、剩余额度、预测耗尽时间，并支持额度预警与自动刷新。
 
-- macOS menu bar quota indicator
-- 5-hour and weekly quota progress bars
-- Pace marker and projected run-out time
-- Manual and automatic refresh
-- Optional launch at login
-- Optional quota warning notifications
-- Native SwiftUI/AppKit floating panel
+## 功能
 
-## Requirements
+- macOS 菜单栏额度指示器
+- 5 小时与周限额进度条
+- 剩余额度百分比
+- 按当前使用节奏预测耗尽时间
+- 手动刷新与自动刷新
+- 登录时启动
+- 额度预警通知
+- 原生 SwiftUI/AppKit 浮动窗口
 
-- macOS 13 or later
-- Apple Silicon Mac for the `arm64` release build, or Intel Mac for the
-  `x86_64` release build
-- Swift 6 toolchain
-- Codex app installed at `/Applications/Codex.app`
+## 系统要求
 
-## Download
+- macOS 13 或更新版本
+- 已安装 Codex app，路径为 `/Applications/Codex.app`
+- 如需本地构建，需要 Swift 6 工具链
 
-Choose the release archive that matches your Mac:
+## 下载
 
-- Apple Silicon Mac (M1 or later): `CodexQ-1.0.0-arm64.zip`
-- Intel Mac: `CodexQ-1.0.0-x86_64.zip`
+在 GitHub Releases 中选择与你的 Mac 匹配的安装包：
 
-Unzip the archive, then move `CodexQ.app` to Applications.
+- Apple Silicon Mac：`CodexQ-1.0.2-arm64.zip`
+- Intel Mac：`CodexQ-1.0.2-x86_64.zip`
 
-The release builds are ad-hoc signed and not notarized. On first launch, macOS
-may require right-clicking the app and choosing Open.
+下载后解压，将 `CodexQ.app` 移动到“应用程序”文件夹。
 
-发布版本使用 ad-hoc 签名，未经过 notarization 公证。首次启动时，macOS
-可能需要右键点击 app 并选择打开。
+当前发布包使用 ad-hoc 签名，未经过 notarization 公证。首次启动时，macOS 可能需要右键点击 app 并选择“打开”。
 
-## Build and Run
+## 本地运行
 
 ```bash
 ./script/build_and_run.sh
 ```
 
-Verify that the app starts:
+验证 app 是否成功启动：
 
 ```bash
 ./script/build_and_run.sh --verify
 ```
 
-Run tests:
+运行测试：
 
 ```bash
 swift test
 ```
 
-## Package a Release
+## 打包 Release
 
-Generate a ZIP archive for GitHub Releases using the current Mac's architecture:
-
-```bash
-./script/package_release.sh 1.0.0
-```
-
-Pass an architecture explicitly when needed:
+按当前 Mac 架构生成 GitHub Release zip：
 
 ```bash
-./script/package_release.sh 1.0.0 arm64
-./script/package_release.sh 1.0.0 x86_64
+./script/package_release.sh 1.0.2
 ```
 
-The archive is written to:
+也可以显式指定架构：
+
+```bash
+./script/package_release.sh 1.0.2 arm64
+./script/package_release.sh 1.0.2 x86_64
+```
+
+生成文件位于：
 
 ```text
-dist/CodexQ-1.0.0-<arch>.zip
+dist/CodexQ-1.0.2-<arch>.zip
 ```
 
-## Packaging Note
+## 打包说明
 
-The helper script builds a local `.app` bundle in `dist/CodexQ.app` for
-development use. Generated build artifacts are intentionally excluded from Git.
+开发运行脚本会在 `dist/CodexQ.app` 生成本地 `.app` bundle。构建产物不会提交到 Git。
