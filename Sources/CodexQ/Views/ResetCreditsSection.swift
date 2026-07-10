@@ -57,7 +57,7 @@ struct ResetCreditsSection: View {
                                     .fixedSize(horizontal: true, vertical: false)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.vertical, 4)
+                            .padding(.vertical, 1)
 
                             if row.id != presentation.rows.last?.id {
                                 Divider()
