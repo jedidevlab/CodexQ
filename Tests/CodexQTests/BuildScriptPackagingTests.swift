@@ -7,6 +7,8 @@ struct BuildScriptPackagingTests {
         let script = try String(contentsOfFile: "script/build_and_run.sh", encoding: .utf8)
 
         #expect(script.contains("cp \"$ROOT_DIR/Sources/CodexQ/Resources/MenuBarIcon.png\" \"$APP_RESOURCES/MenuBarIcon.png\""))
+        #expect(script.contains("/usr/bin/codesign --force --sign - \"$APP_BUNDLE\""))
+        #expect(script.contains("/usr/bin/codesign --verify --strict --verbose=2 \"$APP_BUNDLE\""))
         #expect(!script.contains("cp -R \"$RESOURCE_BUNDLE\" \"$APP_BUNDLE/\""))
     }
 

@@ -18,7 +18,7 @@ CodexQ is a macOS menu bar utility for monitoring Codex quota usage in real time
 ## Requirements
 
 - macOS 13 or later
-- Codex app installed at `/Applications/Codex.app`
+- ChatGPT app installed at `/Applications/ChatGPT.app` (legacy `/Applications/Codex.app` is also supported)
 - Swift 6 toolchain for local builds
 
 ## Download

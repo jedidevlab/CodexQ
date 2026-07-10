@@ -18,7 +18,7 @@ CodexQ 是一款 macOS 菜单栏工具，用于实时查看 Codex 额度使用�
 ## 系统要求
 
 - macOS 13 或更新版本
-- 已安装 Codex app，路径为 `/Applications/Codex.app`
+- 已安装 ChatGPT app，路径为 `/Applications/ChatGPT.app`（同时兼容旧版 `/Applications/Codex.app`）
 - 如需本地构建，需要 Swift 6 工具链
 
 ## 下载

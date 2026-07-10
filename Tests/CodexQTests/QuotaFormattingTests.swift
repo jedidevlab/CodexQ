@@ -232,6 +232,67 @@ struct QuotaFormattingTests {
 }
 
 struct AppServerClientTests {
+    @Test("缺少候选程序时错误提示同时涵盖新旧应用")
+    func missingExecutableMessageCoversCurrentAndLegacyApps() {
+        #expect(AppServerClient.ClientError.executableMissing.errorDescription
+            == "未找到 ChatGPT/Codex app-server")
+    }
+
+    @Test("默认候选优先新版 ChatGPT 并兼容旧版 Codex")
+    func defaultCandidatesCoverCurrentAndLegacyApps() {
+        #expect(AppServerClient.defaultExecutableURLs.map(\.path) == [
+            "/Applications/ChatGPT.app/Contents/Resources/codex",
+            "/Applications/Codex.app/Contents/Resources/codex"
+        ])
+    }
+
+    @Test("优先使用候选列表中的第一个可执行文件")
+    func firstExecutableCandidateWins() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let first = directory.appendingPathComponent("first-codex")
+        let second = directory.appendingPathComponent("second-codex")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        for executable in [first, second] {
+            try Data("#!/bin/sh\n".utf8).write(to: executable)
+            try FileManager.default.setAttributes(
+                [.posixPermissions: 0o755],
+                ofItemAtPath: executable.path
+            )
+        }
+
+        #expect(AppServerClient.firstExecutableURL(in: [first, second]) == first)
+    }
+
+    @Test("首个候选不可执行时回退到后续候选")
+    func fallsBackToNextExecutableCandidate() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let first = directory.appendingPathComponent("first-codex")
+        let second = directory.appendingPathComponent("second-codex")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        try Data("not executable\n".utf8).write(to: first)
+        try Data("#!/bin/sh\n".utf8).write(to: second)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o755],
+            ofItemAtPath: second.path
+        )
+
+        #expect(AppServerClient.firstExecutableURL(in: [first, second]) == second)
+    }
+
+    @Test("没有可执行候选时返回空")
+    func noExecutableCandidateReturnsNil() {
+        let missing = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+
+        #expect(AppServerClient.firstExecutableURL(in: [missing]) == nil)
+    }
+
     @Test("app-server 不响应时刷新会超时返回")
     func unresponsiveServerTimesOut() async throws {
         let directory = FileManager.default.temporaryDirectory

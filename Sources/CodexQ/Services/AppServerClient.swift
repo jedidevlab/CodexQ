@@ -13,7 +13,7 @@ struct AppServerClient: Sendable {
         var errorDescription: String? {
             switch self {
             case .executableMissing:
-                return "未找到 Codex app-server"
+                return "未找到 ChatGPT/Codex app-server"
             case .launchFailed(let message):
                 return "无法启动 Codex app-server：\(message)"
             case .serverClosed:
@@ -28,17 +28,27 @@ struct AppServerClient: Sendable {
         }
     }
 
-    private let executableURL: URL
+    static let defaultExecutableURLs = [
+        URL(fileURLWithPath: "/Applications/ChatGPT.app/Contents/Resources/codex"),
+        URL(fileURLWithPath: "/Applications/Codex.app/Contents/Resources/codex")
+    ]
+
+    private let executableURLs: [URL]
     private let responseTimeout: TimeInterval
 
     init(
-        executableURL: URL = URL(
-            fileURLWithPath: "/Applications/Codex.app/Contents/Resources/codex"
-        ),
+        executableURL: URL? = nil,
         responseTimeout: TimeInterval = 10
     ) {
-        self.executableURL = executableURL
+        executableURLs = executableURL.map { [$0] } ?? Self.defaultExecutableURLs
         self.responseTimeout = responseTimeout
+    }
+
+    static func firstExecutableURL(
+        in candidates: [URL],
+        fileManager: FileManager = .default
+    ) -> URL? {
+        candidates.first { fileManager.isExecutableFile(atPath: $0.path) }
     }
 
     func readRateLimits() async throws -> QuotaSnapshot {
@@ -48,7 +58,7 @@ struct AppServerClient: Sendable {
     }
 
     private func readRateLimitsSynchronously() throws -> QuotaSnapshot {
-        guard FileManager.default.isExecutableFile(atPath: executableURL.path) else {
+        guard let executableURL = Self.firstExecutableURL(in: executableURLs) else {
             throw ClientError.executableMissing
         }
 
