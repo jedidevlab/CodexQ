@@ -175,7 +175,8 @@ struct ResetCreditUISafetyTests {
             encoding: .utf8
         )
 
-        #expect(source.contains(".padding(.bottom, 2)"))
-        #expect(!source.contains(".padding(.vertical, 6)"))
+        #expect(source.contains(".padding(.vertical, 4)"))
+        #expect(!source.contains(".padding(.top, 5)"))
+        #expect(!source.contains(".padding(.bottom, 2)"))
     }
 }
