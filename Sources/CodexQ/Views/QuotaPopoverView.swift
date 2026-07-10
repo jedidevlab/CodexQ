@@ -68,11 +68,10 @@ struct QuotaPopoverView: View {
 
             if let resetCredits = store.snapshot?.resetCredits {
                 Divider()
-                VStack(alignment: .leading, spacing: 2) {
-                    ResetCreditsSection(summary: resetCredits)
-                    Divider()
-                }
+                ResetCreditsSection(summary: resetCredits)
             }
+
+            Divider()
 
             EmbeddedSettingsView(
                 settings: settings,

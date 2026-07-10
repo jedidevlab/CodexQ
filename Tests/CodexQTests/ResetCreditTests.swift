@@ -156,16 +156,18 @@ struct ResetCreditUISafetyTests {
         #expect(!source.contains("使用重置"))
     }
 
-    @Test("重置到期时间与标题同行并保持右侧可见")
+    @Test("重置标题与到期时间同行并右对齐")
     func resetCreditRowKeepsExpiryAlongsideTitle() throws {
         let source = try String(
             contentsOfFile: "Sources/CodexQ/Views/ResetCreditsSection.swift",
             encoding: .utf8
         )
 
+        #expect(source.contains("HStack(alignment: .firstTextBaseline, spacing: 8)"))
         #expect(source.contains(".layoutPriority(1)"))
         #expect(source.contains("Spacer(minLength: 8)"))
         #expect(source.contains(".fixedSize(horizontal: true, vertical: false)"))
+        #expect(source.contains(".padding(.vertical, 6)"))
     }
 
     @Test("重置记录下方与分割线保持紧凑间距")
@@ -175,20 +177,21 @@ struct ResetCreditUISafetyTests {
             encoding: .utf8
         )
 
-        #expect(source.contains(".padding(.vertical, 1)"))
-        #expect(!source.contains(".padding(.vertical, 4)"))
+        #expect(source.contains(".padding(.vertical, 6)"))
+        #expect(!source.contains(".padding(.vertical, 1)"))
         #expect(!source.contains(".padding(.top, 5)"))
         #expect(!source.contains(".padding(.bottom, 2)"))
     }
 
-    @Test("重置区与下方分割线使用紧凑间距")
-    func resetCreditSectionCompactsFollowingDivider() throws {
+    @Test("重置区沿用原始外层分割线布局")
+    func resetCreditSectionKeepsOriginalDividerLayout() throws {
         let source = try String(
             contentsOfFile: "Sources/CodexQ/Views/QuotaPopoverView.swift",
             encoding: .utf8
         )
 
-        #expect(source.contains("VStack(alignment: .leading, spacing: 2)"))
         #expect(source.contains("ResetCreditsSection(summary: resetCredits)"))
+        #expect(!source.contains("VStack(alignment: .leading, spacing: 2)"))
+        #expect(source.contains("\n            Divider()\n\n            EmbeddedSettingsView"))
     }
 }
