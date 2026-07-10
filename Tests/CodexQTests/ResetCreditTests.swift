@@ -155,4 +155,16 @@ struct ResetCreditUISafetyTests {
         #expect(!source.contains("rateLimitResetCredit/consume"))
         #expect(!source.contains("使用重置"))
     }
+
+    @Test("重置到期时间与标题同行并保持右侧可见")
+    func resetCreditRowKeepsExpiryAlongsideTitle() throws {
+        let source = try String(
+            contentsOfFile: "Sources/CodexQ/Views/ResetCreditsSection.swift",
+            encoding: .utf8
+        )
+
+        #expect(source.contains(".layoutPriority(1)"))
+        #expect(source.contains("Spacer(minLength: 8)"))
+        #expect(source.contains(".fixedSize(horizontal: true, vertical: false)"))
+    }
 }

@@ -45,13 +45,16 @@ struct ResetCreditsSection: View {
                 } else {
                     VStack(alignment: .leading, spacing: 0) {
                         ForEach(presentation.rows) { row in
-                            VStack(alignment: .leading, spacing: 3) {
+                            HStack(alignment: .firstTextBaseline, spacing: 8) {
                                 Text(row.title)
                                     .font(.caption)
                                     .lineLimit(1)
+                                    .layoutPriority(1)
+                                Spacer(minLength: 8)
                                 Text(row.detail)
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: true, vertical: false)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.vertical, 6)
