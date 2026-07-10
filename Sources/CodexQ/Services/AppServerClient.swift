@@ -116,9 +116,8 @@ struct AppServerClient: Sendable {
 
         let data = try JSONSerialization.data(withJSONObject: result)
         let decoded = try JSONDecoder().decode(RateLimitsResponse.self, from: data)
-        let limits = decoded.preferredSnapshot
 
-        guard let snapshot = limits.quotaSnapshot else {
+        guard let snapshot = decoded.quotaSnapshot else {
             throw ClientError.missingRateLimits
         }
         return snapshot
