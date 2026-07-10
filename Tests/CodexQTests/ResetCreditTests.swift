@@ -180,4 +180,15 @@ struct ResetCreditUISafetyTests {
         #expect(!source.contains(".padding(.top, 5)"))
         #expect(!source.contains(".padding(.bottom, 2)"))
     }
+
+    @Test("重置区与下方分割线使用紧凑间距")
+    func resetCreditSectionCompactsFollowingDivider() throws {
+        let source = try String(
+            contentsOfFile: "Sources/CodexQ/Views/QuotaPopoverView.swift",
+            encoding: .utf8
+        )
+
+        #expect(source.contains("VStack(alignment: .leading, spacing: 2)"))
+        #expect(source.contains("ResetCreditsSection(summary: resetCredits)"))
+    }
 }
