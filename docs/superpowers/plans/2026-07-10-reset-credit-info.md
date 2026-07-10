@@ -31,7 +31,7 @@
 - 输出：`QuotaSnapshot.resetCredits: ResetCreditsSummary?`
 - 输出：`ResetCreditsSummary.availableCredits: [ResetCredit]`
 
-- [ ] **步骤 1：编写失败测试**
+- [x] **步骤 1：编写失败测试**
 
 在 `ResetCreditTests.swift` 中加入：
 
@@ -104,13 +104,13 @@ struct ResetCreditDecodingTests {
 }
 ```
 
-- [ ] **步骤 2：确认测试因缺少模型而失败**
+- [x] **步骤 2：确认测试因缺少模型而失败**
 
 运行：`swift test --filter ResetCreditDecodingTests`
 
 预期：编译失败，提示 `QuotaSnapshot` 没有 `resetCredits` 或找不到 `ResetCreditsSummary`。
 
-- [ ] **步骤 3：实现最小数据模型与响应映射**
+- [x] **步骤 3：实现最小数据模型与响应映射**
 
 在 `QuotaSnapshot.swift` 增加：
 
@@ -211,13 +211,13 @@ guard let snapshot = decoded.quotaSnapshot else {
 return snapshot
 ```
 
-- [ ] **步骤 4：运行聚焦测试并确认通过**
+- [x] **步骤 4：运行聚焦测试并确认通过**
 
 运行：`swift test --filter ResetCreditDecodingTests`
 
 预期：4 个测试通过。
 
-- [ ] **步骤 5：提交数据层变更**
+- [x] **步骤 5：提交数据层变更**
 
 ```bash
 git add Sources/CodexQ/Models/QuotaSnapshot.swift Sources/CodexQ/Services/AppServerClient.swift Tests/CodexQTests/ResetCreditTests.swift
@@ -234,7 +234,7 @@ git commit -m "Decode reset credit information"
 - 输入：`ResetCreditsSummary`、时区
 - 输出：`ResetCreditPresentation(countText:rows:emptyMessage:)`
 
-- [ ] **步骤 1：编写失败测试**
+- [x] **步骤 1：编写失败测试**
 
 加入标题优先级、到期日期、0 次和无明细测试：
 
@@ -273,13 +273,13 @@ struct ResetCreditPresentationTests {
 }
 ```
 
-- [ ] **步骤 2：确认测试因缺少 presentation 而失败**
+- [x] **步骤 2：确认测试因缺少 presentation 而失败**
 
 运行：`swift test --filter ResetCreditPresentationTests`
 
 预期：编译失败，提示找不到 `ResetCreditPresentation`。
 
-- [ ] **步骤 3：实现展示类型**
+- [x] **步骤 3：实现展示类型**
 
 ```swift
 import Foundation
@@ -333,13 +333,13 @@ struct ResetCreditPresentation: Equatable {
 }
 ```
 
-- [ ] **步骤 4：运行聚焦测试并确认通过**
+- [x] **步骤 4：运行聚焦测试并确认通过**
 
 运行：`swift test --filter ResetCreditPresentationTests`
 
 预期：3 个测试通过。
 
-- [ ] **步骤 5：提交展示逻辑**
+- [x] **步骤 5：提交展示逻辑**
 
 ```bash
 git add Sources/CodexQ/Support/ResetCreditPresentation.swift Tests/CodexQTests/ResetCreditTests.swift
@@ -357,7 +357,7 @@ git commit -m "Format reset credit information"
 - 输入：`ResetCreditsSummary`
 - 输出：默认收起的 `ResetCreditsSection`
 
-- [ ] **步骤 1：添加安全边界测试**
+- [x] **步骤 1：添加安全边界测试**
 
 ```swift
 struct ResetCreditUISafetyTests {
@@ -375,7 +375,7 @@ struct ResetCreditUISafetyTests {
 
 测试文件尚不存在时运行并确认失败。
 
-- [ ] **步骤 2：实现 `ResetCreditsSection`**
+- [x] **步骤 2：实现 `ResetCreditsSection`**
 
 创建独立 SwiftUI 视图：
 
@@ -450,7 +450,7 @@ struct ResetCreditsSection: View {
 
 徽标有次数时使用绿色背景，0 次时使用次要灰色；行标题单行截断，到期信息使用次要 caption 样式。
 
-- [ ] **步骤 3：接入现有弹窗**
+- [x] **步骤 3：接入现有弹窗**
 
 在 `QuotaPopoverView` 的额度区和设置区之间加入：
 
@@ -463,13 +463,13 @@ if let resetCredits = store.snapshot?.resetCredits {
 
 保留设置区前原有 `Divider()`，因此缺少字段时布局不变。
 
-- [ ] **步骤 4：运行聚焦测试和编译验证**
+- [x] **步骤 4：运行聚焦测试和编译验证**
 
 运行：`swift test --filter ResetCredit`
 
 预期：所有限额重置测试通过，SwiftUI 新文件编译成功。
 
-- [ ] **步骤 5：提交界面变更**
+- [x] **步骤 5：提交界面变更**
 
 ```bash
 git add Sources/CodexQ/Views/ResetCreditsSection.swift Sources/CodexQ/Views/QuotaPopoverView.swift Tests/CodexQTests/ResetCreditTests.swift
@@ -485,9 +485,9 @@ git commit -m "Show reset credit information"
 - 输入：任务 1 至任务 3 的完整实现
 - 输出：可运行、可打包的菜单栏应用
 
-- [ ] 运行 `swift test`，要求 0 失败、0 跳过。
-- [ ] 运行 `swift build -c release -Xswiftc -warnings-as-errors`，要求退出码 0。
-- [ ] 运行 `./script/build_and_run.sh --verify`，要求 CodexQ 进程启动且 app bundle 签名通过。
-- [ ] 通过真实 `account/rateLimits/read` 验证返回的 `availableCount` 与缓存中的 `resetCredits` 一致。
-- [ ] 搜索 `account/rateLimitResetCredit/consume` 和“使用重置”，确认生产代码中不存在消耗入口。
-- [ ] 运行 `git diff --check`，检查提交历史和工作区状态。
+- [x] 运行 `swift test`，要求 0 失败、0 跳过。
+- [x] 运行 `swift build -c release -Xswiftc -warnings-as-errors`，要求退出码 0。
+- [x] 运行 `./script/build_and_run.sh --verify`，要求 CodexQ 进程启动且 app bundle 签名通过。
+- [x] 通过真实 `account/rateLimits/read` 验证返回的 `availableCount` 与缓存中的 `resetCredits` 一致。
+- [x] 搜索 `account/rateLimitResetCredit/consume` 和“使用重置”，确认生产代码中不存在消耗入口。
+- [x] 运行 `git diff --check`，检查提交历史和工作区状态。
