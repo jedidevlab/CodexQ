@@ -79,3 +79,67 @@ struct ResetCreditDecodingTests {
         #expect(summary.availableCredits.map(\.id) == ["a"])
     }
 }
+
+struct ResetCreditPresentationTests {
+    @Test("展示内容优先使用后端标题并格式化到期日")
+    func presentsBackendTitleAndExpiry() throws {
+        let expiry = Date(timeIntervalSince1970: 1_784_260_800)
+        let summary = ResetCreditsSummary(
+            availableCount: 1,
+            credits: [
+                ResetCredit(
+                    id: "a",
+                    resetType: "codexRateLimits",
+                    status: "available",
+                    title: "Full reset",
+                    expiresAt: expiry
+                )
+            ]
+        )
+        let presentation = ResetCreditPresentation(
+            summary: summary,
+            timeZone: TimeZone(secondsFromGMT: 8 * 60 * 60)!
+        )
+
+        #expect(presentation.countText == "可用 1 次")
+        #expect(presentation.rows.first?.title == "Full reset")
+        #expect(presentation.rows.first?.detail == "将于 7/17 到期")
+    }
+
+    @Test("标题缺失时使用中文兜底")
+    func fallsBackWhenTitleIsMissing() {
+        let known = ResetCredit(
+            id: "a",
+            resetType: "codexRateLimits",
+            status: "available",
+            title: nil,
+            expiresAt: nil
+        )
+        let unknown = ResetCredit(
+            id: "b",
+            resetType: "unknown",
+            status: "available",
+            title: "  ",
+            expiresAt: nil
+        )
+        let presentation = ResetCreditPresentation(
+            summary: ResetCreditsSummary(
+                availableCount: 2,
+                credits: [known, unknown]
+            )
+        )
+
+        #expect(presentation.rows.map(\.title) == ["完整额度重置", "额度重置"])
+        #expect(presentation.rows.allSatisfy { $0.detail == "无到期时间" })
+    }
+
+    @Test("空状态区分无可用次数与无明细")
+    func distinguishesEmptyStates() {
+        #expect(ResetCreditPresentation(
+            summary: ResetCreditsSummary(availableCount: 0, credits: [])
+        ).emptyMessage == "暂无可用重置")
+        #expect(ResetCreditPresentation(
+            summary: ResetCreditsSummary(availableCount: 2, credits: nil)
+        ).emptyMessage == "暂无详细信息")
+    }
+}
