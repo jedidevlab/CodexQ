@@ -167,4 +167,15 @@ struct ResetCreditUISafetyTests {
         #expect(source.contains("Spacer(minLength: 8)"))
         #expect(source.contains(".fixedSize(horizontal: true, vertical: false)"))
     }
+
+    @Test("重置记录下方与分割线保持紧凑间距")
+    func resetCreditRowUsesCompactBottomSpacing() throws {
+        let source = try String(
+            contentsOfFile: "Sources/CodexQ/Views/ResetCreditsSection.swift",
+            encoding: .utf8
+        )
+
+        #expect(source.contains(".padding(.bottom, 2)"))
+        #expect(!source.contains(".padding(.vertical, 6)"))
+    }
 }
