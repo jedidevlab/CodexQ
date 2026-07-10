@@ -1,118 +1,94 @@
-# Reset Credit Information Design
+# 限额重置信息设计
 
-## Goal
+## 目标
 
-Show Codex rate-limit reset-credit information in the existing menu-bar popover
-without allowing CodexQ to consume a credit. Users can see the authoritative
-available count and inspect available credit details without leaving the quota
-surface.
+在现有菜单栏弹窗中展示 Codex 限额重置次数和每次重置的到期信息。该功能只负责展示，不能在 CodexQ 内消耗重置次数。
 
-## Non-goals
+所有用户可见文字必须使用中文。后端返回的英文标题和描述不直接显示。
 
-- Do not call `account/rateLimitResetCredit/consume`.
-- Do not render a “使用重置” button or any other credit-spending action.
-- Do not add a separate refresh loop or network request.
-- Do not change quota calculations, notifications, or menu-bar title behavior.
+## 不在本次范围内
 
-## Source Data
+- 不调用 `account/rateLimitResetCredit/consume`。
+- 不显示“使用重置”按钮，也不提供任何会消耗重置次数的操作。
+- 不增加单独的刷新循环或网络请求。
+- 不修改现有额度计算、通知和菜单栏标题逻辑。
 
-The existing `account/rateLimits/read` response includes an optional top-level
-`rateLimitResetCredits` object:
+## 数据来源
 
-- `availableCount`: authoritative number of available credits.
-- `credits`: optional detail rows. The backend may omit this array or return
-  fewer rows than `availableCount`.
-- Each detail row provides `id`, `resetType`, `status`, optional `title`, and
-  optional `expiresAt` as a Unix timestamp.
+现有 `account/rateLimits/read` 响应包含可选的顶层字段 `rateLimitResetCredits`：
 
-CodexQ will continue using the same app-server process and JSON-RPC request. The
-experimental consume method is explicitly outside this feature.
+- `availableCount`：后端确认的可用次数。
+- `credits`：可选的明细数组。后端可能不返回明细，或只返回少于可用次数的部分明细。
+- 每条明细提供 `id`、`resetType`、`status` 和可选的 `expiresAt` Unix 时间戳。
 
-## Domain Model and Decoding
+CodexQ 继续使用当前 app-server 进程和 JSON-RPC 请求。本功能不接入实验性的消耗接口。
 
-`QuotaSnapshot` gains an optional `resetCredits` value so existing callers and
-old cache files remain valid. The new value contains:
+## 数据模型与解析
+
+`QuotaSnapshot` 增加可选的 `resetCredits`，确保现有调用方和旧缓存仍能使用。新模型包含：
 
 - `availableCount: Int`
 - `credits: [ResetCredit]?`
 
-Each `ResetCredit` contains the fields needed for display: `id`, `resetType`,
-`status`, optional `title`, and optional expiry date. Protocol status and reset
-type remain strings instead of closed Swift enums so a future backend value does
-not break decoding. Only rows whose status is exactly `available` are shown.
+每条 `ResetCredit` 只保存展示所需的 `id`、`resetType`、`status` 和可选到期时间。协议状态和重置类型使用字符串，不定义封闭的 Swift 枚举，避免后端新增值时导致整个额度响应解析失败。
 
-`RateLimitsResponse` decodes `rateLimitResetCredits` beside the existing quota
-fields. `AppServerClient` attaches it to the returned `QuotaSnapshot` before the
-snapshot reaches `QuotaStore`. `SnapshotCache` persists the combined snapshot;
-decoding a cache written by an older version yields `resetCredits == nil`.
+`RateLimitsResponse` 在现有额度字段旁解析 `rateLimitResetCredits`。`AppServerClient` 将其合并到返回的 `QuotaSnapshot`，再交给 `QuotaStore`。`SnapshotCache` 保存合并后的快照；旧版本缓存缺少该字段时解析结果为 `nil`。
 
-## Popover Layout
+## 弹窗布局
 
-When `resetCredits` is non-nil, a reset-credit section appears between the quota
-rows and embedded settings. When the field is absent or null, the section and
-its divider are omitted so older app-server versions keep the current layout.
+当 `resetCredits` 非空时，在额度进度条和设置区域之间显示“限额重置”区块。字段缺失或为 `null` 时，整个区块及其分隔线隐藏，旧版 app-server 保持当前布局。
 
-The section header is always visible and contains:
+区块标题栏始终显示：
 
-- “限额重置” on the left.
-- A compact “可用 N 次” badge on the right.
-- A disclosure chevron.
+- 左侧：“限额重置”。
+- 右侧：“可用 N 次”徽标。
+- 最右侧：展开箭头。
 
-The badge uses green when `availableCount > 0` and a secondary neutral style
-when the count is zero. The whole header toggles expansion. It starts collapsed
-for each view lifetime and does not add a persisted preference.
+`availableCount > 0` 时徽标使用绿色；为 0 时使用中性的次要样式。点击整行标题可展开或收起。每次创建视图时默认收起，不新增持久化设置。
 
-When expanded:
+展开后：
 
-- Show one compact row for each `available` credit detail.
-- Use the backend title when it is non-empty; otherwise show “完整额度重置” for
-  `codexRateLimits` and “额度重置” for unknown reset types.
-- Show “将于 M/D 到期” using the current locale when `expiresAt` is present.
-- Show “无到期时间” when expiry is absent.
-- If `availableCount == 0`, show “暂无可用重置”.
-- If `availableCount > 0` but no available detail rows were supplied, show
-  “暂无详细信息”.
+- 只显示 `status == "available"` 的明细。
+- `resetType == "codexRateLimits"` 时固定显示“完整重置（周限额 + 5 小时）”。
+- 未知重置类型统一显示“额度重置”。
+- 不显示后端提供的英文 `title` 或 `description`。
+- 有到期时间时显示“将于 M月d日到期”。
+- 没有到期时间时显示“无到期时间”。
+- `availableCount == 0` 时显示“暂无可用重置”。
+- 可用次数大于 0 但没有可展示明细时显示“暂无详细信息”。
 
-The header count always comes from `availableCount`, never from the detail-row
-count, because the backend may cap or omit the list. No row contains a button,
-context menu, gesture, or other action that can consume a credit.
+标题栏次数始终使用 `availableCount`，不能根据明细行数推算，因为后端可能限制或省略明细。所有行均不包含按钮、菜单、手势或其他会消耗重置次数的操作。
 
-## Formatting
+## 日期格式
 
-A focused reset-credit expiry formatter owns the short `M/d` date text and is
-tested independently. The view supplies the “将于 … 到期” and “无到期时间”
-labels. This avoids coupling reset-credit dates to the existing five-hour and
-weekly reset formatter.
+新增独立的限额重置到期日期格式化逻辑，输出中文 `M月d日`。视图负责组合“将于……到期”和“无到期时间”。该逻辑不复用现有 5 小时与周限额重置时间格式化器，避免两类日期规则互相耦合。
 
-## Error and Compatibility Behavior
+## 异常与兼容处理
 
-- Missing or null `rateLimitResetCredits`: hide the section; quota refresh still
-  succeeds.
-- Missing detail array: preserve and display the authoritative count.
-- Unknown status: retain in the model but do not display it as available.
-- Unknown reset type: use the generic fallback title.
-- Old cache without the new field: decode successfully and hide the section
-  until the next refresh supplies data.
-- Normal app-server, timeout, and quota-decoding errors keep their current UI.
+- `rateLimitResetCredits` 缺失或为 `null`：隐藏区块，额度刷新仍成功。
+- 明细数组缺失：保留并展示后端返回的可用次数。
+- 未知状态：保留在模型中，但不作为可用明细展示。
+- 未知重置类型：使用中文通用标题“额度重置”。
+- 旧缓存缺少新字段：正常解析，下一次刷新取得数据前隐藏区块。
+- app-server 启动、超时和额度解析错误继续使用现有处理方式。
 
-## Testing
+## 测试范围
 
-Tests will cover:
+测试需要覆盖：
 
-- Decoding count, detail rows, titles, statuses, reset types, and expiry dates.
-- Missing and null reset-credit data.
-- Old cached snapshot compatibility.
-- Filtering only `available` rows without changing `availableCount`.
-- Fallback titles for missing titles and unknown reset types.
-- Expiry formatting and missing-expiry copy.
-- Zero-count and count-without-details display states.
-- The existing full test suite, release build, signed app bundle, and live
-  `account/rateLimits/read` refresh path.
+- 可用次数、明细、状态、重置类型和到期时间的解析。
+- 字段缺失和 `null` 的情况。
+- 旧缓存快照兼容性。
+- 只筛选 `available` 明细，同时不改变 `availableCount`。
+- 已知与未知重置类型的中文标题。
+- 中文到期日期及缺少到期时间的文案。
+- 0 次和有次数但无明细的展示状态。
+- 现有全量测试、Release 构建、签名后的 app bundle，以及真实 `account/rateLimits/read` 刷新链路。
 
-## Success Criteria
+## 完成标准
 
-- The popover shows “可用 N 次” whenever the server returns reset-credit data.
-- Expanding the section shows only available details and their expiry state.
-- CodexQ never sends a consume request.
-- Existing quota display, old caches, and older app-server responses continue to
-  work unchanged.
+- 服务端返回重置信息时，弹窗显示“可用 N 次”。
+- 展开后只显示可用明细，并以中文显示重置类型和到期状态。
+- 限额重置区域不出现任何英文后端标题或描述。
+- CodexQ 永远不发送消耗重置次数的请求。
+- 现有额度展示、旧缓存和旧版 app-server 响应保持正常。
