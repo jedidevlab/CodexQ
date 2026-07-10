@@ -143,3 +143,16 @@ struct ResetCreditPresentationTests {
         ).emptyMessage == "暂无详细信息")
     }
 }
+
+struct ResetCreditUISafetyTests {
+    @Test("限额重置界面不接入消耗操作")
+    func resetCreditUIContainsNoConsumeAction() throws {
+        let source = try String(
+            contentsOfFile: "Sources/CodexQ/Views/ResetCreditsSection.swift",
+            encoding: .utf8
+        )
+
+        #expect(!source.contains("rateLimitResetCredit/consume"))
+        #expect(!source.contains("使用重置"))
+    }
+}
