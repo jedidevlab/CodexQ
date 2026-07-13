@@ -80,7 +80,7 @@ struct QuotaPopoverView: View {
             TokenActivitySection(
                 snapshot: store.tokenActivity,
                 errorMessage: store.tokenActivityErrorMessage,
-                isRefreshing: store.isRefreshing,
+                isRefreshing: store.isTokenActivityRefreshing,
                 now: relativeTimeNow
             )
 

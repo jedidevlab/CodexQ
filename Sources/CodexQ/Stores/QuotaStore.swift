@@ -7,16 +7,16 @@ final class QuotaStore: ObservableObject {
     @Published private(set) var errorMessage: String?
     @Published private(set) var tokenActivity: TokenActivitySnapshot?
     @Published private(set) var tokenActivityErrorMessage: String?
+    @Published private(set) var isTokenActivityRefreshing = false
     @Published private(set) var lastUpdatedAt: Date?
     @Published private(set) var isPopoverPresented = false
 
     private let readRateLimits: () async throws -> QuotaSnapshot
     private let readTokenActivity: () async throws -> TokenActivitySnapshot
     private let saveCachedSnapshot: (CachedQuotaSnapshot) -> Void
-    private let notificationsEnabled: () -> Bool
-    private let settings = AppSettings.shared
-    private let notificationService = QuotaNotificationService()
+    private let notifyQuotaCrossings: (QuotaSnapshot?, QuotaSnapshot) async -> Void
     private var refreshTask: Task<Void, Never>?
+    private var tokenActivityTask: Task<Void, Never>?
 
     init(
         readRateLimits: @escaping () async throws -> QuotaSnapshot = {
@@ -27,12 +27,22 @@ final class QuotaStore: ObservableObject {
         },
         loadCachedSnapshot: () -> CachedQuotaSnapshot? = SnapshotCache.load,
         saveCachedSnapshot: @escaping (CachedQuotaSnapshot) -> Void = SnapshotCache.save,
-        notificationsEnabled: @escaping () -> Bool = { AppSettings.shared.notificationsEnabled }
+        notifyQuotaCrossings: ((QuotaSnapshot?, QuotaSnapshot) async -> Void)? = nil
     ) {
         self.readRateLimits = readRateLimits
         self.readTokenActivity = readTokenActivity
         self.saveCachedSnapshot = saveCachedSnapshot
-        self.notificationsEnabled = notificationsEnabled
+        self.notifyQuotaCrossings = notifyQuotaCrossings ?? { previous, current in
+            let settings = AppSettings.shared
+            guard settings.notificationsEnabled else { return }
+            let service = QuotaNotificationService()
+            await service.requestAuthorization()
+            await service.notifyCrossings(
+                previous: previous,
+                current: current,
+                thresholds: settings.warningThresholds
+            )
+        }
         if let cached = loadCachedSnapshot() {
             snapshot = cached.snapshot
             lastUpdatedAt = cached.updatedAt
@@ -61,6 +71,7 @@ final class QuotaStore: ObservableObject {
     func stop() {
         refreshTask?.cancel()
         refreshTask = nil
+        tokenActivityTask?.cancel()
     }
 
     func setPopoverPresented(_ isPresented: Bool) {
@@ -85,7 +96,6 @@ final class QuotaStore: ObservableObject {
         guard !isRefreshing else { return false }
         isRefreshing = true
         errorMessage = nil
-        tokenActivityErrorMessage = nil
         defer { isRefreshing = false }
 
         var quotaSucceeded = false
@@ -96,27 +106,39 @@ final class QuotaStore: ObservableObject {
             snapshot = newSnapshot
             lastUpdatedAt = updatedAt
             saveCachedSnapshot(CachedQuotaSnapshot(snapshot: newSnapshot, updatedAt: updatedAt))
-            if notificationsEnabled() {
-                await notificationService.requestAuthorization()
-                await notificationService.notifyCrossings(
-                    previous: previousSnapshot,
-                    current: newSnapshot,
-                    thresholds: settings.warningThresholds
-                )
-            }
+            await notifyQuotaCrossings(previousSnapshot, newSnapshot)
             quotaSucceeded = true
         } catch {
             errorMessage = error.localizedDescription
         }
 
-        do {
-            tokenActivity = try await readTokenActivity()
-        } catch {
-            tokenActivity = nil
-            tokenActivityErrorMessage = error.localizedDescription
-        }
+        startTokenActivityRefreshIfNeeded()
 
         return quotaSucceeded
+    }
+
+    private func startTokenActivityRefreshIfNeeded() {
+        guard tokenActivityTask == nil else { return }
+        tokenActivityErrorMessage = nil
+        isTokenActivityRefreshing = true
+
+        tokenActivityTask = Task { [weak self, readTokenActivity] in
+            defer {
+                self?.isTokenActivityRefreshing = false
+                self?.tokenActivityTask = nil
+            }
+            do {
+                let activity = try await readTokenActivity()
+                guard !Task.isCancelled else { return }
+                self?.tokenActivity = activity
+            } catch is CancellationError {
+                return
+            } catch {
+                guard !Task.isCancelled else { return }
+                self?.tokenActivity = nil
+                self?.tokenActivityErrorMessage = error.localizedDescription
+            }
+        }
     }
 }
 

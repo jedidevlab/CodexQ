@@ -6,23 +6,10 @@ struct TokenActivitySection: View {
     let isRefreshing: Bool
     let now: Date
 
-    @State private var mode: Mode = .daily
-
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                Text("Token 活动")
-                    .font(.headline)
-                Spacer()
-                Picker("Token 活动范围", selection: $mode) {
-                    ForEach(Mode.allCases) { mode in
-                        Text(mode.title).tag(mode)
-                    }
-                }
-                .labelsHidden()
-                .pickerStyle(.segmented)
-                .frame(width: 116)
-            }
+            Text("Token 活动")
+                .font(.headline)
 
             content
         }
@@ -38,17 +25,13 @@ struct TokenActivitySection: View {
                 .frame(maxWidth: .infinity, minHeight: 54)
                 .help(errorMessage)
         } else if let snapshot {
-            switch mode {
-            case .daily:
-                DailyTokenActivityGrid(snapshot: snapshot, now: now, calendar: calendar)
-            case .weekly:
-                WeeklyTokenActivityGrid(snapshot: snapshot, now: now, calendar: calendar)
-            }
-
             if snapshot.days.isEmpty {
                 Text("暂无 Token 使用记录")
-                    .font(.caption2)
+                    .font(.caption)
                     .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, minHeight: 36)
+            } else {
+                DailyTokenActivityGrid(snapshot: snapshot, now: now, calendar: calendar)
             }
         } else if isRefreshing {
             ProgressView("正在读取 Token 活动...")
@@ -66,22 +49,6 @@ struct TokenActivitySection: View {
         var calendar = Calendar.autoupdatingCurrent
         calendar.firstWeekday = 2
         return calendar
-    }
-}
-
-private extension TokenActivitySection {
-    enum Mode: String, CaseIterable, Identifiable {
-        case daily
-        case weekly
-
-        var id: Self { self }
-
-        var title: String {
-            switch self {
-            case .daily: return "每日"
-            case .weekly: return "每周"
-            }
-        }
     }
 }
 
@@ -156,59 +123,6 @@ private struct DailyTokenActivityGrid: View {
     }
 }
 
-private struct WeeklyTokenActivityGrid: View {
-    let snapshot: TokenActivitySnapshot
-    let now: Date
-    let calendar: Calendar
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: TokenActivityGridLayout.spacing) {
-            ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
-                HStack(spacing: TokenActivityGridLayout.spacing) {
-                    Text(row.cells.first.map { weekLabel($0.date) } ?? "")
-                        .font(.system(size: 8, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 34, alignment: .trailing)
-                    ForEach(row.cells, id: \.date) { cell in
-                        WeeklyActivitySquare(
-                            cell: cell,
-                            peakTokens: snapshot.peakDailyTokens,
-                            isOutsideRange: cell.date < statisticalStart || cell.date > statisticalEnd
-                        )
-                    }
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private var rows: [TokenActivityWeek] {
-        TokenActivityPresentation.weeklyRows(
-            snapshot: snapshot,
-            now: now,
-            calendar: calendar
-        )
-    }
-
-    private var statisticalEnd: Date {
-        calendar.startOfDay(for: now)
-    }
-
-    private var statisticalStart: Date {
-        guard let lowerMonth = calendar.date(byAdding: .month, value: -1, to: statisticalEnd),
-              let start = calendar.date(
-                from: calendar.dateComponents([.year, .month], from: lowerMonth)
-              ) else {
-            return statisticalEnd
-        }
-        return start
-    }
-
-    private func weekLabel(_ date: Date) -> String {
-        date.formatted(.dateTime.month().day())
-    }
-}
-
 private struct ActivityMonth: Identifiable {
     let start: Date
     let leadingBlankCount: Int
@@ -225,40 +139,27 @@ private struct DailyActivitySquare: View {
         let level = cell.tokens.map {
             TokenActivityLevel.level(tokens: $0, peakTokens: peakTokens)
         }
-        TokenActivitySquare(level: level, isOutsideRange: false)
-            .help(cell.tokens.map {
-                "\(dateText) · \(TokenCountFormatter.string($0))"
-            } ?? "\(dateText) · 无数据")
+        TokenActivitySquare(
+            level: level,
+            accessibilityLabel: dateText,
+            accessibilityValue: tokenText
+        )
+        .help("\(dateText) · \(tokenText)")
     }
 
     private var dateText: String {
         cell.date.formatted(date: .abbreviated, time: .omitted)
     }
-}
 
-private struct WeeklyActivitySquare: View {
-    let cell: TokenActivityCell
-    let peakTokens: Int64
-    let isOutsideRange: Bool
-
-    var body: some View {
-        let level = cell.tokens.map {
-            TokenActivityLevel.level(tokens: $0, peakTokens: peakTokens)
-        }
-        TokenActivitySquare(level: level, isOutsideRange: isOutsideRange)
-            .help(cell.tokens.map {
-                "\(dateText) · \(TokenCountFormatter.string($0))"
-            } ?? "\(dateText) · \(isOutsideRange ? "范围外" : "无数据")")
-    }
-
-    private var dateText: String {
-        cell.date.formatted(date: .abbreviated, time: .omitted)
+    private var tokenText: String {
+        cell.tokens.map(TokenCountFormatter.string) ?? "无数据"
     }
 }
 
 private struct TokenActivitySquare: View {
     let level: Int?
-    let isOutsideRange: Bool
+    let accessibilityLabel: String
+    let accessibilityValue: String
 
     var body: some View {
         RoundedRectangle(cornerRadius: 2)
@@ -267,11 +168,8 @@ private struct TokenActivitySquare: View {
                 if level == nil {
                     RoundedRectangle(cornerRadius: 2)
                         .strokeBorder(
-                            Color.secondary.opacity(isOutsideRange ? 0.2 : 0.1),
-                            style: StrokeStyle(
-                                lineWidth: 0.5,
-                                dash: isOutsideRange ? [2, 1] : []
-                            )
+                            Color.secondary.opacity(0.1),
+                            lineWidth: 0.5
                         )
                 }
             }
@@ -279,11 +177,14 @@ private struct TokenActivitySquare: View {
                 width: TokenActivityGridLayout.squareSize,
                 height: TokenActivityGridLayout.squareSize
             )
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(accessibilityLabel)
+            .accessibilityValue(accessibilityValue)
     }
 
     private var fillColor: Color {
         guard let level else {
-            return isOutsideRange ? .clear : Color.secondary.opacity(0.07)
+            return Color.secondary.opacity(0.07)
         }
         switch level {
         case 0: return Color.secondary.opacity(0.22)

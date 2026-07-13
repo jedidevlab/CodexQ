@@ -35,10 +35,6 @@ struct TokenActivityCell: Equatable, Sendable {
     let tokens: Int64?
 }
 
-struct TokenActivityWeek: Equatable, Sendable {
-    let cells: [TokenActivityCell]
-}
-
 enum TokenActivityPresentation {
     static func dailyCells(
         snapshot: TokenActivitySnapshot,
@@ -51,47 +47,6 @@ enum TokenActivityPresentation {
             return []
         }
         return cells(from: start, through: end, snapshot: snapshot, calendar: calendar)
-    }
-
-    static func weeklyRows(
-        snapshot: TokenActivitySnapshot,
-        now: Date,
-        calendar: Calendar
-    ) -> [TokenActivityWeek] {
-        let statisticalEnd = calendar.startOfDay(for: now)
-        guard let lowerMonth = calendar.date(byAdding: .month, value: -1, to: statisticalEnd),
-              let statisticalStart = calendar.date(
-                from: calendar.dateComponents([.year, .month], from: lowerMonth)
-              ),
-              let paddedStart = calendar.date(
-                byAdding: .day,
-                value: -mondayOffset(for: statisticalStart, calendar: calendar),
-                to: statisticalStart
-              ),
-              let paddedEnd = calendar.date(
-                byAdding: .day,
-                value: sundayOffset(for: statisticalEnd, calendar: calendar),
-                to: statisticalEnd
-              ) else {
-            return []
-        }
-
-        let tokensByDate = tokenLookup(snapshot: snapshot, calendar: calendar)
-        var rows: [TokenActivityWeek] = []
-        var weekStart = paddedStart
-        while weekStart <= paddedEnd {
-            let week = (0..<7).compactMap { offset -> TokenActivityCell? in
-                guard let date = calendar.date(byAdding: .day, value: offset, to: weekStart) else {
-                    return nil
-                }
-                let inRange = date >= statisticalStart && date <= statisticalEnd
-                return TokenActivityCell(date: date, tokens: inRange ? tokensByDate[date] : nil)
-            }
-            rows.append(TokenActivityWeek(cells: week))
-            guard let nextWeek = calendar.date(byAdding: .day, value: 7, to: weekStart) else { break }
-            weekStart = nextWeek
-        }
-        return rows
     }
 
     private static func cells(
@@ -139,14 +94,6 @@ enum TokenActivityPresentation {
             return nil
         }
         return date
-    }
-
-    private static func mondayOffset(for date: Date, calendar: Calendar) -> Int {
-        (calendar.component(.weekday, from: date) + 5) % 7
-    }
-
-    private static func sundayOffset(for date: Date, calendar: Calendar) -> Int {
-        (8 - calendar.component(.weekday, from: date)) % 7
     }
 }
 

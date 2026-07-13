@@ -43,31 +43,6 @@ struct TokenActivityTests {
         }
     }
 
-    @Test("周历模式按完整周补齐两个月统计范围")
-    func weeklyRowsKeepTwoMonthsAndSevenDailyCells() throws {
-        let now = try date("2026-07-13")
-        let june1 = try date("2026-06-01")
-        let july19 = try date("2026-07-19")
-        let fixture = TokenActivitySnapshot(
-            peakDailyTokens: 2_000,
-            days: [.init(startDate: "2026-06-01", tokens: 1_200)]
-        )
-        let rows = TokenActivityPresentation.weeklyRows(
-            snapshot: fixture,
-            now: now,
-            calendar: utcCalendar
-        )
-
-        #expect(rows.first?.cells.count == 7)
-        #expect(rows.allSatisfy { $0.cells.count == 7 })
-        #expect(rows.allSatisfy { row in
-            row.cells.first.map { utcCalendar.component(.weekday, from: $0.date) == 2 } == true
-        })
-        #expect(rows.flatMap(\.cells).first(where: { $0.date == june1 })?.tokens == 1_200)
-        #expect(rows.last?.cells.last?.date == july19)
-        #expect(rows.last?.cells.last?.tokens == nil)
-    }
-
     @Test("服务端无效日期不能归一化成另一天的用量")
     func invalidServerDateDoesNotCreateActivity() throws {
         let normalizedDate = try date("2026-03-02")
@@ -100,11 +75,22 @@ struct TokenActivityTests {
         #expect(cells.last?.date == expectedLastDate)
     }
 
-    @Test("日历与周历共享 Token 数量和活动等级规则")
+    @Test("每日方块使用统一 Token 数量和活动等级规则")
     func sharedFormattingAndActivityLevels() {
         #expect(TokenCountFormatter.string(1_200).hasSuffix(" tokens"))
         #expect(TokenActivityLevel.level(tokens: 0, peakTokens: 2_000) == 0)
         #expect(TokenActivityLevel.level(tokens: 2_000, peakTokens: 2_000) == 4)
+    }
+
+    @Test("Token 活动模型不再暴露周视图演示类型")
+    func modelHasNoWeeklyPresentation() throws {
+        let source = try String(
+            contentsOfFile: "Sources/CodexQ/Models/TokenActivity.swift",
+            encoding: .utf8
+        )
+
+        #expect(!source.contains("TokenActivityWeek"))
+        #expect(!source.contains("weeklyRows"))
     }
 
     private func date(_ value: String) throws -> Date {
