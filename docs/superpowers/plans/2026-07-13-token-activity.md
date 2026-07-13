@@ -4,15 +4,14 @@
 
 **Goal:** Add daily and week-grouped account Token activity blocks to the existing CodexQ menu bar popover.
 
-**Architecture:** Read `account/usage/read` from the same local Codex app-server used for rate limits, decode its daily buckets, and keep activity loading/error state independent from quota state. Pure calendar presentation logic produces three-month daily cells and two-month Monday-based week rows; a focused SwiftUI section renders both modes with one formatter and color scale.
+**Architecture:** Read `account/usage/read` from the same local Codex app-server used for rate limits, decode its daily buckets, and keep activity loading/error state independent from quota state. Pure calendar presentation logic produces three-month daily cells; a focused SwiftUI section renders them with one formatter and color scale.
 
 **Tech Stack:** Swift 6, SwiftUI, Foundation `Calendar`, Swift Testing, local Codex app-server JSON-RPC.
 
 ## Global Constraints
 
 - Daily mode shows only the latest 3 calendar months.
-- Weekly mode shows only the latest 2 calendar months, grouped Monday through Sunday without aggregating daily token counts.
-- Both modes use the same token unit, formatter, and color thresholds.
+- All daily cells use the same token unit, formatter, and color thresholds.
 - Missing dates render empty cells; no data may be fabricated.
 - Token activity failure must not prevent quota display or refresh.
 - Do not read or print authentication credentials.
@@ -26,7 +25,7 @@
 - Create: `Tests/CodexQTests/TokenActivityTests.swift`
 
 **Interfaces:**
-- Produces: `TokenActivitySnapshot`, `TokenActivityDay`, `TokenActivityCell`, and `TokenActivityPresentation.dailyCells(snapshot:now:calendar:)` / `weeklyRows(snapshot:now:calendar:)`.
+- Produces: `TokenActivitySnapshot`, `TokenActivityDay`, `TokenActivityCell`, and `TokenActivityPresentation.dailyCells(snapshot:now:calendar:)`.
 - Produces: `TokenCountFormatter.string(_:)` and `TokenActivityLevel.level(tokens:peakTokens:)` shared by both modes.
 
 - [ ] **Step 1: Write failing decoding and date-window tests**
@@ -45,11 +44,6 @@
     #expect(cells.first(where: { $0.date == missingDate })?.tokens == nil)
 }
 
-@Test func weeklyRowsKeepTwoMonthsAndSevenDailyCells() throws {
-    let rows = TokenActivityPresentation.weeklyRows(snapshot: fixture, now: july13, calendar: utcCalendar)
-    #expect(rows.first?.cells.count == 7)
-    #expect(rows.flatMap(\.cells).first(where: { $0.date == june1 })?.tokens == expectedTokens)
-}
 ```
 
 - [ ] **Step 2: Run tests and verify RED**
@@ -60,7 +54,7 @@ Expected: compilation fails because the Token activity types do not exist.
 
 - [ ] **Step 3: Implement the minimal models and pure presentation logic**
 
-Decode `startDate` as the server-provided `yyyy-MM-dd` value, normalize all comparisons with `Calendar.startOfDay(for:)`, compute daily lower bound as the first day of the month two months before `now`, and weekly lower bound as the first day of the month one month before `now`. Pad weekly output to Monday/Sunday boundaries while marking dates outside the two-month statistical range with `tokens == nil`.
+Decode `startDate` as the server-provided `yyyy-MM-dd` value, normalize all comparisons with `Calendar.startOfDay(for:)`, and compute the daily lower bound as the first day of the month two months before `now`.
 
 Use one formatter for both modes:
 
@@ -147,7 +141,7 @@ git commit -m "Read token activity from app server"
 
 - [ ] **Step 1: Write failing store-policy and source-structure tests**
 
-Test that activity failure is represented separately from quota failure and that the popover embeds `TokenActivitySection`. Test both modes use `TokenCountFormatter` and `TokenActivityLevel`, preventing unit or color drift.
+Test that activity failure is represented separately from quota failure and that the popover embeds `TokenActivitySection`. Test the daily square uses `TokenCountFormatter` and `TokenActivityLevel`, preventing unit or color drift.
 
 ```swift
 #expect(source.contains("TokenActivitySection("))
@@ -166,7 +160,7 @@ In `QuotaStore.refresh()`, preserve the existing quota request and error behavio
 
 - [ ] **Step 4: Implement the SwiftUI section**
 
-Add a compact “Token 活动” header and `.segmented` picker for daily/weekly mode. Render daily cells as a compact calendar grid and weekly mode as week rows containing seven day squares. Use semantic SwiftUI colors, a single square size/spacing, shared formatter/levels, `.help(...)` for date and token count, and an explicit unavailable state. Insert the section below quota/reset-credit content and above embedded settings; widen or height-adjust the popover only as required to prevent clipping.
+Add a compact “Token 活动” header and render the daily cells as a compact three-month calendar grid without a mode picker. Use semantic SwiftUI colors, a single square size/spacing, shared formatter/levels, `.help(...)` for date and token count, and an explicit unavailable state. Insert the section below quota/reset-credit content and above embedded settings; widen or height-adjust the popover only as required to prevent clipping.
 
 - [ ] **Step 5: Run tests, build, and launch verification**
 
