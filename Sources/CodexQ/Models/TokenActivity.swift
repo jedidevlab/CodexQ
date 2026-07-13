@@ -131,7 +131,14 @@ enum TokenActivityPresentation {
               let day = Int(parts[2]) else {
             return nil
         }
-        return calendar.date(from: DateComponents(year: year, month: month, day: day))
+        guard let date = calendar.date(from: DateComponents(year: year, month: month, day: day)) else {
+            return nil
+        }
+        let resolved = calendar.dateComponents([.year, .month, .day], from: date)
+        guard resolved.year == year, resolved.month == month, resolved.day == day else {
+            return nil
+        }
+        return date
     }
 
     private static func mondayOffset(for date: Date, calendar: Calendar) -> Int {

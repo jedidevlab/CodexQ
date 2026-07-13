@@ -12,11 +12,11 @@ struct TokenActivityTests {
 
     @Test("账户用量响应保留服务端日期和 Token 数")
     func decodesAccountUsageBuckets() throws {
-        let data = #"{"summary":{"peakDailyTokens":2000},"dailyUsageBuckets":[{"startDate":"2026-07-12","tokens":1200}]}"#.data(using: .utf8)!
+        let data = #"{"summary":{"peakDailyTokens":5000000000},"dailyUsageBuckets":[{"startDate":"2026-07-12","tokens":4000000000}]}"#.data(using: .utf8)!
         let value = try JSONDecoder().decode(TokenActivitySnapshot.self, from: data)
 
-        #expect(value.days == [.init(startDate: "2026-07-12", tokens: 1200)])
-        #expect(value.peakDailyTokens == 2000)
+        #expect(value.days == [.init(startDate: "2026-07-12", tokens: 4_000_000_000)])
+        #expect(value.peakDailyTokens == 5_000_000_000)
     }
 
     @Test("日历模式保留当前月及前两个月，并为空缺日期补位")
@@ -36,7 +36,11 @@ struct TokenActivityTests {
 
         #expect(cells.first?.date == firstDate)
         #expect(cells.last?.date == now)
-        #expect(cells.first(where: { $0.date == missingDate })?.tokens == nil)
+        let missingCell = try #require(cells.first(where: { $0.date == missingDate }))
+        #expect(missingCell.tokens == nil)
+        for pair in zip(cells, cells.dropFirst()) {
+            #expect(utcCalendar.date(byAdding: .day, value: 1, to: pair.0.date) == pair.1.date)
+        }
     }
 
     @Test("周历模式按完整周补齐两个月统计范围")
@@ -55,9 +59,45 @@ struct TokenActivityTests {
         )
 
         #expect(rows.first?.cells.count == 7)
+        #expect(rows.allSatisfy { $0.cells.count == 7 })
+        #expect(rows.allSatisfy { row in
+            row.cells.first.map { utcCalendar.component(.weekday, from: $0.date) == 2 } == true
+        })
         #expect(rows.flatMap(\.cells).first(where: { $0.date == june1 })?.tokens == 1_200)
         #expect(rows.last?.cells.last?.date == july19)
         #expect(rows.last?.cells.last?.tokens == nil)
+    }
+
+    @Test("服务端无效日期不能归一化成另一天的用量")
+    func invalidServerDateDoesNotCreateActivity() throws {
+        let normalizedDate = try date("2026-03-02")
+        let fixture = TokenActivitySnapshot(
+            peakDailyTokens: 2_000,
+            days: [.init(startDate: "2026-02-30", tokens: 1_200)]
+        )
+
+        let cells = TokenActivityPresentation.dailyCells(
+            snapshot: fixture,
+            now: try date("2026-03-03"),
+            calendar: utcCalendar
+        )
+        let normalizedCell = try #require(cells.first(where: { $0.date == normalizedDate }))
+
+        #expect(normalizedCell.tokens == nil)
+    }
+
+    @Test("跨年时日历下界仍是两个月前的月初")
+    func dailyCellsHandleYearBoundary() throws {
+        let expectedFirstDate = try date("2026-11-01")
+        let expectedLastDate = try date("2027-01-05")
+        let cells = TokenActivityPresentation.dailyCells(
+            snapshot: .init(peakDailyTokens: 0, days: []),
+            now: expectedLastDate,
+            calendar: utcCalendar
+        )
+
+        #expect(cells.first?.date == expectedFirstDate)
+        #expect(cells.last?.date == expectedLastDate)
     }
 
     @Test("日历与周历共享 Token 数量和活动等级规则")
