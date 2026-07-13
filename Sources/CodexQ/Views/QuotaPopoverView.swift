@@ -77,6 +77,15 @@ struct QuotaPopoverView: View {
 
             Divider()
 
+            TokenActivitySection(
+                snapshot: store.tokenActivity,
+                errorMessage: store.tokenActivityErrorMessage,
+                isRefreshing: store.isRefreshing,
+                now: relativeTimeNow
+            )
+
+            Divider()
+
             EmbeddedSettingsView(
                 settings: settings,
                 settingsDidChange: settingsDidChange
