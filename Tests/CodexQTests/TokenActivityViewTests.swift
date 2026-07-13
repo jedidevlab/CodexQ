@@ -168,16 +168,19 @@ struct TokenActivityViewTests {
         secondGate.open()
     }
 
-    @Test("弹窗在设置前嵌入 Token 活动区域")
-    func popoverEmbedsTokenActivityBeforeSettings() throws {
+    @Test("弹窗依次展示 Token 活动、限额重置和设置")
+    func popoverOrdersTokenActivityBeforeResetCreditsAndSettings() throws {
         let source = try String(
             contentsOfFile: "Sources/CodexQ/Views/QuotaPopoverView.swift",
             encoding: .utf8
         )
         let activityIndex = try #require(source.range(of: "TokenActivitySection("))
+        let resetCreditsIndex = try #require(source.range(of: "ResetCreditsSection("))
         let settingsIndex = try #require(source.range(of: "EmbeddedSettingsView("))
 
+        #expect(activityIndex.lowerBound < resetCreditsIndex.lowerBound)
         #expect(activityIndex.lowerBound < settingsIndex.lowerBound)
+        #expect(resetCreditsIndex.lowerBound < settingsIndex.lowerBound)
     }
 
     @Test("每日路径调用共享方块、单位和等级")

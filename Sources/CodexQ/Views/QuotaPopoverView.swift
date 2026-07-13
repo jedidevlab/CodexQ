@@ -70,11 +70,6 @@ struct QuotaPopoverView: View {
                     .frame(maxWidth: .infinity, minHeight: 80)
             }
 
-            if let resetCredits = store.snapshot?.resetCredits {
-                Divider()
-                ResetCreditsSection(summary: resetCredits)
-            }
-
             Divider()
 
             TokenActivitySection(
@@ -83,6 +78,11 @@ struct QuotaPopoverView: View {
                 isRefreshing: store.isTokenActivityRefreshing,
                 now: relativeTimeNow
             )
+
+            if let resetCredits = store.snapshot?.resetCredits {
+                Divider()
+                ResetCreditsSection(summary: resetCredits)
+            }
 
             Divider()
 
