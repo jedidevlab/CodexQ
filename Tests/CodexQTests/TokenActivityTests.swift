@@ -12,11 +12,35 @@ struct TokenActivityTests {
 
     @Test("账户用量响应保留服务端日期和 Token 数")
     func decodesAccountUsageBuckets() throws {
-        let data = #"{"summary":{"peakDailyTokens":5000000000},"dailyUsageBuckets":[{"startDate":"2026-07-12","tokens":4000000000}]}"#.data(using: .utf8)!
+        let data = #"{"summary":{"lifetimeTokens":9000000000,"peakDailyTokens":5000000000},"dailyUsageBuckets":[{"startDate":"2026-07-12","tokens":4000000000}]}"#.data(using: .utf8)!
         let value = try JSONDecoder().decode(TokenActivitySnapshot.self, from: data)
 
         #expect(value.days == [.init(startDate: "2026-07-12", tokens: 4_000_000_000)])
         #expect(value.peakDailyTokens == 5_000_000_000)
+        #expect(value.lifetimeTokens == 9_000_000_000)
+    }
+
+    @Test("今日 Token 只读取本地日历当天数据")
+    func todayTokensUsesCurrentCalendarDay() throws {
+        let snapshot = TokenActivitySnapshot(
+            peakDailyTokens: 2_000,
+            lifetimeTokens: 9_000,
+            days: [
+                .init(startDate: "2026-07-12", tokens: 800),
+                .init(startDate: "2026-07-13", tokens: 1_200)
+            ]
+        )
+
+        #expect(TokenActivityPresentation.tokens(
+            on: try date("2026-07-13"),
+            snapshot: snapshot,
+            calendar: utcCalendar
+        ) == 1_200)
+        #expect(TokenActivityPresentation.tokens(
+            on: try date("2026-07-14"),
+            snapshot: snapshot,
+            calendar: utcCalendar
+        ) == nil)
     }
 
     @Test("日历模式保留当前月及前两个月，并为空缺日期补位")

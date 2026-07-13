@@ -35,6 +35,14 @@ struct TokenActivitySection: View {
                 peakTokens: snapshot.peakDailyTokens,
                 calendar: calendar
             )
+            TokenActivitySummaryRow(
+                todayTokens: TokenActivityPresentation.tokens(
+                    on: now,
+                    snapshot: snapshot,
+                    calendar: calendar
+                ),
+                lifetimeTokens: snapshot.lifetimeTokens
+            )
             if !TokenActivityPresentation.hasRecordedTokens(in: cells) {
                 Text("暂无 Token 使用记录")
                     .font(.caption)
@@ -56,6 +64,34 @@ struct TokenActivitySection: View {
         var calendar = Calendar.autoupdatingCurrent
         calendar.firstWeekday = 2
         return calendar
+    }
+}
+
+private struct TokenActivitySummaryRow: View {
+    let todayTokens: Int64?
+    let lifetimeTokens: Int64?
+
+    var body: some View {
+        HStack(spacing: 8) {
+            metric(title: "今日 Token", tokens: todayTokens)
+            metric(title: "累计 Token", tokens: lifetimeTokens)
+        }
+    }
+
+    private func metric(title: String, tokens: Int64?) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            Text(tokens.map(TokenCountFormatter.string) ?? "暂无数据")
+                .font(.system(.caption, design: .rounded, weight: .semibold))
+                .monospacedDigit()
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
     }
 }
 

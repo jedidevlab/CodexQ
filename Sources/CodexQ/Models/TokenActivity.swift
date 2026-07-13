@@ -1,10 +1,16 @@
 import Foundation
 
 struct TokenActivitySnapshot: Decodable, Equatable, Sendable {
+    let lifetimeTokens: Int64?
     let peakDailyTokens: Int64
     let days: [TokenActivityDay]
 
-    init(peakDailyTokens: Int64, days: [TokenActivityDay]) {
+    init(
+        peakDailyTokens: Int64,
+        lifetimeTokens: Int64? = nil,
+        days: [TokenActivityDay]
+    ) {
+        self.lifetimeTokens = lifetimeTokens
         self.peakDailyTokens = peakDailyTokens
         self.days = days
     }
@@ -15,12 +21,15 @@ struct TokenActivitySnapshot: Decodable, Equatable, Sendable {
     }
 
     private struct Summary: Decodable {
+        let lifetimeTokens: Int64?
         let peakDailyTokens: Int64
     }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        peakDailyTokens = try container.decode(Summary.self, forKey: .summary).peakDailyTokens
+        let summary = try container.decode(Summary.self, forKey: .summary)
+        lifetimeTokens = summary.lifetimeTokens
+        peakDailyTokens = summary.peakDailyTokens
         days = try container.decode([TokenActivityDay].self, forKey: .days)
     }
 }
@@ -60,6 +69,14 @@ enum TokenActivityPresentation {
 
     static func hasRecordedTokens(in cells: [TokenActivityCell]) -> Bool {
         cells.contains { $0.tokens != nil }
+    }
+
+    static func tokens(
+        on date: Date,
+        snapshot: TokenActivitySnapshot,
+        calendar: Calendar
+    ) -> Int64? {
+        tokenLookup(snapshot: snapshot, calendar: calendar)[calendar.startOfDay(for: date)]
     }
 
     private static func cells(

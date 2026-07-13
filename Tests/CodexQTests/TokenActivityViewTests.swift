@@ -197,6 +197,19 @@ struct TokenActivityViewTests {
         #expect(dailySource.contains("TokenActivityLevel.level"))
     }
 
+    @Test("Token 活动显示今日与累计 Token 汇总")
+    func activityShowsTodayAndLifetimeTokenSummary() throws {
+        let source = try String(
+            contentsOfFile: "Sources/CodexQ/Views/TokenActivitySection.swift",
+            encoding: .utf8
+        )
+
+        #expect(source.contains("今日 Token"))
+        #expect(source.contains("累计 Token"))
+        #expect(source.contains("snapshot.lifetimeTokens"))
+        #expect(source.contains("TokenActivityPresentation.tokens("))
+    }
+
     @Test("Token 活动只保留三个月每日入口")
     func activityUIHasNoWeeklyControlsOrRenderer() throws {
         let source = try String(
