@@ -20,6 +20,30 @@ struct TokenActivityTests {
         #expect(value.lifetimeTokens == 9_000_000_000)
     }
 
+    @Test("可选汇总字段为空时仍能读取每日用量")
+    func decodesNullPeakDailyTokens() throws {
+        let data = #"{"summary":{"lifetimeTokens":null,"peakDailyTokens":null},"dailyUsageBuckets":[{"startDate":"2026-07-12","tokens":4000}]}"#.data(using: .utf8)!
+        let value = try JSONDecoder().decode(TokenActivitySnapshot.self, from: data)
+
+        #expect(value.peakDailyTokens == 4_000)
+        #expect(value.lifetimeTokens == nil)
+        #expect(value.days == [.init(startDate: "2026-07-12", tokens: 4_000)])
+    }
+
+    @Test("每日用量列表缺失或为空时按空活动处理")
+    func decodesAbsentOrNullDailyUsageBuckets() throws {
+        for json in [
+            #"{"summary":{}}"#,
+            #"{"summary":{},"dailyUsageBuckets":null}"#
+        ] {
+            let data = try #require(json.data(using: .utf8))
+            let value = try JSONDecoder().decode(TokenActivitySnapshot.self, from: data)
+
+            #expect(value.peakDailyTokens == 0)
+            #expect(value.days.isEmpty)
+        }
+    }
+
     @Test("今日 Token 只读取本地日历当天数据")
     func todayTokensUsesCurrentCalendarDay() throws {
         let snapshot = TokenActivitySnapshot(

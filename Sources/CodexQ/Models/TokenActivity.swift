@@ -22,15 +22,16 @@ struct TokenActivitySnapshot: Decodable, Equatable, Sendable {
 
     private struct Summary: Decodable {
         let lifetimeTokens: Int64?
-        let peakDailyTokens: Int64
+        let peakDailyTokens: Int64?
     }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let summary = try container.decode(Summary.self, forKey: .summary)
+        let decodedDays = try container.decodeIfPresent([TokenActivityDay].self, forKey: .days) ?? []
         lifetimeTokens = summary.lifetimeTokens
-        peakDailyTokens = summary.peakDailyTokens
-        days = try container.decode([TokenActivityDay].self, forKey: .days)
+        peakDailyTokens = summary.peakDailyTokens ?? decodedDays.map(\.tokens).max() ?? 0
+        days = decodedDays
     }
 }
 
