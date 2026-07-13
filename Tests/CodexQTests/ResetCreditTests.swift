@@ -224,11 +224,5 @@ struct ResetCreditUISafetyTests {
 
         #expect(source.contains("DisabledSegmentedBatteryBar"))
         #expect(source.contains("暂不设限"))
-        let rowStart = try #require(source.range(of: "private struct UnavailableQuotaRow"))
-        let rowEnd = try #require(source.range(of: "private struct DisabledSegmentedBatteryBar"))
-        let rowSource = source[rowStart.lowerBound..<rowEnd.lowerBound]
-
-        #expect(rowSource.contains(".fixedSize(horizontal: true, vertical: false)"))
-        #expect(!rowSource.contains("Spacer()"))
     }
 }

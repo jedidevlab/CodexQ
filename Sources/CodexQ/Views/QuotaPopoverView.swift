@@ -160,10 +160,10 @@ private struct UnavailableQuotaRow: View {
                     .frame(width: QuotaBarLayout.width(for: .fiveHour), alignment: .leading)
                 DisabledSegmentedBatteryBar(period: .fiveHour)
             }
+            Spacer()
             Text("暂不设限")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-                .fixedSize(horizontal: true, vertical: false)
         }
     }
 }
