@@ -31,4 +31,19 @@ struct QuotaBarLayoutTests {
     func markerDoesNotExceedSegmentHeight() {
         #expect(QuotaBarLayout.markerExtraHeight == 0)
     }
+
+    @Test("右侧文案宽度不同不能改变进度条左边缘")
+    func quotaRowsUseLeadingContainerAlignment() throws {
+        let source = try String(
+            contentsOfFile: "Sources/CodexQ/Views/QuotaPopoverView.swift",
+            encoding: .utf8
+        )
+        let viewStart = try #require(source.range(of: "struct QuotaPopoverView"))
+        let viewEnd = try #require(source.range(of: "private struct UnavailableQuotaRow"))
+        let viewSource = source[viewStart.lowerBound..<viewEnd.lowerBound]
+
+        #expect(viewSource.contains(
+            "var body: some View {\n        VStack(alignment: .leading, spacing: 10) {"
+        ))
+    }
 }

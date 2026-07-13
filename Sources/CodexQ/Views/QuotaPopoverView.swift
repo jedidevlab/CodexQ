@@ -30,7 +30,7 @@ struct QuotaPopoverView: View {
     private let formatter = ResetTimeFormatter()
 
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(alignment: .leading, spacing: 10) {
             if let snapshot = store.snapshot {
                 if let fiveHour = snapshot.fiveHour {
                     QuotaRow(
