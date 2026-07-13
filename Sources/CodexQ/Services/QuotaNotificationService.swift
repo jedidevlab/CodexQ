@@ -2,6 +2,23 @@ import Foundation
 import UserNotifications
 
 actor QuotaNotificationService {
+    static func crossedThreshold(previous: Double, current: Double, threshold: Int) -> Bool {
+        previous >= Double(threshold) && current < Double(threshold)
+    }
+
+    static func notificationBody(name: String, threshold: Int) -> String {
+        let limitName = name.hasSuffix("限额") ? name : "\(name)限额"
+        return "\(limitName)已低于 \(threshold)%"
+    }
+
+    static func isSameResetCycle(previous: QuotaWindow, current: QuotaWindow) -> Bool {
+        guard let previousResetsAt = previous.resetsAt,
+              let currentResetsAt = current.resetsAt else {
+            return false
+        }
+        return previousResetsAt == currentResetsAt
+    }
+
     func requestAuthorization() async {
         _ = try? await UNUserNotificationCenter.current()
             .requestAuthorization(options: [.alert, .sound])
@@ -31,13 +48,16 @@ actor QuotaNotificationService {
         current: QuotaWindow,
         thresholds: [Int]
     ) async {
-        guard previous.resetsAt == current.resetsAt else { return }
-        for threshold in thresholds where previous.remainingPercent > Double(threshold)
-            && current.remainingPercent <= Double(threshold)
+        guard Self.isSameResetCycle(previous: previous, current: current) else { return }
+        for threshold in thresholds where Self.crossedThreshold(
+            previous: previous.remainingPercent,
+            current: current.remainingPercent,
+            threshold: threshold
+        )
         {
             let content = UNMutableNotificationContent()
             content.title = "CodexQ 额度提醒"
-            content.body = "\(name)剩余 \(Int(current.remainingPercent.rounded()))%，已低于 \(threshold)%"
+            content.body = Self.notificationBody(name: name, threshold: threshold)
             content.sound = .default
             let request = UNNotificationRequest(
                 identifier: "\(name)-\(current.resetsAt?.timeIntervalSince1970 ?? 0)-\(threshold)",

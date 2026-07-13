@@ -100,7 +100,11 @@ struct RateLimitsResponse: Decodable {
     let rateLimitResetCredits: RateLimitResetCreditsResponse?
 
     var preferredSnapshot: RateLimitSnapshot {
-        rateLimitsByLimitId?["codex"] ?? rateLimits
+        guard let codexLimits = rateLimitsByLimitId?["codex"],
+              codexLimits.quotaSnapshot != nil else {
+            return rateLimits
+        }
+        return codexLimits
     }
 
     var quotaSnapshot: QuotaSnapshot? {

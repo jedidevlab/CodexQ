@@ -27,8 +27,8 @@ CodexQ is a macOS menu bar utility for monitoring Codex quota and token usage in
 
 Choose the release archive that matches your Mac:
 
-- Apple Silicon Mac: `CodexQ-1.0.7-arm64.zip`
-- Intel Mac: `CodexQ-1.0.7-x86_64.zip`
+- Apple Silicon Mac: `CodexQ-1.0.8-arm64.zip`
+- Intel Mac: `CodexQ-1.0.8-x86_64.zip`
 
 Unzip the archive, then move `CodexQ.app` to Applications.
 
@@ -57,20 +57,20 @@ swift test
 Generate a ZIP archive for GitHub Releases using the current Mac architecture:
 
 ```bash
-./script/package_release.sh 1.0.7
+./script/package_release.sh 1.0.8
 ```
 
 Pass an architecture explicitly when needed:
 
 ```bash
-./script/package_release.sh 1.0.7 arm64
-./script/package_release.sh 1.0.7 x86_64
+./script/package_release.sh 1.0.8 arm64
+./script/package_release.sh 1.0.8 x86_64
 ```
 
 The archive is written to:
 
 ```text
-dist/CodexQ-1.0.7-<arch>.zip
+dist/CodexQ-1.0.8-<arch>.zip
 ```
 
 ## Packaging Note

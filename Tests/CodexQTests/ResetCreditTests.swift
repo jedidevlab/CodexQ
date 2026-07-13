@@ -3,6 +3,30 @@ import Testing
 @testable import CodexQ
 
 struct ResetCreditDecodingTests {
+    @Test("codex 专用额度窗口不完整时回退到顶层额度窗口")
+    func fallsBackWhenCodexLimitGroupIsIncomplete() throws {
+        let json = #"""
+        {
+          "rateLimits": {
+            "primary": {"usedPercent": 6, "windowDurationMins": 300},
+            "secondary": {"usedPercent": 1, "windowDurationMins": 10080}
+          },
+          "rateLimitsByLimitId": {
+            "codex": {
+              "primary": {"usedPercent": 9, "windowDurationMins": 300}
+            }
+          }
+        }
+        """#.data(using: .utf8)!
+
+        let response = try JSONDecoder().decode(RateLimitsResponse.self, from: json)
+        let snapshot = try #require(response.quotaSnapshot)
+        let fiveHour = try #require(snapshot.fiveHour)
+
+        #expect(fiveHour.usedPercent == 6)
+        #expect(snapshot.weekly.usedPercent == 1)
+    }
+
     @Test("额度响应解析可用次数和重置明细")
     func decodesResetCreditSummary() throws {
         let json = #"""
