@@ -8,6 +8,7 @@ CodexQ is a macOS menu bar utility for monitoring Codex quota usage in real time
 
 - macOS menu bar quota indicator
 - 5-hour and weekly quota progress bars
+- Shows the 5-hour quota as unlimited when that window is temporarily absent, while weekly quota refresh continues
 - Remaining quota percentage
 - Projected run-out time based on current usage pace
 - Manual and automatic refresh
@@ -25,8 +26,8 @@ CodexQ is a macOS menu bar utility for monitoring Codex quota usage in real time
 
 Choose the release archive that matches your Mac:
 
-- Apple Silicon Mac: `CodexQ-1.0.3-arm64.zip`
-- Intel Mac: `CodexQ-1.0.3-x86_64.zip`
+- Apple Silicon Mac: `CodexQ-1.0.5-arm64.zip`
+- Intel Mac: `CodexQ-1.0.5-x86_64.zip`
 
 Unzip the archive, then move `CodexQ.app` to Applications.
 
@@ -55,20 +56,20 @@ swift test
 Generate a ZIP archive for GitHub Releases using the current Mac architecture:
 
 ```bash
-./script/package_release.sh 1.0.3
+./script/package_release.sh 1.0.5
 ```
 
 Pass an architecture explicitly when needed:
 
 ```bash
-./script/package_release.sh 1.0.3 arm64
-./script/package_release.sh 1.0.3 x86_64
+./script/package_release.sh 1.0.5 arm64
+./script/package_release.sh 1.0.5 x86_64
 ```
 
 The archive is written to:
 
 ```text
-dist/CodexQ-1.0.3-<arch>.zip
+dist/CodexQ-1.0.5-<arch>.zip
 ```
 
 ## Packaging Note
