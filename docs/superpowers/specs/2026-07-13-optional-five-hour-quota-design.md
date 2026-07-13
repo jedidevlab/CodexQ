@@ -9,7 +9,7 @@ Keep CodexQ refreshing and presenting the weekly quota when Codex temporarily om
 - Treat the weekly window as required for a valid quota snapshot.
 - Treat the 5-hour window as optional.
 - Preserve the current two-window presentation whenever both windows are returned.
-- When the 5-hour window is absent, show `5 小时 暂不设限` and continue to show the weekly quota, update time, reset credits, and refresh controls.
+- When the 5-hour window is absent, show `5 小时 无限制` and continue to show the weekly quota, update time, reset credits, and refresh controls.
 - Use the weekly remaining percentage in the menu bar while the 5-hour window is absent.
 
 ## Non-goals

@@ -83,7 +83,7 @@ Expected: fails because the fallback property does not exist.
 
 - [x] **Step 3: Implement the minimum presentation change**
 
-Add `statusRemainingPercent`, conditionally render `QuotaRow` for a present 5-hour window, render `5 小时` plus `暂不设限` otherwise, and pass the fallback percentage to the status bar.
+Add `statusRemainingPercent`, conditionally render `QuotaRow` for a present 5-hour window, render `5 小时` plus `无限制` otherwise, and pass the fallback percentage to the status bar.
 
 - [x] **Step 4: Verify all behavior**
 

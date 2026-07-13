@@ -161,7 +161,7 @@ private struct UnavailableQuotaRow: View {
                 DisabledSegmentedBatteryBar(period: .fiveHour)
             }
             Spacer()
-            Text("暂不设限")
+            Text("无限制")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
