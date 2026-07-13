@@ -12,11 +12,10 @@ struct TokenActivitySection: View {
                 Text("Token 活动")
                     .font(.headline)
                 Spacer(minLength: 8)
-                if let snapshot,
-                   let yesterday = calendar.date(byAdding: .day, value: -1, to: now) {
+                if let snapshot {
                     TokenActivityInlineSummary(
-                        yesterdayTokens: TokenActivityPresentation.tokens(
-                            on: yesterday,
+                        todayTokens: TokenActivityPresentation.tokens(
+                            on: now,
                             snapshot: snapshot,
                             calendar: calendar
                         ),
@@ -74,12 +73,12 @@ struct TokenActivitySection: View {
 }
 
 private struct TokenActivityInlineSummary: View {
-    let yesterdayTokens: Int64?
+    let todayTokens: Int64?
     let lifetimeTokens: Int64?
 
     var body: some View {
         HStack(spacing: 10) {
-            metric(label: "昨日", accessibilityLabel: "昨日 Token", tokens: yesterdayTokens)
+            metric(label: "今日", accessibilityLabel: "今日 Token", tokens: todayTokens)
             metric(label: "累计", accessibilityLabel: "累计 Token", tokens: lifetimeTokens)
         }
         .font(.caption2)

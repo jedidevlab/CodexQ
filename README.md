@@ -27,8 +27,8 @@ CodexQ 是一款 macOS 菜单栏工具，用于实时查看 Codex 额度与 Toke
 
 在 GitHub Releases 中选择与你的 Mac 匹配的安装包：
 
-- Apple Silicon Mac：`CodexQ-1.0.6-arm64.zip`
-- Intel Mac：`CodexQ-1.0.6-x86_64.zip`
+- Apple Silicon Mac：`CodexQ-1.0.7-arm64.zip`
+- Intel Mac：`CodexQ-1.0.7-x86_64.zip`
 
 下载后解压，将 `CodexQ.app` 移动到“应用程序”文件夹。
 
@@ -57,20 +57,20 @@ swift test
 按当前 Mac 架构生成 GitHub Release zip：
 
 ```bash
-./script/package_release.sh 1.0.6
+./script/package_release.sh 1.0.7
 ```
 
 也可以显式指定架构：
 
 ```bash
-./script/package_release.sh 1.0.6 arm64
-./script/package_release.sh 1.0.6 x86_64
+./script/package_release.sh 1.0.7 arm64
+./script/package_release.sh 1.0.7 x86_64
 ```
 
 生成文件位于：
 
 ```text
-dist/CodexQ-1.0.6-<arch>.zip
+dist/CodexQ-1.0.7-<arch>.zip
 ```
 
 ## 打包说明

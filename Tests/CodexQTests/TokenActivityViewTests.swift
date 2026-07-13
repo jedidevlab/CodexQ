@@ -200,18 +200,19 @@ struct TokenActivityViewTests {
         #expect(dailySource.contains("TokenActivityLevel.level"))
     }
 
-    @Test("Token 活动显示昨日与累计 Token 汇总")
-    func activityShowsYesterdayAndLifetimeTokenSummary() throws {
+    @Test("Token 活动显示今日与累计 Token 汇总")
+    func activityShowsTodayAndLifetimeTokenSummary() throws {
         let source = try String(
             contentsOfFile: "Sources/CodexQ/Views/TokenActivitySection.swift",
             encoding: .utf8
         )
 
-        #expect(source.contains("昨日 Token"))
+        #expect(source.contains("今日 Token"))
         #expect(source.contains("累计 Token"))
         #expect(source.contains("snapshot.lifetimeTokens"))
         #expect(source.contains("TokenActivityPresentation.tokens("))
-        #expect(source.contains("date(byAdding: .day, value: -1, to: now)"))
+        #expect(source.contains("on: now"))
+        #expect(!source.contains("昨日 Token"))
         #expect(source.contains("TokenCountFormatter.compactNumber"))
         #expect(source.contains("TokenActivityInlineSummary("))
         #expect(!source.contains("TokenActivitySummaryRow"))
