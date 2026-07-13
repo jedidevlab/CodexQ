@@ -237,12 +237,11 @@ private struct QuotaRow: View {
                     Text(title)
                         .font(.headline)
                     Spacer()
-                    if let projection {
-                        Text(paceText(for: projection))
+                    if let projection,
+                       let paceText = PaceFormatter.status(projection) {
+                        Text(paceText)
                             .font(.caption)
-                            .foregroundStyle(
-                                projection.isInDeficit ? Color.red : Color.secondary
-                            )
+                            .foregroundStyle(.red)
                     }
                 }
                 .frame(width: QuotaBarLayout.width(for: period))
@@ -274,16 +273,6 @@ private struct QuotaRow: View {
         window.projection(at: now)
     }
 
-    private func paceText(for projection: QuotaProjection) -> String {
-        if projection.isOnTrack {
-            return "进度正常"
-        }
-        let percent = Int(projection.displayPercent.rounded())
-        if projection.isInDeficit, let eta = projection.etaSeconds {
-            return "超额 \(percent)% · \(PaceFormatter.eta(eta))"
-        }
-        return projection.isInDeficit ? "进度超额 \(percent)%" : "进度余量 \(percent)%"
-    }
 }
 
 private struct SegmentedBatteryBar: View {

@@ -211,6 +211,32 @@ struct QuotaFormattingTests {
         #expect(projection.isInDeficit == false)
     }
 
+    @Test("正常与余量状态不显示 Pace 文案")
+    func quietPaceHidesNonDeficitCopy() {
+        #expect(PaceFormatter.status(.init(
+            reservePercent: 0,
+            expectedRemainingPercent: 60,
+            deltaPercent: 1,
+            etaSeconds: nil
+        )) == nil)
+        #expect(PaceFormatter.status(.init(
+            reservePercent: 8,
+            expectedRemainingPercent: 60,
+            deltaPercent: -8,
+            etaSeconds: nil
+        )) == nil)
+    }
+
+    @Test("超额状态保留风险 Pace 文案")
+    func deficitPaceKeepsRiskCopy() {
+        #expect(PaceFormatter.status(.init(
+            reservePercent: 0,
+            expectedRemainingPercent: 60,
+            deltaPercent: 5,
+            etaSeconds: 45 * 60
+        )) == "超额 5% · 0h45m 后用完")
+    }
+
     @Test("超额使用时给出早于重置的耗尽时间")
     func providesRunOutETA() throws {
         let now = Date(timeIntervalSince1970: 10_000)

@@ -1,6 +1,15 @@
 import Foundation
 
 enum PaceFormatter {
+    static func status(_ projection: QuotaProjection) -> String? {
+        guard projection.isInDeficit else { return nil }
+        let percent = Int(projection.displayPercent.rounded())
+        if let etaSeconds = projection.etaSeconds {
+            return "超额 \(percent)% · \(eta(etaSeconds))"
+        }
+        return "进度超额 \(percent)%"
+    }
+
     static func eta(_ seconds: TimeInterval) -> String {
         let minutes = max(1, Int(ceil(seconds / 60)))
         let hours = minutes / 60
