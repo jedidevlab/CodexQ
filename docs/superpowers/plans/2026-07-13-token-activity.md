@@ -161,7 +161,7 @@ In `QuotaStore.refresh()`, preserve the existing quota request and error behavio
 
 - [ ] **Step 4: Implement the SwiftUI section**
 
-Add a compact “Token 活动” header and render the daily cells as a compact three-month calendar grid without a mode picker. In the header's trailing space, show the previous local calendar day's “昨日 Token” and “累计 Token” as one compact line with no background or border; missing values display “暂无数据”. Use semantic SwiftUI colors, a single square size/spacing, shared formatter/levels, `.help(...)` for date and token count, and an explicit unavailable state. Insert the section below quota/reset-credit content and above embedded settings; widen or height-adjust the popover only as required to prevent clipping.
+Add a compact “Token 活动” header and render the daily cells as a compact three-month calendar grid without a mode picker. In the header's trailing space, show the previous local calendar day's “昨日 Token” and “累计 Token” as one compact line with no background or border; omit the repeated `tokens` suffix from these two visible values, while missing values display “暂无数据”. Use semantic SwiftUI colors, a single square size/spacing, shared formatter/levels, `.help(...)` for date and token count, and an explicit unavailable state. Insert the section below quota/reset-credit content and above embedded settings; widen or height-adjust the popover only as required to prevent clipping.
 
 - [ ] **Step 5: Run tests, build, and launch verification**
 

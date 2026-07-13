@@ -209,6 +209,7 @@ struct TokenActivityViewTests {
         #expect(source.contains("snapshot.lifetimeTokens"))
         #expect(source.contains("TokenActivityPresentation.tokens("))
         #expect(source.contains("date(byAdding: .day, value: -1, to: now)"))
+        #expect(source.contains("TokenCountFormatter.compactNumber"))
         #expect(source.contains("TokenActivityInlineSummary("))
         #expect(!source.contains("TokenActivitySummaryRow"))
         #expect(!source.contains(".background(.quaternary"))
