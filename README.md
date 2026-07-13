@@ -2,7 +2,7 @@
 
 [English](README.en.md)
 
-CodexQ 是一款 macOS 菜单栏工具，用于实时查看 Codex 额度使用情况，展示 5 小时与周限额进度、剩余额度、预测耗尽时间，并支持额度预警与自动刷新。
+CodexQ 是一款 macOS 菜单栏工具，用于实时查看 Codex 额度与 Token 使用情况，展示 5 小时与周限额进度、剩余额度、预测耗尽时间，并支持额度预警与自动刷新。
 
 ## 功能
 
@@ -11,6 +11,7 @@ CodexQ 是一款 macOS 菜单栏工具，用于实时查看 Codex 额度使用�
 - 5 小时限额临时取消时显示“无限制”，周限额继续正常刷新
 - 剩余额度百分比
 - 按当前使用节奏预测耗尽时间
+- 近三个月每日 Token 活动，以及昨日与累计 Token 用量
 - 手动刷新与自动刷新
 - 登录时启动
 - 额度预警通知
@@ -26,8 +27,8 @@ CodexQ 是一款 macOS 菜单栏工具，用于实时查看 Codex 额度使用�
 
 在 GitHub Releases 中选择与你的 Mac 匹配的安装包：
 
-- Apple Silicon Mac：`CodexQ-1.0.5-arm64.zip`
-- Intel Mac：`CodexQ-1.0.5-x86_64.zip`
+- Apple Silicon Mac：`CodexQ-1.0.6-arm64.zip`
+- Intel Mac：`CodexQ-1.0.6-x86_64.zip`
 
 下载后解压，将 `CodexQ.app` 移动到“应用程序”文件夹。
 
@@ -56,20 +57,20 @@ swift test
 按当前 Mac 架构生成 GitHub Release zip：
 
 ```bash
-./script/package_release.sh 1.0.5
+./script/package_release.sh 1.0.6
 ```
 
 也可以显式指定架构：
 
 ```bash
-./script/package_release.sh 1.0.5 arm64
-./script/package_release.sh 1.0.5 x86_64
+./script/package_release.sh 1.0.6 arm64
+./script/package_release.sh 1.0.6 x86_64
 ```
 
 生成文件位于：
 
 ```text
-dist/CodexQ-1.0.5-<arch>.zip
+dist/CodexQ-1.0.6-<arch>.zip
 ```
 
 ## 打包说明
