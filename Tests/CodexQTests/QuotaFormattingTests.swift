@@ -263,6 +263,40 @@ struct QuotaFormattingTests {
 }
 
 struct AppServerClientTests {
+    @Test("token activity 通过 account/usage/read 读取每日用量")
+    func tokenActivityUsesUsageReadMethod() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let executable = directory.appendingPathComponent("fake-codex")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let script = #"""
+        #!/bin/sh
+        IFS= read -r initialize_request
+        printf '%s\n' '{"id":1,"result":{}}'
+        IFS= read -r initialized_notification
+        IFS= read -r usage_request
+        case "$usage_request" in
+          *'"method":"account/usage/read"'*|*'"method":"account\/usage\/read"'*)
+            printf '%s\n' '{"id":2,"result":{"summary":{"peakDailyTokens":1200},"dailyUsageBuckets":[{"startDate":"2026-07-12","tokens":1200}]}}'
+            ;;
+          *)
+            printf '%s\n' '{"id":2,"error":{"message":"unexpected method"}}'
+            ;;
+        esac
+        """#
+        try Data(script.utf8).write(to: executable)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o755],
+            ofItemAtPath: executable.path
+        )
+
+        let snapshot = try await AppServerClient(executableURL: executable).readTokenActivity()
+
+        #expect(snapshot.days.first?.tokens == 1_200)
+    }
+
     @Test("缺少候选程序时错误提示同时涵盖新旧应用")
     func missingExecutableMessageCoversCurrentAndLegacyApps() {
         #expect(AppServerClient.ClientError.executableMissing.errorDescription

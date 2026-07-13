@@ -9,6 +9,7 @@ struct AppServerClient: Sendable {
         case responseTimedOut
         case serverError(String)
         case missingRateLimits
+        case missingTokenActivity
 
         var errorDescription: String? {
             switch self {
@@ -24,6 +25,8 @@ struct AppServerClient: Sendable {
                 return "Codex app-server 返回错误：\(message)"
             case .missingRateLimits:
                 return "额度响应缺少 5 小时或周限额"
+            case .missingTokenActivity:
+                return "用量响应缺少 token 活动数据"
             }
         }
     }
@@ -57,7 +60,36 @@ struct AppServerClient: Sendable {
         }.value
     }
 
+    func readTokenActivity() async throws -> TokenActivitySnapshot {
+        try await Task.detached(priority: .utility) {
+            try readTokenActivitySynchronously()
+        }.value
+    }
+
     private func readRateLimitsSynchronously() throws -> QuotaSnapshot {
+        guard let result = try readResult(method: "account/rateLimits/read") else {
+            throw ClientError.serverError("未知错误")
+        }
+
+        let data = try JSONSerialization.data(withJSONObject: result)
+        let decoded = try JSONDecoder().decode(RateLimitsResponse.self, from: data)
+
+        guard let snapshot = decoded.quotaSnapshot else {
+            throw ClientError.missingRateLimits
+        }
+        return snapshot
+    }
+
+    private func readTokenActivitySynchronously() throws -> TokenActivitySnapshot {
+        guard let result = try readResult(method: "account/usage/read") else {
+            throw ClientError.missingTokenActivity
+        }
+
+        let data = try JSONSerialization.data(withJSONObject: result)
+        return try JSONDecoder().decode(TokenActivitySnapshot.self, from: data)
+    }
+
+    private func readResult(method: String) throws -> Any? {
         guard let executableURL = Self.firstExecutableURL(in: executableURLs) else {
             throw ClientError.executableMissing
         }
@@ -106,21 +138,13 @@ struct AppServerClient: Sendable {
 
         try write(["method": "initialized"], to: inputPipe.fileHandleForWriting)
         try write(
-            ["method": "account/rateLimits/read", "id": 2],
+            ["method": method, "id": 2],
             to: inputPipe.fileHandleForWriting
         )
 
         let response = try readResponse(id: 2, from: outputPipe.fileHandleForReading)
         try validate(response)
-        guard let result = response["result"] else { throw ClientError.serverError("未知错误") }
-
-        let data = try JSONSerialization.data(withJSONObject: result)
-        let decoded = try JSONDecoder().decode(RateLimitsResponse.self, from: data)
-
-        guard let snapshot = decoded.quotaSnapshot else {
-            throw ClientError.missingRateLimits
-        }
-        return snapshot
+        return response["result"]
     }
 
     private func write(_ object: [String: Any], to handle: FileHandle) throws {
