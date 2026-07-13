@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add daily and week-grouped account Token activity blocks to the existing CodexQ menu bar popover.
+**Goal:** Add the latest three calendar months of daily account Token activity blocks to the existing CodexQ menu bar popover.
 
 **Architecture:** Read `account/usage/read` from the same local Codex app-server used for rate limits, decode its daily buckets, and keep activity loading/error state independent from quota state. Pure calendar presentation logic produces three-month daily cells; a focused SwiftUI section renders them with one formatter and color scale.
 
@@ -26,7 +26,7 @@
 
 **Interfaces:**
 - Produces: `TokenActivitySnapshot`, `TokenActivityDay`, `TokenActivityCell`, and `TokenActivityPresentation.dailyCells(snapshot:now:calendar:)`.
-- Produces: `TokenCountFormatter.string(_:)` and `TokenActivityLevel.level(tokens:peakTokens:)` shared by both modes.
+- Produces: `TokenCountFormatter.string(_:)` and `TokenActivityLevel.level(tokens:peakTokens:)` shared by all daily cells.
 
 - [ ] **Step 1: Write failing decoding and date-window tests**
 
@@ -56,7 +56,7 @@ Expected: compilation fails because the Token activity types do not exist.
 
 Decode `startDate` as the server-provided `yyyy-MM-dd` value, normalize all comparisons with `Calendar.startOfDay(for:)`, and compute the daily lower bound as the first day of the month two months before `now`.
 
-Use one formatter for both modes:
+Use one formatter for every daily cell:
 
 ```swift
 enum TokenCountFormatter {
@@ -145,7 +145,7 @@ Test that activity failure is represented separately from quota failure and that
 
 ```swift
 #expect(source.contains("TokenActivitySection("))
-#expect(activitySource.components(separatedBy: "TokenCountFormatter.string").count >= 3)
+#expect(dailyCellSource.contains("TokenCountFormatter.string"))
 ```
 
 - [ ] **Step 2: Run focused tests and verify RED**
@@ -156,7 +156,7 @@ Expected: fails because the section and store properties do not exist.
 
 - [ ] **Step 3: Implement independent refresh state**
 
-In `QuotaStore.refresh()`, preserve the existing quota request and error behavior, then fetch Token activity without replacing a valid quota result when activity fails. Publish the snapshot and a separate activity error string on the main actor.
+In `QuotaStore.refresh()`, preserve the existing quota request and error behavior while starting Token activity concurrently with a separate loading/error state. Token activity must not delay the quota result, global refresh state, or next quota schedule. Publish the activity snapshot and error string on the main actor.
 
 - [ ] **Step 4: Implement the SwiftUI section**
 

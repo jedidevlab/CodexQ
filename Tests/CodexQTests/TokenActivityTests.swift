@@ -75,6 +75,25 @@ struct TokenActivityTests {
         #expect(cells.last?.date == expectedLastDate)
     }
 
+    @Test("范围外或非法响应仍生成完整空日历")
+    func outOfRangeAndInvalidDaysProduceEmptyCalendarStructure() throws {
+        let cells = TokenActivityPresentation.dailyCells(
+            snapshot: .init(
+                peakDailyTokens: 2_000,
+                days: [
+                    .init(startDate: "2026-04-30", tokens: 900),
+                    .init(startDate: "2026-06-31", tokens: 1_200)
+                ]
+            ),
+            now: try date("2026-07-13"),
+            calendar: utcCalendar
+        )
+
+        #expect(cells.count == 74)
+        #expect(!TokenActivityPresentation.hasRecordedTokens(in: cells))
+        #expect(cells.allSatisfy { $0.tokens == nil })
+    }
+
     @Test("每日方块使用统一 Token 数量和活动等级规则")
     func sharedFormattingAndActivityLevels() {
         #expect(TokenCountFormatter.string(1_200).hasSuffix(" tokens"))

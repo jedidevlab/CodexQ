@@ -1,8 +1,46 @@
+import Combine
 import Foundation
 import Testing
 @testable import CodexQ
 
 struct TokenActivityViewTests {
+    @Test("活动请求随额度请求立即并发启动")
+    @MainActor
+    func activityStartsWhileQuotaRequestIsSuspended() async {
+        let quotaGate = ActivityGate()
+        let activityGate = ActivityGate()
+        let activityStarted = AsyncStream<Void>.makeStream()
+        var activityStartedIterator = activityStarted.stream.makeAsyncIterator()
+        let quota = QuotaSnapshot(
+            fiveHour: .init(usedPercent: 25, resetsAt: nil, durationMinutes: 300),
+            weekly: .init(usedPercent: 40, resetsAt: nil, durationMinutes: 10_080)
+        )
+        let store = QuotaStore(
+            readRateLimits: {
+                await quotaGate.wait()
+                return quota
+            },
+            readTokenActivity: {
+                activityStarted.continuation.yield()
+                await activityGate.wait()
+                return .init(peakDailyTokens: 0, days: [])
+            },
+            loadCachedSnapshot: { nil },
+            saveCachedSnapshot: { _ in },
+            notifyQuotaCrossings: { _, _ in }
+        )
+
+        let refreshTask = Task { @MainActor in await store.refresh() }
+        _ = await activityStartedIterator.next()
+
+        #expect(store.isRefreshing)
+        #expect(store.isTokenActivityRefreshing)
+
+        quotaGate.open()
+        #expect(await refreshTask.value)
+        activityGate.open()
+    }
+
     @Test("挂起的 Token 活动不会阻塞额度刷新返回")
     @MainActor
     func suspendedActivityDoesNotBlockQuotaRefresh() async {
@@ -63,11 +101,15 @@ struct TokenActivityViewTests {
             saveCachedSnapshot: { _ in cacheSaveCount += 1 },
             notifyQuotaCrossings: { _, _ in notificationCallCount += 1 }
         )
+        let activityFinished = AsyncStream<Void>.makeStream()
+        var activityFinishedIterator = activityFinished.stream.makeAsyncIterator()
+        let cancellable = store.$isTokenActivityRefreshing
+            .dropFirst()
+            .filter { !$0 }
+            .sink { _ in activityFinished.continuation.yield() }
 
         let succeeded = await store.refresh()
-        for _ in 0..<100 where store.isTokenActivityRefreshing {
-            try? await Task.sleep(for: .milliseconds(1))
-        }
+        _ = await activityFinishedIterator.next()
 
         #expect(succeeded)
         #expect(store.snapshot == quota)
@@ -76,6 +118,54 @@ struct TokenActivityViewTests {
         #expect(store.tokenActivityErrorMessage != nil)
         #expect(cacheSaveCount == 1)
         #expect(notificationCallCount == 1)
+        withExtendedLifetime(cancellable) {}
+    }
+
+    @Test("停止后的旧活动任务不能清理新任务状态")
+    @MainActor
+    func stoppedActivityTaskCannotClearNewGeneration() async {
+        let firstGate = ActivityGate()
+        let secondGate = ActivityGate()
+        let firstStarted = AsyncStream<Void>.makeStream()
+        let secondStarted = AsyncStream<Void>.makeStream()
+        var firstStartedIterator = firstStarted.stream.makeAsyncIterator()
+        var secondStartedIterator = secondStarted.stream.makeAsyncIterator()
+        var callCount = 0
+        let quota = QuotaSnapshot(
+            fiveHour: nil,
+            weekly: .init(usedPercent: 40, resetsAt: nil, durationMinutes: 10_080)
+        )
+        let store = QuotaStore(
+            readRateLimits: { quota },
+            readTokenActivity: {
+                callCount += 1
+                if callCount == 1 {
+                    firstStarted.continuation.yield()
+                    await firstGate.wait()
+                } else {
+                    secondStarted.continuation.yield()
+                    await secondGate.wait()
+                }
+                return .init(peakDailyTokens: 0, days: [])
+            },
+            loadCachedSnapshot: { nil },
+            saveCachedSnapshot: { _ in },
+            notifyQuotaCrossings: { _, _ in }
+        )
+
+        #expect(await store.refresh())
+        _ = await firstStartedIterator.next()
+        store.stop()
+        #expect(!store.isTokenActivityRefreshing)
+
+        #expect(await store.refresh())
+        _ = await secondStartedIterator.next()
+        firstGate.open()
+        await Task.yield()
+
+        #expect(store.isTokenActivityRefreshing)
+        #expect(callCount == 2)
+        secondGate.open()
     }
 
     @Test("弹窗在设置前嵌入 Token 活动区域")
@@ -122,8 +212,8 @@ struct TokenActivityViewTests {
         #expect(source.contains(".accessibilityValue("))
     }
 
-    @Test("活动 loading 独立且空快照不绘制日历")
-    func popoverUsesIndependentLoadingAndEmptyStatePrecedesGrids() throws {
+    @Test("活动 loading 独立且空快照仍绘制完整日历")
+    func popoverUsesIndependentLoadingAndEmptyStateKeepsGrid() throws {
         let popoverSource = try String(
             contentsOfFile: "Sources/CodexQ/Views/QuotaPopoverView.swift",
             encoding: .utf8
@@ -132,17 +222,47 @@ struct TokenActivityViewTests {
             contentsOfFile: "Sources/CodexQ/Views/TokenActivitySection.swift",
             encoding: .utf8
         )
-        let emptyIndex = try #require(activitySource.range(of: "if snapshot.days.isEmpty"))
+        let emptyIndex = try #require(activitySource.range(of: "暂无 Token 使用记录"))
         let gridIndex = try #require(activitySource.range(of: "DailyTokenActivityGrid("))
 
         #expect(popoverSource.contains("isRefreshing: store.isTokenActivityRefreshing"))
-        #expect(emptyIndex.lowerBound < gridIndex.lowerBound)
+        #expect(activitySource.contains("hasRecordedTokens"))
+        #expect(gridIndex.lowerBound < emptyIndex.lowerBound)
+    }
+
+    @Test("设计与计划只保留近三个月每日口径")
+    func docsContainNoSupersededWeeklyOrSwitchingLanguage() throws {
+        for path in [
+            "docs/superpowers/specs/2026-07-13-token-activity-design.md",
+            "docs/superpowers/plans/2026-07-13-token-activity.md"
+        ] {
+            let source = try String(contentsOfFile: path, encoding: .utf8)
+            let lowercased = source.lowercased()
+
+            #expect(!lowercased.contains("week-grouped"))
+            #expect(!lowercased.contains("both modes"))
+            #expect(!source.contains("切换"))
+        }
     }
 
     private func sourceSection(_ source: String, from start: String, to end: String) throws -> String {
         let startIndex = try #require(source.range(of: start)?.lowerBound)
         let endIndex = try #require(source.range(of: end, range: startIndex..<source.endIndex)?.lowerBound)
         return String(source[startIndex..<endIndex])
+    }
+}
+
+@MainActor
+private final class ActivityGate {
+    private var continuation: CheckedContinuation<Void, Never>?
+
+    func wait() async {
+        await withCheckedContinuation { continuation = $0 }
+    }
+
+    func open() {
+        continuation?.resume()
+        continuation = nil
     }
 }
 

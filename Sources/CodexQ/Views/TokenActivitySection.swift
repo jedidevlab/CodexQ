@@ -25,13 +25,20 @@ struct TokenActivitySection: View {
                 .frame(maxWidth: .infinity, minHeight: 54)
                 .help(errorMessage)
         } else if let snapshot {
-            if snapshot.days.isEmpty {
+            let cells = TokenActivityPresentation.dailyCells(
+                snapshot: snapshot,
+                now: now,
+                calendar: calendar
+            )
+            DailyTokenActivityGrid(
+                cells: cells,
+                peakTokens: snapshot.peakDailyTokens,
+                calendar: calendar
+            )
+            if !TokenActivityPresentation.hasRecordedTokens(in: cells) {
                 Text("暂无 Token 使用记录")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, minHeight: 36)
-            } else {
-                DailyTokenActivityGrid(snapshot: snapshot, now: now, calendar: calendar)
             }
         } else if isRefreshing {
             ProgressView("正在读取 Token 活动...")
@@ -66,8 +73,8 @@ private enum TokenActivityGridLayout {
 }
 
 private struct DailyTokenActivityGrid: View {
-    let snapshot: TokenActivitySnapshot
-    let now: Date
+    let cells: [TokenActivityCell]
+    let peakTokens: Int64
     let calendar: Calendar
 
     var body: some View {
@@ -89,7 +96,7 @@ private struct DailyTokenActivityGrid: View {
                         ForEach(month.cells, id: \.date) { cell in
                             DailyActivitySquare(
                                 cell: cell,
-                                peakTokens: snapshot.peakDailyTokens
+                                peakTokens: peakTokens
                             )
                         }
                     }
@@ -100,11 +107,6 @@ private struct DailyTokenActivityGrid: View {
     }
 
     private var months: [ActivityMonth] {
-        let cells = TokenActivityPresentation.dailyCells(
-            snapshot: snapshot,
-            now: now,
-            calendar: calendar
-        )
         var result: [ActivityMonth] = []
         for cell in cells {
             let components = calendar.dateComponents([.year, .month], from: cell.date)

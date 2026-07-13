@@ -17,6 +17,7 @@ final class QuotaStore: ObservableObject {
     private let notifyQuotaCrossings: (QuotaSnapshot?, QuotaSnapshot) async -> Void
     private var refreshTask: Task<Void, Never>?
     private var tokenActivityTask: Task<Void, Never>?
+    private var tokenActivityGeneration = 0
 
     init(
         readRateLimits: @escaping () async throws -> QuotaSnapshot = {
@@ -71,7 +72,10 @@ final class QuotaStore: ObservableObject {
     func stop() {
         refreshTask?.cancel()
         refreshTask = nil
+        tokenActivityGeneration += 1
         tokenActivityTask?.cancel()
+        tokenActivityTask = nil
+        isTokenActivityRefreshing = false
     }
 
     func setPopoverPresented(_ isPresented: Bool) {
@@ -97,6 +101,7 @@ final class QuotaStore: ObservableObject {
         isRefreshing = true
         errorMessage = nil
         defer { isRefreshing = false }
+        startTokenActivityRefreshIfNeeded()
 
         var quotaSucceeded = false
         do {
@@ -112,31 +117,37 @@ final class QuotaStore: ObservableObject {
             errorMessage = error.localizedDescription
         }
 
-        startTokenActivityRefreshIfNeeded()
-
         return quotaSucceeded
     }
 
     private func startTokenActivityRefreshIfNeeded() {
         guard tokenActivityTask == nil else { return }
+        tokenActivityGeneration += 1
+        let generation = tokenActivityGeneration
         tokenActivityErrorMessage = nil
         isTokenActivityRefreshing = true
 
         tokenActivityTask = Task { [weak self, readTokenActivity] in
             defer {
-                self?.isTokenActivityRefreshing = false
-                self?.tokenActivityTask = nil
+                if let self, self.tokenActivityGeneration == generation {
+                    self.isTokenActivityRefreshing = false
+                    self.tokenActivityTask = nil
+                }
             }
             do {
                 let activity = try await readTokenActivity()
-                guard !Task.isCancelled else { return }
-                self?.tokenActivity = activity
+                guard let self,
+                      self.tokenActivityGeneration == generation,
+                      !Task.isCancelled else { return }
+                self.tokenActivity = activity
             } catch is CancellationError {
                 return
             } catch {
-                guard !Task.isCancelled else { return }
-                self?.tokenActivity = nil
-                self?.tokenActivityErrorMessage = error.localizedDescription
+                guard let self,
+                      self.tokenActivityGeneration == generation,
+                      !Task.isCancelled else { return }
+                self.tokenActivity = nil
+                self.tokenActivityErrorMessage = error.localizedDescription
             }
         }
     }

@@ -49,6 +49,10 @@ enum TokenActivityPresentation {
         return cells(from: start, through: end, snapshot: snapshot, calendar: calendar)
     }
 
+    static func hasRecordedTokens(in cells: [TokenActivityCell]) -> Bool {
+        cells.contains { $0.tokens != nil }
+    }
+
     private static func cells(
         from start: Date,
         through end: Date,

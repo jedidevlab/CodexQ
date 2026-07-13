@@ -277,14 +277,13 @@ struct AppServerClientTests {
         printf '%s\n' '{"id":1,"result":{}}'
         IFS= read -r initialized_notification
         IFS= read -r usage_request
-        case "$usage_request" in
-          *'"method":"account/usage/read"'*|*'"method":"account\/usage\/read"'*)
-            printf '%s\n' '{"id":2,"result":{"summary":{"peakDailyTokens":1200},"dailyUsageBuckets":[{"startDate":"2026-07-12","tokens":1200}]}}'
-            ;;
-          *)
-            printf '%s\n' '{"id":2,"error":{"message":"unexpected method"}}'
-            ;;
-        esac
+        method=$(printf '%s' "$usage_request" | /usr/bin/plutil -extract method raw -o - - 2>/dev/null)
+        request_id=$(printf '%s' "$usage_request" | /usr/bin/plutil -extract id raw -o - - 2>/dev/null)
+        if [ "$method" = "account/usage/read" ] && [ "$request_id" = "2" ]; then
+          printf '%s\n' '{"id":2,"result":{"summary":{"peakDailyTokens":1200},"dailyUsageBuckets":[{"startDate":"2026-07-12","tokens":1200}]}}'
+        else
+          printf '%s\n' '{"id":2,"error":{"message":"unexpected method or id"}}'
+        fi
         """#
         try Data(script.utf8).write(to: executable)
         try FileManager.default.setAttributes(
