@@ -214,4 +214,15 @@ struct ResetCreditUISafetyTests {
         #expect(!source.contains("VStack(alignment: .leading, spacing: 2)"))
         #expect(source.contains("\n            Divider()\n\n            EmbeddedSettingsView"))
     }
+
+    @Test("暂不设限时保留灰色五小时进度条")
+    func unavailableFiveHourWindowKeepsDisabledSegments() throws {
+        let source = try String(
+            contentsOfFile: "Sources/CodexQ/Views/QuotaPopoverView.swift",
+            encoding: .utf8
+        )
+
+        #expect(source.contains("DisabledSegmentedBatteryBar"))
+        #expect(source.contains("暂不设限"))
+    }
 }

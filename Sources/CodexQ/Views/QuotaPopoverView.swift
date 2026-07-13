@@ -153,15 +153,35 @@ struct QuotaPopoverView: View {
 
 private struct UnavailableQuotaRow: View {
     var body: some View {
-        HStack {
-            Text("5 小时")
-                .font(.headline)
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("5 小时")
+                    .font(.headline)
+                    .frame(width: QuotaBarLayout.width(for: .fiveHour), alignment: .leading)
+                DisabledSegmentedBatteryBar(period: .fiveHour)
+            }
             Spacer()
             Text("暂不设限")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
-        .frame(maxWidth: .infinity)
+    }
+}
+
+private struct DisabledSegmentedBatteryBar: View {
+    let period: QuotaPeriod
+
+    var body: some View {
+        HStack(spacing: QuotaBarLayout.segmentSpacing) {
+            ForEach(0..<QuotaBarLayout.segments, id: \.self) { _ in
+                RoundedRectangle(cornerRadius: QuotaBarLayout.cornerRadius)
+                    .fill(Color.secondary.opacity(QuotaBarLayout.emptySegmentOpacity))
+            }
+        }
+        .frame(
+            width: QuotaBarLayout.width(for: period),
+            height: QuotaBarLayout.height(for: period)
+        )
     }
 }
 
