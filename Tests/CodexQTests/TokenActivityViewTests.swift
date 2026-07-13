@@ -208,6 +208,9 @@ struct TokenActivityViewTests {
         #expect(source.contains("累计 Token"))
         #expect(source.contains("snapshot.lifetimeTokens"))
         #expect(source.contains("TokenActivityPresentation.tokens("))
+        #expect(source.contains("TokenActivityInlineSummary("))
+        #expect(!source.contains("TokenActivitySummaryRow"))
+        #expect(!source.contains(".background(.quaternary"))
     }
 
     @Test("Token 活动只保留三个月每日入口")

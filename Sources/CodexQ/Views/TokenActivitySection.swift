@@ -8,8 +8,21 @@ struct TokenActivitySection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Token 活动")
-                .font(.headline)
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text("Token 活动")
+                    .font(.headline)
+                Spacer(minLength: 8)
+                if let snapshot {
+                    TokenActivityInlineSummary(
+                        todayTokens: TokenActivityPresentation.tokens(
+                            on: now,
+                            snapshot: snapshot,
+                            calendar: calendar
+                        ),
+                        lifetimeTokens: snapshot.lifetimeTokens
+                    )
+                }
+            }
 
             content
         }
@@ -35,14 +48,6 @@ struct TokenActivitySection: View {
                 peakTokens: snapshot.peakDailyTokens,
                 calendar: calendar
             )
-            TokenActivitySummaryRow(
-                todayTokens: TokenActivityPresentation.tokens(
-                    on: now,
-                    snapshot: snapshot,
-                    calendar: calendar
-                ),
-                lifetimeTokens: snapshot.lifetimeTokens
-            )
             if !TokenActivityPresentation.hasRecordedTokens(in: cells) {
                 Text("暂无 Token 使用记录")
                     .font(.caption)
@@ -67,31 +72,35 @@ struct TokenActivitySection: View {
     }
 }
 
-private struct TokenActivitySummaryRow: View {
+private struct TokenActivityInlineSummary: View {
     let todayTokens: Int64?
     let lifetimeTokens: Int64?
 
     var body: some View {
-        HStack(spacing: 8) {
-            metric(title: "今日 Token", tokens: todayTokens)
-            metric(title: "累计 Token", tokens: lifetimeTokens)
+        HStack(spacing: 10) {
+            metric(label: "今日", accessibilityLabel: "今日 Token", tokens: todayTokens)
+            metric(label: "累计", accessibilityLabel: "累计 Token", tokens: lifetimeTokens)
         }
+        .font(.caption2)
+        .lineLimit(1)
+        .minimumScaleFactor(0.8)
     }
 
-    private func metric(title: String, tokens: Int64?) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title)
-                .font(.caption2)
+    private func metric(
+        label: String,
+        accessibilityLabel: String,
+        tokens: Int64?
+    ) -> some View {
+        HStack(spacing: 3) {
+            Text(label)
                 .foregroundStyle(.secondary)
             Text(tokens.map(TokenCountFormatter.string) ?? "暂无数据")
-                .font(.system(.caption, design: .rounded, weight: .semibold))
+                .fontWeight(.semibold)
                 .monospacedDigit()
-                .lineLimit(1)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityValue(tokens.map(TokenCountFormatter.string) ?? "暂无数据")
     }
 }
 
