@@ -32,16 +32,20 @@ struct QuotaPopoverView: View {
     var body: some View {
         VStack(spacing: 10) {
             if let snapshot = store.snapshot {
-                QuotaRow(
-                    title: "5 小时",
-                    period: .fiveHour,
-                    window: snapshot.fiveHour,
-                    now: projectionNow,
-                    resetText: formatter.string(
-                        for: snapshot.fiveHour.resetsAt,
-                        period: .fiveHour
+                if let fiveHour = snapshot.fiveHour {
+                    QuotaRow(
+                        title: "5 小时",
+                        period: .fiveHour,
+                        window: fiveHour,
+                        now: projectionNow,
+                        resetText: formatter.string(
+                            for: fiveHour.resetsAt,
+                            period: .fiveHour
+                        )
                     )
-                )
+                } else {
+                    UnavailableQuotaRow()
+                }
                 QuotaRow(
                     title: "周限额",
                     period: .weekly,
@@ -144,6 +148,20 @@ struct QuotaPopoverView: View {
             updatedAt: store.lastUpdatedAt,
             now: relativeTimeNow
         )
+    }
+}
+
+private struct UnavailableQuotaRow: View {
+    var body: some View {
+        HStack {
+            Text("5 小时")
+                .font(.headline)
+            Spacer()
+            Text("暂不设限")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
     }
 }
 

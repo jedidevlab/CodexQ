@@ -1,12 +1,16 @@
 import Foundation
 
 struct QuotaSnapshot: Codable, Equatable, Sendable {
-    let fiveHour: QuotaWindow
+    let fiveHour: QuotaWindow?
     let weekly: QuotaWindow
     let resetCredits: ResetCreditsSummary?
 
+    var statusRemainingPercent: Double {
+        fiveHour?.remainingPercent ?? weekly.remainingPercent
+    }
+
     init(
-        fiveHour: QuotaWindow,
+        fiveHour: QuotaWindow?,
         weekly: QuotaWindow,
         resetCredits: ResetCreditsSummary? = nil
     ) {
@@ -150,9 +154,9 @@ struct RateLimitSnapshot: Decodable {
         let weekly = windows.first { $0.windowDurationMins == 10_080 }
             ?? secondary.flatMap { $0.windowDurationMins == nil ? $0 : nil }
 
-        guard let fiveHour, let weekly else { return nil }
+        guard let weekly else { return nil }
         return QuotaSnapshot(
-            fiveHour: fiveHour.quotaWindow,
+            fiveHour: fiveHour?.quotaWindow,
             weekly: weekly.quotaWindow
         )
     }

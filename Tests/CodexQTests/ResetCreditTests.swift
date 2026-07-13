@@ -53,6 +53,26 @@ struct ResetCreditDecodingTests {
         }
     }
 
+    @Test("服务端仅返回周限额时仍可解析")
+    func decodesWeeklyOnlyRateLimitsResponse() throws {
+        let json = #"{"rateLimits":{"limitId":"codex","primary":{"usedPercent":1,"windowDurationMins":10080,"resetsAt":1784508437},"secondary":null}}"#.data(using: .utf8)!
+
+        let response = try JSONDecoder().decode(RateLimitsResponse.self, from: json)
+        let snapshot = try #require(response.quotaSnapshot)
+
+        #expect(snapshot.fiveHour == nil)
+        #expect(snapshot.weekly.usedPercent == 1)
+    }
+
+    @Test("缺少周限额的响应仍视为无效")
+    func rejectsResponseWithoutWeeklyWindow() throws {
+        let json = #"{"rateLimits":{"primary":{"usedPercent":6,"windowDurationMins":300}}}"#.data(using: .utf8)!
+
+        let response = try JSONDecoder().decode(RateLimitsResponse.self, from: json)
+
+        #expect(response.quotaSnapshot == nil)
+    }
+
     @Test("只展示 available 状态但保留权威次数")
     func filtersAvailableDetailsWithoutChangingCount() {
         let summary = ResetCreditsSummary(

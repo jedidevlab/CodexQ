@@ -163,7 +163,7 @@ final class StatusBarController: NSObject {
     }
 
     private func updateStatusItem() {
-        let remainingPercent = store.snapshot?.fiveHour.remainingPercent
+        let remainingPercent = store.snapshot?.statusRemainingPercent
         let error = store.errorMessage
         let now = Date()
         let hasFreshQuota = StatusTitleFormatter.hasFreshQuota(

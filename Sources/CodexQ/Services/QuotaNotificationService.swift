@@ -13,7 +13,15 @@ actor QuotaNotificationService {
         thresholds: [Int]
     ) async {
         guard let previous else { return }
-        await notify(name: "5 小时", previous: previous.fiveHour, current: current.fiveHour, thresholds: thresholds)
+        if let previousFiveHour = previous.fiveHour,
+           let currentFiveHour = current.fiveHour {
+            await notify(
+                name: "5 小时",
+                previous: previousFiveHour,
+                current: currentFiveHour,
+                thresholds: thresholds
+            )
+        }
         await notify(name: "周限额", previous: previous.weekly, current: current.weekly, thresholds: thresholds)
     }
 

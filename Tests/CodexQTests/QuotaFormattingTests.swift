@@ -88,8 +88,39 @@ struct QuotaFormattingTests {
             )
         )
 
-        #expect(limits.quotaSnapshot?.fiveHour.usedPercent == 5)
+        #expect(limits.quotaSnapshot?.fiveHour?.usedPercent == 5)
         #expect(limits.quotaSnapshot?.weekly.usedPercent == 20)
+    }
+
+    @Test("仅周限额时仍生成可用快照")
+    func weeklyOnlyWindowProducesSnapshot() throws {
+        let limits = RateLimitSnapshot(
+            primary: RateLimitWindow(
+                usedPercent: 1,
+                windowDurationMins: 10_080,
+                resetsAt: nil
+            ),
+            secondary: nil
+        )
+
+        let snapshot = try #require(limits.quotaSnapshot)
+
+        #expect(snapshot.fiveHour == nil)
+        #expect(snapshot.weekly.usedPercent == 1)
+    }
+
+    @Test("5小时窗口缺失时状态栏使用周限额")
+    func weeklyQuotaIsStatusFallback() {
+        let snapshot = QuotaSnapshot(
+            fiveHour: nil,
+            weekly: .init(
+                usedPercent: 22,
+                resetsAt: nil,
+                durationMinutes: 10_080
+            )
+        )
+
+        #expect(snapshot.statusRemainingPercent == 78)
     }
 
     @Test("预计余量与红线均按 CodexBar Pace 计算")

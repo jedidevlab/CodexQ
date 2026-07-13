@@ -50,7 +50,7 @@ final class QuotaStore: ObservableObject {
 
     func refreshIfNeededOnPresentation(now: Date = Date()) async {
         guard QuotaRefreshPolicy.shouldRefreshOnPresentation(
-            remainingPercent: snapshot?.fiveHour.remainingPercent,
+            remainingPercent: snapshot?.statusRemainingPercent,
             lastUpdatedAt: lastUpdatedAt,
             errorMessage: errorMessage,
             isRefreshing: isRefreshing,
