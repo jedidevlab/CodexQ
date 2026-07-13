@@ -60,6 +60,30 @@ struct StatusPanelPositionerTests {
         #expect(fitIndex.lowerBound < showIndex.lowerBound)
     }
 
+    @Test("控制器按刷新与交互状态统一管理自动关闭")
+    func controllerUsesInteractionAwareAutoClosePolicy() throws {
+        let source = try String(
+            contentsOfFile: "Sources/CodexQ/App/StatusBarController.swift",
+            encoding: .utf8
+        )
+
+        #expect(source.contains("activeInteractions"))
+        #expect(source.contains("interactionDidChange"))
+        #expect(source.contains("PopoverAutoClosePolicy.shouldSchedule"))
+        #expect(source.contains("activeInteractions.removeAll()"))
+    }
+
+    @Test("弹窗失去焦点后仍立即关闭")
+    func panelStillClosesWhenItResignsKey() throws {
+        let source = try String(
+            contentsOfFile: "Sources/CodexQ/App/StatusPanel.swift",
+            encoding: .utf8
+        )
+
+        #expect(source.contains("override func resignKey()"))
+        #expect(source.contains("self.orderOut(nil)"))
+    }
+
     @Test("面板在现有位置基础上整体向左偏移十像素")
     func panelOffsetsTenPixelsLeft() {
         let frame = StatusPanelPositioner.frame(

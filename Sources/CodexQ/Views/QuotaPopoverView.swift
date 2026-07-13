@@ -25,8 +25,11 @@ enum QuotaBarLayout {
 struct QuotaPopoverView: View {
     @ObservedObject var store: QuotaStore
     @ObservedObject var settings: AppSettings
-    let settingsDidChange: () -> Void
+    let contentDidChange: () -> Void
+    let interactionDidChange: (PopoverInteraction, Bool) -> Void
     @State private var relativeTimeNow = Date()
+    @State private var isResetCreditsExpanded = false
+    @State private var isSettingsExpanded = false
     private let formatter = ResetTimeFormatter()
 
     var body: some View {
@@ -81,15 +84,19 @@ struct QuotaPopoverView: View {
 
             if let resetCredits = store.snapshot?.resetCredits {
                 Divider()
-                ResetCreditsSection(summary: resetCredits)
+                ResetCreditsSection(
+                    summary: resetCredits,
+                    isExpanded: $isResetCreditsExpanded
+                )
             }
 
-            Divider()
-
-            EmbeddedSettingsView(
-                settings: settings,
-                settingsDidChange: settingsDidChange
-            )
+            if isSettingsExpanded {
+                Divider()
+                EmbeddedSettingsView(
+                    settings: settings,
+                    settingsDidChange: contentDidChange
+                )
+            }
 
             Divider()
 
@@ -111,9 +118,17 @@ struct QuotaPopoverView: View {
                 }
                 Spacer()
                 Button {
+                    isSettingsExpanded.toggle()
+                } label: {
+                    Image(systemName: isSettingsExpanded ? "gearshape.fill" : "gearshape")
+                }
+                .buttonStyle(.borderless)
+                .help("设置")
+
+                Button {
                     Task { await store.refresh() }
                 } label: {
-                    if store.isRefreshing {
+                    if isAnyRefreshing {
                         ProgressView()
                             .controlSize(.small)
                     } else {
@@ -121,7 +136,7 @@ struct QuotaPopoverView: View {
                     }
                 }
                 .buttonStyle(.borderless)
-                .disabled(store.isRefreshing)
+                .disabled(isAnyRefreshing)
                 .help("刷新")
 
                 Button("退出") {
@@ -132,6 +147,22 @@ struct QuotaPopoverView: View {
         }
         .padding(16)
         .frame(width: 316)
+        .onHover { isHovering in
+            interactionDidChange(.pointer, isHovering)
+        }
+        .onChange(of: isResetCreditsExpanded) { isExpanded in
+            interactionDidChange(.resetCredits, isExpanded)
+            contentDidChange()
+        }
+        .onChange(of: isSettingsExpanded) { isExpanded in
+            interactionDidChange(.settings, isSettingsExpanded)
+            contentDidChange()
+        }
+        .onChange(of: store.isPopoverPresented) { isPresented in
+            guard !isPresented else { return }
+            isResetCreditsExpanded = false
+            isSettingsExpanded = false
+        }
         .task(id: store.isPopoverPresented) {
             guard store.isPopoverPresented else { return }
             relativeTimeNow = Date()
@@ -149,6 +180,10 @@ struct QuotaPopoverView: View {
             return relativeTimeNow
         }
         return max(relativeTimeNow, lastUpdatedAt)
+    }
+
+    private var isAnyRefreshing: Bool {
+        store.isRefreshing || store.isTokenActivityRefreshing
     }
 
     private func failureStatus(error: String) -> String {

@@ -16,6 +16,7 @@ final class StatusBarController: NSObject {
     private var hostingController: NSHostingController<AnyView>?
     private var cancellables = Set<AnyCancellable>()
     private var autoCloseTask: Task<Void, Never>?
+    private var activeInteractions = Set<PopoverInteraction>()
     private var freshnessTask: Task<Void, Never>?
     private var panelRefitTask: Task<Void, Never>?
     private var currentAnchorRect: NSRect?
@@ -39,11 +40,14 @@ final class StatusBarController: NSObject {
         let rootView = AnyView(
             QuotaPopoverView(
                 store: store,
-                settings: .shared
-            ) { [weak self] in
-                self?.schedulePanelRefit()
-                self?.scheduleAutoClose()
-            }
+                settings: .shared,
+                contentDidChange: { [weak self] in
+                    self?.schedulePanelRefit()
+                },
+                interactionDidChange: { [weak self] interaction, isActive in
+                    self?.interactionDidChange(interaction, isActive: isActive)
+                }
+            )
             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
             .overlay {
                 RoundedRectangle(cornerRadius: 18)
@@ -72,8 +76,8 @@ final class StatusBarController: NSObject {
 
         store.$isRefreshing
             .removeDuplicates()
-            .sink { [weak self] isRefreshing in
-                self?.updateAutoClose(isRefreshing: isRefreshing)
+            .sink { [weak self] _ in
+                self?.updateAutoClose()
                 self?.schedulePanelRefit()
             }
             .store(in: &cancellables)
@@ -101,6 +105,7 @@ final class StatusBarController: NSObject {
         store.$isTokenActivityRefreshing
             .removeDuplicates()
             .sink { [weak self] _ in
+                self?.updateAutoClose()
                 self?.schedulePanelRefit()
             }
             .store(in: &cancellables)
@@ -142,7 +147,7 @@ final class StatusBarController: NSObject {
             fitPanel(anchorRect: anchorRect, visibleFrame: screen.visibleFrame)
             panel.orderFrontRegardless()
             panel.makeKey()
-            updateAutoClose(isRefreshing: store.isRefreshing)
+            updateAutoClose()
             Task { [weak store] in
                 await store?.refreshIfNeededOnPresentation()
             }
@@ -152,6 +157,7 @@ final class StatusBarController: NSObject {
     private func panelDidClose() {
         autoCloseTask?.cancel()
         autoCloseTask = nil
+        activeInteractions.removeAll()
         store.setPopoverPresented(false)
     }
 
@@ -162,6 +168,7 @@ final class StatusBarController: NSObject {
         freshnessTask = nil
         panelRefitTask?.cancel()
         panelRefitTask = nil
+        activeInteractions.removeAll()
         panel.orderOut(nil)
         store.stop()
     }
@@ -178,15 +185,31 @@ final class StatusBarController: NSObject {
         }
     }
 
-    private func updateAutoClose(isRefreshing: Bool) {
+    private func updateAutoClose() {
         guard panel.isVisible else { return }
 
-        if isRefreshing {
+        guard PopoverAutoClosePolicy.shouldSchedule(
+            isQuotaRefreshing: store.isRefreshing,
+            isTokenActivityRefreshing: store.isTokenActivityRefreshing,
+            activeInteractions: activeInteractions
+        ) else {
             autoCloseTask?.cancel()
             autoCloseTask = nil
-        } else {
-            scheduleAutoClose()
+            return
         }
+        scheduleAutoClose()
+    }
+
+    private func interactionDidChange(
+        _ interaction: PopoverInteraction,
+        isActive: Bool
+    ) {
+        if isActive {
+            activeInteractions.insert(interaction)
+        } else {
+            activeInteractions.remove(interaction)
+        }
+        updateAutoClose()
     }
 
     private func schedulePanelRefit() {

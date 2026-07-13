@@ -183,6 +183,46 @@ struct TokenActivityViewTests {
         #expect(resetCreditsIndex.lowerBound < settingsIndex.lowerBound)
     }
 
+    @Test("刷新按钮等待额度与 Token 活动全部完成")
+    func refreshButtonTracksQuotaAndTokenActivity() throws {
+        let source = try String(
+            contentsOfFile: "Sources/CodexQ/Views/QuotaPopoverView.swift",
+            encoding: .utf8
+        )
+
+        #expect(source.contains("store.isRefreshing || store.isTokenActivityRefreshing"))
+        #expect(source.contains("if isAnyRefreshing"))
+        #expect(source.contains(".disabled(isAnyRefreshing)"))
+    }
+
+    @Test("低频设置默认折叠并由底部齿轮控制")
+    func settingsAreCollapsedBehindGearButton() throws {
+        let source = try String(
+            contentsOfFile: "Sources/CodexQ/Views/QuotaPopoverView.swift",
+            encoding: .utf8
+        )
+
+        #expect(source.contains("@State private var isSettingsExpanded = false"))
+        #expect(source.contains("if isSettingsExpanded"))
+        #expect(source.contains("gearshape.fill"))
+        #expect(source.contains("interactionDidChange(.settings, isSettingsExpanded)"))
+    }
+
+    @Test("鼠标停留与展开状态会上报并在关闭后复位")
+    func popoverReportsInteractionsAndResetsExpansionOnClose() throws {
+        let source = try String(
+            contentsOfFile: "Sources/CodexQ/Views/QuotaPopoverView.swift",
+            encoding: .utf8
+        )
+
+        #expect(source.contains(".onHover"))
+        #expect(source.contains("interactionDidChange(.pointer, isHovering)"))
+        #expect(source.contains("interactionDidChange(.resetCredits, isExpanded)"))
+        #expect(source.contains(".onChange(of: store.isPopoverPresented)"))
+        #expect(source.contains("isResetCreditsExpanded = false"))
+        #expect(source.contains("isSettingsExpanded = false"))
+    }
+
     @Test("每日路径调用共享方块、单位和等级")
     func dailyModeCallsSharedSquareFormatterAndLevel() throws {
         let source = try String(

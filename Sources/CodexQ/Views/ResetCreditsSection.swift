@@ -2,7 +2,7 @@ import SwiftUI
 
 struct ResetCreditsSection: View {
     let summary: ResetCreditsSummary
-    @State private var isExpanded = false
+    @Binding var isExpanded: Bool
 
     var body: some View {
         let presentation = ResetCreditPresentation(summary: summary)

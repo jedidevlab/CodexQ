@@ -203,16 +203,20 @@ struct ResetCreditUISafetyTests {
         #expect(!source.contains(".padding(.bottom, 2)"))
     }
 
-    @Test("重置区沿用原始外层分割线布局")
-    func resetCreditSectionKeepsOriginalDividerLayout() throws {
-        let source = try String(
+    @Test("重置展开状态由弹窗持有以便关闭时复位")
+    func resetCreditExpansionUsesExternalBinding() throws {
+        let sectionSource = try String(
+            contentsOfFile: "Sources/CodexQ/Views/ResetCreditsSection.swift",
+            encoding: .utf8
+        )
+        let popoverSource = try String(
             contentsOfFile: "Sources/CodexQ/Views/QuotaPopoverView.swift",
             encoding: .utf8
         )
 
-        #expect(source.contains("ResetCreditsSection(summary: resetCredits)"))
-        #expect(!source.contains("VStack(alignment: .leading, spacing: 2)"))
-        #expect(source.contains("\n            Divider()\n\n            EmbeddedSettingsView"))
+        #expect(sectionSource.contains("@Binding var isExpanded: Bool"))
+        #expect(!sectionSource.contains("@State private var isExpanded"))
+        #expect(popoverSource.contains("isExpanded: $isResetCreditsExpanded"))
     }
 
     @Test("无限制时保留灰色五小时进度条")
