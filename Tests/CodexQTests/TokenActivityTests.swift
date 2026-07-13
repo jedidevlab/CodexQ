@@ -23,10 +23,15 @@ struct TokenActivityTests {
     func dailyCellsKeepThreeCalendarMonthsAndFillMissingDays() throws {
         let now = try date("2026-07-13")
         let firstDate = try date("2026-05-01")
+        let lastDate = try date("2026-07-31")
         let missingDate = try date("2026-05-02")
+        let futureDate = try date("2026-07-14")
         let fixture = TokenActivitySnapshot(
             peakDailyTokens: 2_000,
-            days: [.init(startDate: "2026-06-01", tokens: 1_200)]
+            days: [
+                .init(startDate: "2026-06-01", tokens: 1_200),
+                .init(startDate: "2026-07-14", tokens: 1_500)
+            ]
         )
         let cells = TokenActivityPresentation.dailyCells(
             snapshot: fixture,
@@ -35,9 +40,11 @@ struct TokenActivityTests {
         )
 
         #expect(cells.first?.date == firstDate)
-        #expect(cells.last?.date == now)
+        #expect(cells.last?.date == lastDate)
         let missingCell = try #require(cells.first(where: { $0.date == missingDate }))
         #expect(missingCell.tokens == nil)
+        let futureCell = try #require(cells.first(where: { $0.date == futureDate }))
+        #expect(futureCell.tokens == nil)
         for pair in zip(cells, cells.dropFirst()) {
             #expect(utcCalendar.date(byAdding: .day, value: 1, to: pair.0.date) == pair.1.date)
         }
@@ -64,10 +71,11 @@ struct TokenActivityTests {
     @Test("跨年时日历下界仍是两个月前的月初")
     func dailyCellsHandleYearBoundary() throws {
         let expectedFirstDate = try date("2026-11-01")
-        let expectedLastDate = try date("2027-01-05")
+        let now = try date("2027-01-05")
+        let expectedLastDate = try date("2027-01-31")
         let cells = TokenActivityPresentation.dailyCells(
             snapshot: .init(peakDailyTokens: 0, days: []),
-            now: expectedLastDate,
+            now: now,
             calendar: utcCalendar
         )
 
@@ -89,7 +97,7 @@ struct TokenActivityTests {
             calendar: utcCalendar
         )
 
-        #expect(cells.count == 74)
+        #expect(cells.count == 92)
         #expect(!TokenActivityPresentation.hasRecordedTokens(in: cells))
         #expect(cells.allSatisfy { $0.tokens == nil })
     }

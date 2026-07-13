@@ -41,12 +41,21 @@ enum TokenActivityPresentation {
         now: Date,
         calendar: Calendar
     ) -> [TokenActivityCell] {
-        let end = calendar.startOfDay(for: now)
-        guard let lowerMonth = calendar.date(byAdding: .month, value: -2, to: end),
-              let start = calendar.date(from: calendar.dateComponents([.year, .month], from: lowerMonth)) else {
+        let today = calendar.startOfDay(for: now)
+        guard let lowerMonth = calendar.date(byAdding: .month, value: -2, to: today),
+              let start = calendar.date(from: calendar.dateComponents([.year, .month], from: lowerMonth)),
+              let nextMonth = calendar.date(byAdding: .month, value: 1, to: today),
+              let nextMonthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: nextMonth)),
+              let end = calendar.date(byAdding: .day, value: -1, to: nextMonthStart) else {
             return []
         }
-        return cells(from: start, through: end, snapshot: snapshot, calendar: calendar)
+        return cells(
+            from: start,
+            through: end,
+            recordedThrough: today,
+            snapshot: snapshot,
+            calendar: calendar
+        )
     }
 
     static func hasRecordedTokens(in cells: [TokenActivityCell]) -> Bool {
@@ -56,6 +65,7 @@ enum TokenActivityPresentation {
     private static func cells(
         from start: Date,
         through end: Date,
+        recordedThrough: Date,
         snapshot: TokenActivitySnapshot,
         calendar: Calendar
     ) -> [TokenActivityCell] {
@@ -63,7 +73,10 @@ enum TokenActivityPresentation {
         var result: [TokenActivityCell] = []
         var date = start
         while date <= end {
-            result.append(TokenActivityCell(date: date, tokens: tokensByDate[date]))
+            result.append(TokenActivityCell(
+                date: date,
+                tokens: date <= recordedThrough ? tokensByDate[date] : nil
+            ))
             guard let next = calendar.date(byAdding: .day, value: 1, to: date) else { break }
             date = next
         }

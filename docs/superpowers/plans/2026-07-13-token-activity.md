@@ -40,8 +40,9 @@
 @Test func dailyCellsKeepThreeCalendarMonthsAndFillMissingDays() throws {
     let cells = TokenActivityPresentation.dailyCells(snapshot: fixture, now: july13, calendar: utcCalendar)
     #expect(cells.first?.date == may1)
-    #expect(cells.last?.date == july13)
+    #expect(cells.last?.date == july31)
     #expect(cells.first(where: { $0.date == missingDate })?.tokens == nil)
+    #expect(cells.first(where: { $0.date == july14 })?.tokens == nil)
 }
 
 ```
@@ -54,7 +55,7 @@ Expected: compilation fails because the Token activity types do not exist.
 
 - [ ] **Step 3: Implement the minimal models and pure presentation logic**
 
-Decode `startDate` as the server-provided `yyyy-MM-dd` value, normalize all comparisons with `Calendar.startOfDay(for:)`, and compute the daily lower bound as the first day of the month two months before `now`.
+Decode `startDate` as the server-provided `yyyy-MM-dd` value, normalize all comparisons with `Calendar.startOfDay(for:)`, compute the daily lower bound as the first day of the month two months before `now`, and end the visible grid on the current month's final day. Dates after `now` remain present with `tokens == nil`.
 
 Use one formatter for every daily cell:
 
