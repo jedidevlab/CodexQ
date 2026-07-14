@@ -1,38 +1,42 @@
 # CodexQ
 
-[English](README.en.md)
+<p align="center">
+  <strong>不用打开额外页面，一眼看清 Codex 还能用多久。</strong>
+</p>
 
-CodexQ 是一款 macOS 菜单栏工具，用于实时查看 Codex 额度与 Token 使用情况，展示 5 小时与周限额进度、剩余额度、预测耗尽时间，并支持额度预警与自动刷新。
+<p align="center">
+  <a href="README.en.md">English</a> ·
+  <a href="https://github.com/jedidevlab/CodexQ/releases/latest">下载最新版</a>
+</p>
 
-## 功能
+CodexQ 是一款原生 macOS 菜单栏工具。它把ChatGPT（原Codex）5 小时与周限额、剩余额度、预计耗尽时间和近三个月 Token 活动集中在一个浮动面板中显示。
 
-- macOS 菜单栏额度指示器
-- 5 小时与周限额进度条
-- 5 小时限额临时取消时显示“无限制”，周限额继续正常刷新
-- 剩余额度百分比
-- 按当前使用节奏预测耗尽时间
-- 近三个月每日 Token 活动，以及昨日与累计 Token 用量
-- 手动刷新与自动刷新
-- 登录时启动
-- 额度预警通知
-- 原生 SwiftUI/AppKit 浮动窗口
+## 一眼掌握使用节奏
 
-## 系统要求
+- **额度进度**：同时查看 5 小时与周限额；临时没有 5 小时限制时会明确显示“无限制”。
+- **耗尽预测**：根据当前使用节奏判断额度是否够用，并显示预计耗尽时间。
+- **Token 活动**：查看近三个月每日活动、今日与累计 Token 用量。
+- **及时提醒**：支持自动刷新、登录时启动，以及 20% / 10% / 5% 额度预警。
+- **原生体验**：使用 SwiftUI 与 AppKit 构建，常驻菜单栏，不打断当前工作。
+
+## 下载与安装
+
+从 [GitHub Releases](https://github.com/jedidevlab/CodexQ/releases/latest) 下载与你的 Mac 匹配的安装包：
+
+| Mac | 安装包 |
+| --- | --- |
+| Apple Silicon | `CodexQ-1.0.8-arm64.zip` |
+| Intel | `CodexQ-1.0.8-x86_64.zip` |
+
+解压后，将 `CodexQ.app` 移入“应用程序”文件夹。
+
+> 当前发布包使用 ad-hoc 签名，尚未经过 notarization 公证。首次启动时，macOS 可能要求右键点击 App 并选择“打开”。
+
+## 使用条件
 
 - macOS 13 或更新版本
 - 已安装 ChatGPT app，路径为 `/Applications/ChatGPT.app`（同时兼容旧版 `/Applications/Codex.app`）
-- 如需本地构建，需要 Swift 6 工具链
-
-## 下载
-
-在 GitHub Releases 中选择与你的 Mac 匹配的安装包：
-
-- Apple Silicon Mac：`CodexQ-1.0.8-arm64.zip`
-- Intel Mac：`CodexQ-1.0.8-x86_64.zip`
-
-下载后解压，将 `CodexQ.app` 移动到“应用程序”文件夹。
-
-当前发布包使用 ad-hoc 签名，未经过 notarization 公证。首次启动时，macOS 可能需要右键点击 app 并选择“打开”。
+- 本地构建需要 Swift 6 工具链
 
 ## 本地运行
 
@@ -52,7 +56,10 @@ CodexQ 是一款 macOS 菜单栏工具，用于实时查看 Codex 额度与 Toke
 swift test
 ```
 
-## 打包 Release
+<details>
+<summary><strong>维护者：打包 Release</strong></summary>
+
+<br>
 
 按当前 Mac 架构生成 GitHub Release zip：
 
@@ -73,6 +80,6 @@ swift test
 dist/CodexQ-1.0.8-<arch>.zip
 ```
 
-## 打包说明
+开发运行脚本会在 `dist/CodexQ.app` 生成本地 `.app` bundle；构建产物不会提交到 Git。
 
-开发运行脚本会在 `dist/CodexQ.app` 生成本地 `.app` bundle。构建产物不会提交到 Git。
+</details>

@@ -1,38 +1,42 @@
 # CodexQ
 
-[中文](README.md)
+<p align="center">
+  <strong>Know how much Codex time you have left without leaving your current task.</strong>
+</p>
 
-CodexQ is a macOS menu bar utility for monitoring Codex quota and token usage in real time. It shows 5-hour and weekly quota progress, remaining quota, projected run-out time, and supports quota warnings and automatic refresh.
+<p align="center">
+  <a href="README.md">中文</a> ·
+  <a href="https://github.com/jedidevlab/CodexQ/releases/latest">Download latest</a>
+</p>
 
-## Features
+CodexQ is a native macOS menu bar utility. It brings ChatGPT (formerly Codex) five-hour and weekly quota, remaining capacity, projected run-out time, and the past three months of Token activity into one floating panel.
 
-- macOS menu bar quota indicator
-- 5-hour and weekly quota progress bars
-- Shows the 5-hour quota as unlimited when that window is temporarily absent, while weekly quota refresh continues
-- Remaining quota percentage
-- Projected run-out time based on current usage pace
-- Daily token activity for the latest three months, plus yesterday and lifetime token usage
-- Manual and automatic refresh
-- Launch at login
-- Quota warning notifications
-- Native SwiftUI/AppKit floating panel
+## Your usage pace at a glance
+
+- **Quota progress:** follow five-hour and weekly limits together; a temporarily absent five-hour window is clearly shown as unlimited.
+- **Run-out projection:** see whether your current pace is sustainable and when the quota may run out.
+- **Token activity:** review three months of daily activity plus today's and lifetime Token usage.
+- **Timely alerts:** enable automatic refresh, launch at login, and quota warnings at 20%, 10%, or 5%.
+- **Native experience:** built with SwiftUI and AppKit to stay available without interrupting your work.
+
+## Download and install
+
+Download the archive for your Mac from [GitHub Releases](https://github.com/jedidevlab/CodexQ/releases/latest):
+
+| Mac | Archive |
+| --- | --- |
+| Apple Silicon | `CodexQ-1.0.8-arm64.zip` |
+| Intel | `CodexQ-1.0.8-x86_64.zip` |
+
+Unzip the archive, then move `CodexQ.app` to Applications.
+
+> Releases are ad-hoc signed and not notarized. On first launch, macOS may require right-clicking the app and choosing Open.
 
 ## Requirements
 
 - macOS 13 or later
 - ChatGPT app installed at `/Applications/ChatGPT.app` (legacy `/Applications/Codex.app` is also supported)
 - Swift 6 toolchain for local builds
-
-## Download
-
-Choose the release archive that matches your Mac:
-
-- Apple Silicon Mac: `CodexQ-1.0.8-arm64.zip`
-- Intel Mac: `CodexQ-1.0.8-x86_64.zip`
-
-Unzip the archive, then move `CodexQ.app` to Applications.
-
-The release builds are ad-hoc signed and not notarized. On first launch, macOS may require right-clicking the app and choosing Open.
 
 ## Build and Run
 
@@ -52,7 +56,10 @@ Run tests:
 swift test
 ```
 
-## Package a Release
+<details>
+<summary><strong>Maintainers: package a release</strong></summary>
+
+<br>
 
 Generate a ZIP archive for GitHub Releases using the current Mac architecture:
 
@@ -73,6 +80,6 @@ The archive is written to:
 dist/CodexQ-1.0.8-<arch>.zip
 ```
 
-## Packaging Note
+The helper script builds a local `.app` bundle in `dist/CodexQ.app` for development use. Generated build artifacts are excluded from Git.
 
-The helper script builds a local `.app` bundle in `dist/CodexQ.app` for development use. Generated build artifacts are intentionally excluded from Git.
+</details>
