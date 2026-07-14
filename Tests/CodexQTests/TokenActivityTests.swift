@@ -44,27 +44,47 @@ struct TokenActivityTests {
         }
     }
 
-    @Test("今日 Token 只读取本地日历当天数据")
-    func todayTokensUsesCurrentCalendarDay() throws {
+    @Test("当天桶缺失时使用不晚于今天的最近完整日")
+    func latestRecordedDayUsesNewestAvailableBucket() throws {
         let snapshot = TokenActivitySnapshot(
             peakDailyTokens: 2_000,
             lifetimeTokens: 9_000,
             days: [
                 .init(startDate: "2026-07-12", tokens: 800),
-                .init(startDate: "2026-07-13", tokens: 1_200)
+                .init(startDate: "2026-07-16", tokens: 1_600),
+                .init(startDate: "2026-07-13", tokens: 1_200),
+                .init(startDate: "invalid", tokens: 2_000)
             ]
         )
 
-        #expect(TokenActivityPresentation.tokens(
-            on: try date("2026-07-13"),
+        let latest = TokenActivityPresentation.latestRecordedDay(
+            through: try date("2026-07-15"),
             snapshot: snapshot,
             calendar: utcCalendar
-        ) == 1_200)
-        #expect(TokenActivityPresentation.tokens(
-            on: try date("2026-07-14"),
-            snapshot: snapshot,
+        )
+
+        #expect(latest == TokenActivityCell(
+            date: try date("2026-07-13"),
+            tokens: 1_200
+        ))
+    }
+
+    @Test("最近完整日不是昨天时显示具体日期")
+    func completedDayLabelShowsConcreteDate() throws {
+        #expect(TokenActivityDateLabel.string(
+            for: try date("2026-07-13"),
+            now: try date("2026-07-15"),
             calendar: utcCalendar
-        ) == nil)
+        ) == "7/13")
+    }
+
+    @Test("最近完整日是昨天时显示昨日")
+    func completedDayLabelShowsYesterday() throws {
+        #expect(TokenActivityDateLabel.string(
+            for: try date("2026-07-14"),
+            now: try date("2026-07-15"),
+            calendar: utcCalendar
+        ) == "昨日")
     }
 
     @Test("日历模式保留当前月及前两个月，并为空缺日期补位")

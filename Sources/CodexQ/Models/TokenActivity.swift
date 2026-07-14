@@ -72,12 +72,21 @@ enum TokenActivityPresentation {
         cells.contains { $0.tokens != nil }
     }
 
-    static func tokens(
-        on date: Date,
+    static func latestRecordedDay(
+        through date: Date,
         snapshot: TokenActivitySnapshot,
         calendar: Calendar
-    ) -> Int64? {
-        tokenLookup(snapshot: snapshot, calendar: calendar)[calendar.startOfDay(for: date)]
+    ) -> TokenActivityCell? {
+        let cutoff = calendar.startOfDay(for: date)
+        return snapshot.days.compactMap { day -> TokenActivityCell? in
+            guard let parsedDate = self.date(day.startDate, calendar: calendar) else {
+                return nil
+            }
+            let normalizedDate = calendar.startOfDay(for: parsedDate)
+            guard normalizedDate <= cutoff else { return nil }
+            return TokenActivityCell(date: normalizedDate, tokens: day.tokens)
+        }
+        .max { $0.date < $1.date }
     }
 
     private static func cells(
@@ -139,6 +148,20 @@ enum TokenCountFormatter {
 
     static func string(_ tokens: Int64) -> String {
         compactNumber(tokens) + " tokens"
+    }
+}
+
+enum TokenActivityDateLabel {
+    static func string(for date: Date, now: Date, calendar: Calendar) -> String {
+        if let yesterday = calendar.date(byAdding: .day, value: -1, to: now),
+           calendar.isDate(date, inSameDayAs: yesterday) {
+            return "昨日"
+        }
+        let components = calendar.dateComponents([.month, .day], from: date)
+        guard let month = components.month, let day = components.day else {
+            return ""
+        }
+        return "\(month)/\(day)"
     }
 }
 

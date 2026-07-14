@@ -15,7 +15,7 @@ CodexQ 是一款原生 macOS 菜单栏工具。它把ChatGPT（原Codex）5 小�
 
 - **额度进度**：同时查看 5 小时与周限额；临时没有 5 小时限制时会明确显示“无限制”。
 - **耗尽预测**：根据当前使用节奏判断额度是否够用，并显示预计耗尽时间。
-- **Token 活动**：查看近三个月每日活动、今日与累计 Token 用量。
+- **Token 活动**：查看近三个月每日活动、最近完整日与累计 Token 用量。
 - **及时提醒**：支持自动刷新、登录时启动，以及 20% / 10% / 5% 额度预警。
 - **原生体验**：使用 SwiftUI 与 AppKit 构建，常驻菜单栏，不打断当前工作。
 
@@ -25,8 +25,8 @@ CodexQ 是一款原生 macOS 菜单栏工具。它把ChatGPT（原Codex）5 小�
 
 | Mac | 安装包 |
 | --- | --- |
-| Apple Silicon | `CodexQ-1.0.8-arm64.zip` |
-| Intel | `CodexQ-1.0.8-x86_64.zip` |
+| Apple Silicon | `CodexQ-1.0.9-arm64.zip` |
+| Intel | `CodexQ-1.0.9-x86_64.zip` |
 
 解压后，将 `CodexQ.app` 移入“应用程序”文件夹。
 
@@ -64,20 +64,20 @@ swift test
 按当前 Mac 架构生成 GitHub Release zip：
 
 ```bash
-./script/package_release.sh 1.0.8
+./script/package_release.sh 1.0.9
 ```
 
 也可以显式指定架构：
 
 ```bash
-./script/package_release.sh 1.0.8 arm64
-./script/package_release.sh 1.0.8 x86_64
+./script/package_release.sh 1.0.9 arm64
+./script/package_release.sh 1.0.9 x86_64
 ```
 
 生成文件位于：
 
 ```text
-dist/CodexQ-1.0.8-<arch>.zip
+dist/CodexQ-1.0.9-<arch>.zip
 ```
 
 开发运行脚本会在 `dist/CodexQ.app` 生成本地 `.app` bundle；构建产物不会提交到 Git。

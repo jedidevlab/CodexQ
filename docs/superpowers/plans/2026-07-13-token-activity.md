@@ -55,7 +55,7 @@ Expected: compilation fails because the Token activity types do not exist.
 
 - [ ] **Step 3: Implement the minimal models and pure presentation logic**
 
-Decode `startDate` as the server-provided `yyyy-MM-dd` value, normalize all comparisons with `Calendar.startOfDay(for:)`, compute the daily lower bound as the first day of the month two months before `now`, and end the visible grid on the current month's final day. Dates after `now` remain present with `tokens == nil`.
+Decode `startDate` as the server-provided Gregorian `yyyy-MM-dd` value in the local time zone, normalize all comparisons with `Calendar.startOfDay(for:)`, compute the daily lower bound as the first day of the month two months before `now`, and end the visible grid on the current month's final day. Dates after `now` remain present with `tokens == nil`.
 
 Use one formatter for every daily cell:
 
@@ -161,7 +161,7 @@ In `QuotaStore.refresh()`, preserve the existing quota request and error behavio
 
 - [ ] **Step 4: Implement the SwiftUI section**
 
-Add a compact “Token 活动” header and render the daily cells as a compact three-month calendar grid without a mode picker. In the header's trailing space, show the previous local calendar day's “昨日 Token” and “累计 Token” as one compact line with no background or border; omit the repeated `tokens` suffix from these two visible values, while missing values display “暂无数据”. Use semantic SwiftUI colors, a single square size/spacing, shared formatter/levels, `.help(...)` for date and token count, and an explicit unavailable state. Insert the section below quota/reset-credit content and above embedded settings; widen or height-adjust the popover only as required to prevent clipping.
+Add a compact “Token 活动” header and render the daily cells as a compact three-month calendar grid without a mode picker. In the header's trailing space, show the latest completed daily bucket and “累计 Token” as one compact line with no background or border; label the latest bucket as “昨日” when it matches the previous local calendar day, otherwise show its month/day. Omit the repeated `tokens` suffix from these two visible values, while missing values display “暂无数据”. Use semantic SwiftUI colors, a single square size/spacing, shared formatter/levels, `.help(...)` for date and token count, and an explicit unavailable state. Insert the section below quota/reset-credit content and above embedded settings; widen or height-adjust the popover only as required to prevent clipping.
 
 - [ ] **Step 5: Run tests, build, and launch verification**
 

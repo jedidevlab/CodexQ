@@ -13,12 +13,20 @@ struct TokenActivitySection: View {
                     .font(.headline)
                 Spacer(minLength: 8)
                 if let snapshot {
+                    let latestDay = TokenActivityPresentation.latestRecordedDay(
+                        through: now,
+                        snapshot: snapshot,
+                        calendar: calendar
+                    )
                     TokenActivityInlineSummary(
-                        todayTokens: TokenActivityPresentation.tokens(
-                            on: now,
-                            snapshot: snapshot,
-                            calendar: calendar
-                        ),
+                        completedDayLabel: latestDay.map {
+                            TokenActivityDateLabel.string(
+                                for: $0.date,
+                                now: now,
+                                calendar: calendar
+                            )
+                        } ?? "最近",
+                        completedDayTokens: latestDay?.tokens,
                         lifetimeTokens: snapshot.lifetimeTokens
                     )
                 }
@@ -66,19 +74,25 @@ struct TokenActivitySection: View {
     }
 
     private var calendar: Calendar {
-        var calendar = Calendar.autoupdatingCurrent
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .autoupdatingCurrent
         calendar.firstWeekday = 2
         return calendar
     }
 }
 
 private struct TokenActivityInlineSummary: View {
-    let todayTokens: Int64?
+    let completedDayLabel: String
+    let completedDayTokens: Int64?
     let lifetimeTokens: Int64?
 
     var body: some View {
         HStack(spacing: 10) {
-            metric(label: "今日", accessibilityLabel: "今日 Token", tokens: todayTokens)
+            metric(
+                label: completedDayLabel,
+                accessibilityLabel: "\(completedDayLabel) Token",
+                tokens: completedDayTokens
+            )
             metric(label: "累计", accessibilityLabel: "累计 Token", tokens: lifetimeTokens)
         }
         .font(.caption2)
@@ -126,7 +140,7 @@ private struct DailyTokenActivityGrid: View {
         HStack(alignment: .top, spacing: TokenActivityGridLayout.monthSpacing) {
             ForEach(months) { month in
                 VStack(spacing: 3) {
-                    Text(month.start, format: .dateTime.year().month(.abbreviated))
+                    Text(monthText(month.start))
                         .font(.caption2)
                         .foregroundStyle(.secondary)
 
@@ -141,7 +155,8 @@ private struct DailyTokenActivityGrid: View {
                         ForEach(month.cells, id: \.date) { cell in
                             DailyActivitySquare(
                                 cell: cell,
-                                peakTokens: peakTokens
+                                peakTokens: peakTokens,
+                                calendar: calendar
                             )
                         }
                     }
@@ -168,6 +183,13 @@ private struct DailyTokenActivityGrid: View {
         }
         return result
     }
+
+    private func monthText(_ date: Date) -> String {
+        var format = Date.FormatStyle.dateTime.year().month(.abbreviated)
+        format.calendar = calendar
+        format.timeZone = calendar.timeZone
+        return date.formatted(format)
+    }
 }
 
 private struct ActivityMonth: Identifiable {
@@ -181,6 +203,7 @@ private struct ActivityMonth: Identifiable {
 private struct DailyActivitySquare: View {
     let cell: TokenActivityCell
     let peakTokens: Int64
+    let calendar: Calendar
 
     var body: some View {
         let level = cell.tokens.map {
@@ -195,7 +218,10 @@ private struct DailyActivitySquare: View {
     }
 
     private var dateText: String {
-        cell.date.formatted(date: .abbreviated, time: .omitted)
+        var format = Date.FormatStyle.dateTime.year().month(.abbreviated).day()
+        format.calendar = calendar
+        format.timeZone = calendar.timeZone
+        return cell.date.formatted(format)
     }
 
     private var tokenText: String {

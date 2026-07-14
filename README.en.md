@@ -15,7 +15,7 @@ CodexQ is a native macOS menu bar utility. It brings ChatGPT (formerly Codex) fi
 
 - **Quota progress:** follow five-hour and weekly limits together; a temporarily absent five-hour window is clearly shown as unlimited.
 - **Run-out projection:** see whether your current pace is sustainable and when the quota may run out.
-- **Token activity:** review three months of daily activity plus today's and lifetime Token usage.
+- **Token activity:** review three months of daily activity plus the latest completed day and lifetime Token usage.
 - **Timely alerts:** enable automatic refresh, launch at login, and quota warnings at 20%, 10%, or 5%.
 - **Native experience:** built with SwiftUI and AppKit to stay available without interrupting your work.
 
@@ -25,8 +25,8 @@ Download the archive for your Mac from [GitHub Releases](https://github.com/jedi
 
 | Mac | Archive |
 | --- | --- |
-| Apple Silicon | `CodexQ-1.0.8-arm64.zip` |
-| Intel | `CodexQ-1.0.8-x86_64.zip` |
+| Apple Silicon | `CodexQ-1.0.9-arm64.zip` |
+| Intel | `CodexQ-1.0.9-x86_64.zip` |
 
 Unzip the archive, then move `CodexQ.app` to Applications.
 
@@ -64,20 +64,20 @@ swift test
 Generate a ZIP archive for GitHub Releases using the current Mac architecture:
 
 ```bash
-./script/package_release.sh 1.0.8
+./script/package_release.sh 1.0.9
 ```
 
 Pass an architecture explicitly when needed:
 
 ```bash
-./script/package_release.sh 1.0.8 arm64
-./script/package_release.sh 1.0.8 x86_64
+./script/package_release.sh 1.0.9 arm64
+./script/package_release.sh 1.0.9 x86_64
 ```
 
 The archive is written to:
 
 ```text
-dist/CodexQ-1.0.8-<arch>.zip
+dist/CodexQ-1.0.9-<arch>.zip
 ```
 
 The helper script builds a local `.app` bundle in `dist/CodexQ.app` for development use. Generated build artifacts are excluded from Git.

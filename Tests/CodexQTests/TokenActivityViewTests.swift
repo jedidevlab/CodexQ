@@ -240,23 +240,35 @@ struct TokenActivityViewTests {
         #expect(dailySource.contains("TokenActivityLevel.level"))
     }
 
-    @Test("Token 活动显示今日与累计 Token 汇总")
-    func activityShowsTodayAndLifetimeTokenSummary() throws {
+    @Test("Token 活动显示最近完整日与累计 Token 汇总")
+    func activityShowsLatestRecordedDayAndLifetimeTokenSummary() throws {
         let source = try String(
             contentsOfFile: "Sources/CodexQ/Views/TokenActivitySection.swift",
             encoding: .utf8
         )
 
-        #expect(source.contains("今日 Token"))
         #expect(source.contains("累计 Token"))
         #expect(source.contains("snapshot.lifetimeTokens"))
-        #expect(source.contains("TokenActivityPresentation.tokens("))
-        #expect(source.contains("on: now"))
-        #expect(!source.contains("昨日 Token"))
+        #expect(source.contains("TokenActivityPresentation.latestRecordedDay("))
+        #expect(source.contains("TokenActivityDateLabel.string("))
+        #expect(!source.contains("今日 Token"))
         #expect(source.contains("TokenCountFormatter.compactNumber"))
         #expect(source.contains("TokenActivityInlineSummary("))
         #expect(!source.contains("TokenActivitySummaryRow"))
         #expect(!source.contains(".background(.quaternary"))
+    }
+
+    @Test("服务端日期始终使用公历展示")
+    func activityUsesGregorianCalendarForServerDates() throws {
+        let source = try String(
+            contentsOfFile: "Sources/CodexQ/Views/TokenActivitySection.swift",
+            encoding: .utf8
+        )
+
+        #expect(source.contains("Calendar(identifier: .gregorian)"))
+        #expect(!source.contains("Calendar.autoupdatingCurrent"))
+        #expect(source.components(separatedBy: "format.calendar = calendar").count - 1 == 2)
+        #expect(source.components(separatedBy: "format.timeZone = calendar.timeZone").count - 1 == 2)
     }
 
     @Test("Token 活动只保留三个月每日入口")
