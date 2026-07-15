@@ -62,9 +62,10 @@ struct TokenActivityTests {
             snapshot: snapshot,
             calendar: utcCalendar
         )
+        let expectedDate = try date("2026-07-13")
 
         #expect(latest == TokenActivityCell(
-            date: try date("2026-07-13"),
+            date: expectedDate,
             tokens: 1_200
         ))
     }
