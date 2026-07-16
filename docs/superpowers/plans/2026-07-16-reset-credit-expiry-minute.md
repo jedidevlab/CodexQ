@@ -32,7 +32,7 @@
 Change the fixed UTC+8 expectation in `presentsBackendTitleAndExpiry()` to:
 
 ```swift
-#expect(presentation.rows.first?.detail == "将于 7/17 08:00 到期")
+#expect(presentation.rows.first?.detail == "将于 7/17 12:00 到期")
 ```
 
 - [ ] **Step 2: Run the focused test to verify it fails**
