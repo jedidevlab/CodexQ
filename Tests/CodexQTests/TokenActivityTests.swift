@@ -44,7 +44,7 @@ struct TokenActivityTests {
         }
     }
 
-    @Test("当天桶缺失时使用不晚于今天的最近完整日")
+    @Test("使用早于今天的最近完整日")
     func latestRecordedDayUsesNewestAvailableBucket() throws {
         let snapshot = TokenActivitySnapshot(
             peakDailyTokens: 2_000,
@@ -58,7 +58,7 @@ struct TokenActivityTests {
         )
 
         let latest = TokenActivityPresentation.latestRecordedDay(
-            through: try date("2026-07-15"),
+            before: try date("2026-07-15"),
             snapshot: snapshot,
             calendar: utcCalendar
         )
@@ -68,6 +68,26 @@ struct TokenActivityTests {
             date: expectedDate,
             tokens: 1_200
         ))
+    }
+
+    @Test("最近完整日忽略当天尚未结束的用量桶")
+    func latestRecordedDayExcludesCurrentDay() throws {
+        let snapshot = TokenActivitySnapshot(
+            peakDailyTokens: 2_000,
+            days: [
+                .init(startDate: "2026-07-14", tokens: 1_200),
+                .init(startDate: "2026-07-15", tokens: 400)
+            ]
+        )
+        let expectedDate = try date("2026-07-14")
+
+        let latest = TokenActivityPresentation.latestRecordedDay(
+            before: try date("2026-07-15"),
+            snapshot: snapshot,
+            calendar: utcCalendar
+        )
+
+        #expect(latest == TokenActivityCell(date: expectedDate, tokens: 1_200))
     }
 
     @Test("最近完整日不是昨天时显示具体日期")

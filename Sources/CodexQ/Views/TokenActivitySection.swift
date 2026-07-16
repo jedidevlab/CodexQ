@@ -14,7 +14,7 @@ struct TokenActivitySection: View {
                 Spacer(minLength: 8)
                 if let snapshot {
                     let latestDay = TokenActivityPresentation.latestRecordedDay(
-                        through: now,
+                        before: now,
                         snapshot: snapshot,
                         calendar: calendar
                     )

@@ -73,7 +73,7 @@ enum TokenActivityPresentation {
     }
 
     static func latestRecordedDay(
-        through date: Date,
+        before date: Date,
         snapshot: TokenActivitySnapshot,
         calendar: Calendar
     ) -> TokenActivityCell? {
@@ -83,7 +83,7 @@ enum TokenActivityPresentation {
                 return nil
             }
             let normalizedDate = calendar.startOfDay(for: parsedDate)
-            guard normalizedDate <= cutoff else { return nil }
+            guard normalizedDate < cutoff else { return nil }
             return TokenActivityCell(date: normalizedDate, tokens: day.tokens)
         }
         .max { $0.date < $1.date }
