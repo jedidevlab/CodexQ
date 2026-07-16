@@ -27,6 +27,7 @@ struct ResetTimeFormatter {
 
     func string(for resetDate: Date?, period: QuotaPeriod, now: Date = Date()) -> String {
         guard let resetDate else { return "未知" }
+        guard resetDate > now else { return "已重置" }
 
         switch period {
         case .fiveHour:

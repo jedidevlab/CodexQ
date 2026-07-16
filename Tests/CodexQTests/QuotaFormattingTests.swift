@@ -61,6 +61,24 @@ struct QuotaFormattingTests {
         #expect(formatter.string(for: reset, period: .weekly, now: now) == "24h0m")
     }
 
+    @Test("已经过去的重置时间不显示为零小时零分钟")
+    func pastResetShowsCompletedState() {
+        let formatter = ResetTimeFormatter(locale: locale, timeZone: timeZone)
+        let now = date(2026, 6, 15, 10, 0)
+        let reset = date(2026, 6, 15, 9, 59)
+
+        #expect(formatter.string(for: reset, period: .weekly, now: now) == "已重置")
+    }
+
+    @Test("已过去的五小时重置时间也显示为已重置")
+    func pastFiveHourResetShowsCompletedState() {
+        let formatter = ResetTimeFormatter(locale: locale, timeZone: timeZone)
+        let now = date(2026, 6, 15, 10, 0)
+        let reset = date(2026, 6, 15, 9, 59)
+
+        #expect(formatter.string(for: reset, period: .fiveHour, now: now) == "已重置")
+    }
+
     @Test("周限额大于 24 小时显示绝对日期")
     func weeklyOver24HoursShowsDateOnly() {
         let formatter = ResetTimeFormatter(locale: locale, timeZone: timeZone)

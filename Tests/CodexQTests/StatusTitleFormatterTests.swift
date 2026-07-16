@@ -57,7 +57,18 @@ struct StatusTitleFormatterTests {
             lastUpdatedAt: now,
             error: nil,
             now: now
-        ) == "CodexQ · 5 小时剩余 89%")
+        ) == "CodexQ · 额度剩余 89%")
+    }
+
+    @Test("未来时间戳不能让旧缓存一直保持新鲜")
+    func futureTimestampIsNotFresh() {
+        let now = Date()
+
+        #expect(!StatusTitleFormatter.hasFreshQuota(
+            remainingPercent: 89,
+            lastUpdatedAt: now.addingTimeInterval(24 * 60 * 60),
+            now: now
+        ))
     }
 
     @Test("数据超过十分钟时隐藏百分比")

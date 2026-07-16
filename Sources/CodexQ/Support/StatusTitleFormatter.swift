@@ -10,7 +10,8 @@ enum StatusTitleFormatter {
               let lastUpdatedAt else {
             return false
         }
-        return now.timeIntervalSince(lastUpdatedAt) <= 600
+        let age = now.timeIntervalSince(lastUpdatedAt)
+        return age >= 0 && age <= 600
     }
 
     static func string(
@@ -53,6 +54,6 @@ enum StatusTitleFormatter {
             return "CodexQ · 数据超过 10 分钟未更新"
         }
 
-        return "CodexQ · 5 小时剩余 \(Int(remainingPercent.rounded()))%"
+        return "CodexQ · 额度剩余 \(Int(remainingPercent.rounded()))%"
     }
 }
