@@ -27,7 +27,7 @@ CodexQ 是一款原生 macOS 菜单栏工具。它把ChatGPT（原Codex）5 小�
 
 解压后，将 `CodexQ.app` 移入“应用程序”文件夹。
 
-> v1.0.9 及更早版本使用 ad-hoc 签名，未经过 notarization 公证，不适合作为正式全球发行包。后续正式版本应使用下方 Developer ID＋公证流程生成。
+> 安装包沿用 ad-hoc 签名，无需 Apple 开发者账号，也未经过 notarization 公证。因此首次打开时可能被 macOS 拦截。
 
 如果首次打开时被 macOS 拦截，请先尝试打开一次，再前往“系统设置”→“隐私与安全”，点击“仍要打开”并确认。仅当安装包来自本仓库的官方 Release 且你信任其来源时这样操作。参见 [Apple 官方说明](https://support.apple.com/zh-cn/102445)。
 
@@ -61,24 +61,10 @@ swift test
 
 <br>
 
-先把公证凭证保存到钥匙串：
+生成 ad-hoc 签名的安装包：
 
 ```bash
-xcrun notarytool store-credentials codexq-notary
-```
-
-使用 Developer ID Application 身份生成、提交公证并装订正式发行包：
-
-```bash
-CODE_SIGN_IDENTITY="Developer ID Application: Example" \
-NOTARY_PROFILE="codexq-notary" \
 ./script/package_release.sh 1.0.10 arm64
-```
-
-仅做本地打包验证时，必须明确允许 ad-hoc 签名：
-
-```bash
-ALLOW_ADHOC=1 ./script/package_release.sh 1.0.10 arm64
 ```
 
 生成文件位于：

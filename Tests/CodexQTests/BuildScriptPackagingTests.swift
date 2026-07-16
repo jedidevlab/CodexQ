@@ -50,17 +50,14 @@ struct BuildScriptPackagingTests {
         #expect(englishReadme.contains("Open Anyway"))
     }
 
-    @Test("公开发布默认要求 Developer ID 签名与公证")
-    func publicReleaseRequiresSigningAndNotarization() throws {
+    @Test("发布脚本沿用无需开发者账号的 ad-hoc 签名")
+    func releaseUsesAdHocSigningWithoutDeveloperAccount() throws {
         let script = try String(contentsOfFile: "script/package_release.sh", encoding: .utf8)
 
-        #expect(script.contains("CODE_SIGN_IDENTITY=\"${CODE_SIGN_IDENTITY:-}\""))
-        #expect(script.contains("NOTARY_PROFILE=\"${NOTARY_PROFILE:-}\""))
-        #expect(script.contains("ALLOW_ADHOC=\"${ALLOW_ADHOC:-0}\""))
-        #expect(script.contains("--options runtime --timestamp"))
-        #expect(script.contains("notarytool submit"))
-        #expect(script.contains("stapler staple"))
-        #expect(script.contains("stapler validate"))
-        #expect(script.contains("spctl --assess --type execute"))
+        #expect(script.contains("/usr/bin/codesign --force --sign - \"$APP_BUNDLE\""))
+        #expect(!script.contains("CODE_SIGN_IDENTITY"))
+        #expect(!script.contains("NOTARY_PROFILE"))
+        #expect(!script.contains("ALLOW_ADHOC"))
+        #expect(!script.contains("notarytool submit"))
     }
 }

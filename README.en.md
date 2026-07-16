@@ -27,7 +27,7 @@ Download the Apple Silicon archive from [GitHub Releases](https://github.com/jed
 
 Unzip the archive, then move `CodexQ.app` to Applications.
 
-> v1.0.9 and earlier are ad-hoc signed and not notarized, so they are not suitable as normal global releases. Future production releases should use the Developer ID and notarization flow below.
+> Release archives continue to use ad-hoc signing. They require no Apple developer account and are not notarized, so macOS may block the first launch.
 
 If macOS blocks the first launch, try opening the app once, then go to System Settings → Privacy & Security, click Open Anyway, and confirm. Do this only when the archive came from this repository's official Release and you trust its source. See [Apple's instructions](https://support.apple.com/en-us/102445).
 
@@ -61,24 +61,10 @@ swift test
 
 <br>
 
-Store notarization credentials in Keychain first:
+Build an ad-hoc signed archive:
 
 ```bash
-xcrun notarytool store-credentials codexq-notary
-```
-
-Build, notarize, staple, and validate a production archive with a Developer ID Application identity:
-
-```bash
-CODE_SIGN_IDENTITY="Developer ID Application: Example" \
-NOTARY_PROFILE="codexq-notary" \
 ./script/package_release.sh 1.0.10 arm64
-```
-
-For local packaging validation only, explicitly allow ad-hoc signing:
-
-```bash
-ALLOW_ADHOC=1 ./script/package_release.sh 1.0.10 arm64
 ```
 
 The archive is written to:
