@@ -150,15 +150,15 @@ struct QuotaPopoverView: View {
         .onHover { isHovering in
             interactionDidChange(.pointer, isHovering)
         }
-        .onChange(of: isResetCreditsExpanded) { isExpanded in
+        .onChange(of: isResetCreditsExpanded) { _, isExpanded in
             interactionDidChange(.resetCredits, isExpanded)
             contentDidChange()
         }
-        .onChange(of: isSettingsExpanded) { isExpanded in
+        .onChange(of: isSettingsExpanded) { _, isExpanded in
             interactionDidChange(.settings, isSettingsExpanded)
             contentDidChange()
         }
-        .onChange(of: store.isPopoverPresented) { isPresented in
+        .onChange(of: store.isPopoverPresented) { _, isPresented in
             guard !isPresented else { return }
             isResetCreditsExpanded = false
             isSettingsExpanded = false
@@ -250,11 +250,11 @@ private struct EmbeddedSettingsView: View {
         .font(.caption)
         .toggleStyle(.checkbox)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .onChange(of: settings.launchAtLogin) { _ in settingsDidChange() }
-        .onChange(of: settings.notificationsEnabled) { _ in settingsDidChange() }
-        .onChange(of: settings.notifyAt20) { _ in settingsDidChange() }
-        .onChange(of: settings.notifyAt10) { _ in settingsDidChange() }
-        .onChange(of: settings.notifyAt5) { _ in settingsDidChange() }
+        .onChange(of: settings.launchAtLogin) { settingsDidChange() }
+        .onChange(of: settings.notificationsEnabled) { settingsDidChange() }
+        .onChange(of: settings.notifyAt20) { settingsDidChange() }
+        .onChange(of: settings.notifyAt10) { settingsDidChange() }
+        .onChange(of: settings.notifyAt5) { settingsDidChange() }
     }
 }
 

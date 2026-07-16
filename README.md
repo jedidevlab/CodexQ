@@ -21,21 +21,19 @@ CodexQ 是一款原生 macOS 菜单栏工具。它把ChatGPT（原Codex）5 小�
 
 ## 下载与安装
 
-从 [GitHub Releases](https://github.com/jedidevlab/CodexQ/releases/latest) 下载与你的 Mac 匹配的安装包：
+从 [GitHub Releases](https://github.com/jedidevlab/CodexQ/releases/latest) 下载 Apple Silicon 安装包：
 
-| Mac | 安装包 |
-| --- | --- |
-| Apple Silicon | `CodexQ-1.0.9-arm64.zip` |
-| Intel | `CodexQ-1.0.9-x86_64.zip` |
+`CodexQ-1.0.9-arm64.zip`
 
 解压后，将 `CodexQ.app` 移入“应用程序”文件夹。
 
-> 当前发布包使用 ad-hoc 签名，尚未经过 notarization 公证。首次启动时，macOS 可能要求右键点击 App 并选择“打开”。
+> v1.0.9 及更早版本使用 ad-hoc 签名，未经过 notarization 公证，不适合作为正式全球发行包。后续正式版本应使用下方 Developer ID＋公证流程生成。
 
 ## 使用条件
 
-- macOS 13 或更新版本
-- 已安装 ChatGPT app，路径为 `/Applications/ChatGPT.app`（同时兼容旧版 `/Applications/Codex.app`）
+- Apple Silicon Mac
+- macOS 14 或更新版本
+- 已安装 ChatGPT app，支持 `/Applications` 或 `~/Applications`（同时兼容旧版 Codex app）
 - 本地构建需要 Swift 6 工具链
 
 ## 本地运行
@@ -61,23 +59,30 @@ swift test
 
 <br>
 
-按当前 Mac 架构生成 GitHub Release zip：
+先把公证凭证保存到钥匙串：
 
 ```bash
-./script/package_release.sh 1.0.9
+xcrun notarytool store-credentials codexq-notary
 ```
 
-也可以显式指定架构：
+使用 Developer ID Application 身份生成、提交公证并装订正式发行包：
 
 ```bash
-./script/package_release.sh 1.0.9 arm64
-./script/package_release.sh 1.0.9 x86_64
+CODE_SIGN_IDENTITY="Developer ID Application: Example" \
+NOTARY_PROFILE="codexq-notary" \
+./script/package_release.sh 1.0.10 arm64
+```
+
+仅做本地打包验证时，必须明确允许 ad-hoc 签名：
+
+```bash
+ALLOW_ADHOC=1 ./script/package_release.sh 1.0.10 arm64
 ```
 
 生成文件位于：
 
 ```text
-dist/CodexQ-1.0.9-<arch>.zip
+dist/CodexQ-1.0.10-arm64.zip
 ```
 
 开发运行脚本会在 `dist/CodexQ.app` 生成本地 `.app` bundle；构建产物不会提交到 Git。

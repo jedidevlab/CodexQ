@@ -21,21 +21,19 @@ CodexQ is a native macOS menu bar utility. It brings ChatGPT (formerly Codex) fi
 
 ## Download and install
 
-Download the archive for your Mac from [GitHub Releases](https://github.com/jedidevlab/CodexQ/releases/latest):
+Download the Apple Silicon archive from [GitHub Releases](https://github.com/jedidevlab/CodexQ/releases/latest):
 
-| Mac | Archive |
-| --- | --- |
-| Apple Silicon | `CodexQ-1.0.9-arm64.zip` |
-| Intel | `CodexQ-1.0.9-x86_64.zip` |
+`CodexQ-1.0.9-arm64.zip`
 
 Unzip the archive, then move `CodexQ.app` to Applications.
 
-> Releases are ad-hoc signed and not notarized. On first launch, macOS may require right-clicking the app and choosing Open.
+> v1.0.9 and earlier are ad-hoc signed and not notarized, so they are not suitable as normal global releases. Future production releases should use the Developer ID and notarization flow below.
 
 ## Requirements
 
-- macOS 13 or later
-- ChatGPT app installed at `/Applications/ChatGPT.app` (legacy `/Applications/Codex.app` is also supported)
+- Apple Silicon Mac
+- macOS 14 or later
+- ChatGPT app installed in `/Applications` or `~/Applications` (the legacy Codex app is also supported)
 - Swift 6 toolchain for local builds
 
 ## Build and Run
@@ -61,23 +59,30 @@ swift test
 
 <br>
 
-Generate a ZIP archive for GitHub Releases using the current Mac architecture:
+Store notarization credentials in Keychain first:
 
 ```bash
-./script/package_release.sh 1.0.9
+xcrun notarytool store-credentials codexq-notary
 ```
 
-Pass an architecture explicitly when needed:
+Build, notarize, staple, and validate a production archive with a Developer ID Application identity:
 
 ```bash
-./script/package_release.sh 1.0.9 arm64
-./script/package_release.sh 1.0.9 x86_64
+CODE_SIGN_IDENTITY="Developer ID Application: Example" \
+NOTARY_PROFILE="codexq-notary" \
+./script/package_release.sh 1.0.10 arm64
+```
+
+For local packaging validation only, explicitly allow ad-hoc signing:
+
+```bash
+ALLOW_ADHOC=1 ./script/package_release.sh 1.0.10 arm64
 ```
 
 The archive is written to:
 
 ```text
-dist/CodexQ-1.0.9-<arch>.zip
+dist/CodexQ-1.0.10-arm64.zip
 ```
 
 The helper script builds a local `.app` bundle in `dist/CodexQ.app` for development use. Generated build artifacts are excluded from Git.

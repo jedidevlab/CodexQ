@@ -4,7 +4,7 @@ import PackageDescription
 
 let package = Package(
     name: "CodexQ",
-    platforms: [.macOS(.v13)],
+    platforms: [.macOS(.v14)],
     products: [
         .executable(name: "CodexQ", targets: ["CodexQ"])
     ],

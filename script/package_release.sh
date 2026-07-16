@@ -2,24 +2,36 @@
 set -euo pipefail
 
 VERSION="${1:-1.0.0}"
-ARCH="${2:-$(uname -m)}"
+ARCH="${2:-arm64}"
 APP_NAME="CodexQ"
 BUNDLE_ID="com.jun.codexq"
-MIN_SYSTEM_VERSION="13.0"
+MIN_SYSTEM_VERSION="14.0"
+CODE_SIGN_IDENTITY="${CODE_SIGN_IDENTITY:-}"
+NOTARY_PROFILE="${NOTARY_PROFILE:-}"
+ALLOW_ADHOC="${ALLOW_ADHOC:-0}"
 
 if ! [[ "$VERSION" =~ ^[0-9A-Za-z._-]+$ ]]; then
-  echo "usage: $0 [version] [arm64|x86_64]" >&2
+  echo "usage: $0 [version] [arm64]" >&2
   exit 2
 fi
 
 case "$ARCH" in
-  arm64|x86_64)
+  arm64)
     ;;
   *)
-    echo "usage: $0 [version] [arm64|x86_64]" >&2
+    echo "usage: $0 [version] [arm64]" >&2
     exit 2
     ;;
 esac
+
+if [[ "$ALLOW_ADHOC" == "1" ]]; then
+  SIGNING_MODE="adhoc"
+elif [[ -z "$CODE_SIGN_IDENTITY" || -z "$NOTARY_PROFILE" ]]; then
+  echo "public releases require CODE_SIGN_IDENTITY and NOTARY_PROFILE; use ALLOW_ADHOC=1 only for local validation" >&2
+  exit 2
+else
+  SIGNING_MODE="distribution"
+fi
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIST_DIR="$ROOT_DIR/dist"
@@ -82,8 +94,21 @@ cat >"$INFO_PLIST" <<PLIST
 </plist>
 PLIST
 
-/usr/bin/codesign --force --sign - "$APP_BUNDLE" >/dev/null
-/usr/bin/codesign --verify --strict --verbose=2 "$APP_BUNDLE"
+if [[ "$SIGNING_MODE" == "adhoc" ]]; then
+  /usr/bin/codesign --force --sign - "$APP_BUNDLE" >/dev/null
+else
+  /usr/bin/codesign --force --options runtime --timestamp --sign "$CODE_SIGN_IDENTITY" "$APP_BUNDLE"
+fi
+/usr/bin/codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE"
 /usr/bin/ditto -c -k --sequesterRsrc --keepParent "$APP_BUNDLE" "$ZIP_PATH"
+
+if [[ "$SIGNING_MODE" == "distribution" ]]; then
+  /usr/bin/xcrun notarytool submit "$ZIP_PATH" --keychain-profile "$NOTARY_PROFILE" --wait
+  /usr/bin/xcrun stapler staple "$APP_BUNDLE"
+  /usr/bin/xcrun stapler validate "$APP_BUNDLE"
+  rm -f "$ZIP_PATH"
+  /usr/bin/ditto -c -k --sequesterRsrc --keepParent "$APP_BUNDLE" "$ZIP_PATH"
+  /usr/sbin/spctl --assess --type execute --verbose=2 "$APP_BUNDLE"
+fi
 
 echo "$ZIP_PATH"
