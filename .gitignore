@@ -3,4 +3,5 @@ dist/
 tmp/
 .swiftpm/
 .codex/
+.worktrees/
 .DS_Store
