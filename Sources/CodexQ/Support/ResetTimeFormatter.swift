@@ -6,14 +6,12 @@ enum QuotaPeriod {
 }
 
 struct ResetTimeFormatter {
-    private let calendar: Calendar
     private let timeFormatter: DateFormatter
     private let dateFormatter: DateFormatter
 
     init(locale: Locale = .autoupdatingCurrent, timeZone: TimeZone = .autoupdatingCurrent) {
-        var calendar = Calendar.autoupdatingCurrent
+        var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = timeZone
-        self.calendar = calendar
 
         timeFormatter = DateFormatter()
         timeFormatter.locale = locale
@@ -22,6 +20,7 @@ struct ResetTimeFormatter {
 
         dateFormatter = DateFormatter()
         dateFormatter.locale = locale
+        dateFormatter.calendar = calendar
         dateFormatter.timeZone = timeZone
         dateFormatter.setLocalizedDateFormatFromTemplate("MMMd")
     }

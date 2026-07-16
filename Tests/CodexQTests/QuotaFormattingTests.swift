@@ -73,6 +73,21 @@ struct QuotaFormattingTests {
         #expect(!result.contains(":"))
     }
 
+    @Test("非公历地区设置仍使用公历显示周限额日期")
+    func weeklyAbsoluteDateUsesGregorianCalendar() throws {
+        let formatter = ResetTimeFormatter(
+            locale: Locale(identifier: "en_US@calendar=islamic"),
+            timeZone: try #require(TimeZone(identifier: "America/Los_Angeles"))
+        )
+        let reset = Date(timeIntervalSince1970: 1_784_260_800)
+
+        #expect(formatter.string(
+            for: reset,
+            period: .weekly,
+            now: reset.addingTimeInterval(-25 * 60 * 60)
+        ) == "Jul 16")
+    }
+
     @Test("额度窗口按时长识别，不依赖 primary 和 secondary 顺序")
     func rateLimitWindowsAreMatchedByDuration() {
         let limits = RateLimitSnapshot(
