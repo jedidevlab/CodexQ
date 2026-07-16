@@ -20,7 +20,7 @@ struct ResetCreditPresentation: Equatable {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.timeZone = timeZone
-        formatter.dateFormat = "M/d"
+        formatter.dateFormat = "M/d HH:mm"
 
         rows = summary.availableCredits.map { credit in
             Row(

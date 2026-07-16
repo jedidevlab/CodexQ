@@ -147,7 +147,7 @@ struct ResetCreditPresentationTests {
 
         #expect(presentation.countText == "可用 1 次")
         #expect(presentation.rows.first?.title == "Full reset")
-        #expect(presentation.rows.first?.detail == "将于 7/17 到期")
+        #expect(presentation.rows.first?.detail == "将于 7/17 12:00 到期")
     }
 
     @Test("标题缺失时使用中文兜底")
