@@ -31,10 +31,21 @@ struct AppServerClient: Sendable {
         }
     }
 
-    static let defaultExecutableURLs = [
-        URL(fileURLWithPath: "/Applications/ChatGPT.app/Contents/Resources/codex"),
-        URL(fileURLWithPath: "/Applications/Codex.app/Contents/Resources/codex")
-    ]
+    static var defaultExecutableURLs: [URL] {
+        defaultExecutableURLs(homeDirectory: FileManager.default.homeDirectoryForCurrentUser)
+    }
+
+    static func defaultExecutableURLs(homeDirectory: URL) -> [URL] {
+        let applicationDirectories = [
+            URL(fileURLWithPath: "/Applications", isDirectory: true),
+            homeDirectory.appendingPathComponent("Applications", isDirectory: true)
+        ]
+        return ["ChatGPT", "Codex"].flatMap { appName in
+            applicationDirectories.map {
+                $0.appendingPathComponent("\(appName).app/Contents/Resources/codex")
+            }
+        }
+    }
 
     private let executableURLs: [URL]
     private let responseTimeout: TimeInterval
