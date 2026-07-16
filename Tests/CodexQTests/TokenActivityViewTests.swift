@@ -121,6 +121,46 @@ struct TokenActivityViewTests {
         withExtendedLifetime(cancellable) {}
     }
 
+    @Test("后台重试期间保留已有错误，直到刷新真正恢复")
+    @MainActor
+    func retryKeepsExistingFailureVisibleUntilSuccess() async {
+        let retryGate = ActivityGate()
+        let retryStarted = AsyncStream<Void>.makeStream()
+        var retryStartedIterator = retryStarted.stream.makeAsyncIterator()
+        var quotaCallCount = 0
+        let quota = QuotaSnapshot(
+            fiveHour: .init(usedPercent: 25, resetsAt: nil, durationMinutes: 300),
+            weekly: .init(usedPercent: 40, resetsAt: nil, durationMinutes: 10_080)
+        )
+        let store = QuotaStore(
+            readRateLimits: {
+                quotaCallCount += 1
+                if quotaCallCount == 1 {
+                    throw ActivityFixtureError.unavailable
+                }
+                retryStarted.continuation.yield()
+                await retryGate.wait()
+                return quota
+            },
+            readTokenActivity: { throw ActivityFixtureError.unavailable },
+            loadCachedSnapshot: { nil },
+            saveCachedSnapshot: { _ in },
+            notifyQuotaCrossings: { _, _ in }
+        )
+
+        #expect(!(await store.refresh()))
+        let firstError = try? #require(store.errorMessage)
+        let retryTask = Task { @MainActor in await store.refresh() }
+        _ = await retryStartedIterator.next()
+
+        #expect(store.isRefreshing)
+        #expect(store.errorMessage == firstError)
+
+        retryGate.open()
+        #expect(await retryTask.value)
+        #expect(store.errorMessage == nil)
+    }
+
     @Test("停止后的旧活动任务不能清理新任务状态")
     @MainActor
     func stoppedActivityTaskCannotClearNewGeneration() async {
@@ -183,15 +223,17 @@ struct TokenActivityViewTests {
         #expect(resetCreditsIndex.lowerBound < settingsIndex.lowerBound)
     }
 
-    @Test("刷新按钮等待额度与 Token 活动全部完成")
-    func refreshButtonTracksQuotaAndTokenActivity() throws {
+    @Test("只有手动刷新让按钮转圈，后台刷新只负责禁用按钮")
+    func refreshButtonOnlySpinsForManualRefresh() throws {
         let source = try String(
             contentsOfFile: "Sources/CodexQ/Views/QuotaPopoverView.swift",
             encoding: .utf8
         )
 
         #expect(source.contains("store.isRefreshing || store.isTokenActivityRefreshing"))
-        #expect(source.contains("if isAnyRefreshing"))
+        #expect(source.contains("Task { await store.refreshFromButton() }"))
+        #expect(source.contains("if store.isRefreshButtonBusy"))
+        #expect(!source.contains("if isAnyRefreshing"))
         #expect(source.contains(".disabled(isAnyRefreshing)"))
     }
 

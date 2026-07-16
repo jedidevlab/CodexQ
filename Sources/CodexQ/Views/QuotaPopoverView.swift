@@ -126,9 +126,9 @@ struct QuotaPopoverView: View {
                 .help("设置")
 
                 Button {
-                    Task { await store.refresh() }
+                    Task { await store.refreshFromButton() }
                 } label: {
-                    if isAnyRefreshing {
+                    if store.isRefreshButtonBusy {
                         ProgressView()
                             .controlSize(.small)
                     } else {

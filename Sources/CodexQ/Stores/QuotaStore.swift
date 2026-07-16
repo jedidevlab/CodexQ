@@ -4,6 +4,7 @@ import Foundation
 final class QuotaStore: ObservableObject {
     @Published private(set) var snapshot: QuotaSnapshot?
     @Published private(set) var isRefreshing = false
+    @Published private(set) var isRefreshButtonBusy = false
     @Published private(set) var errorMessage: String?
     @Published private(set) var tokenActivity: TokenActivitySnapshot?
     @Published private(set) var tokenActivityErrorMessage: String?
@@ -99,7 +100,6 @@ final class QuotaStore: ObservableObject {
     func refresh() async -> Bool {
         guard !isRefreshing else { return false }
         isRefreshing = true
-        errorMessage = nil
         defer { isRefreshing = false }
         startTokenActivityRefreshIfNeeded()
 
@@ -109,6 +109,7 @@ final class QuotaStore: ObservableObject {
             let updatedAt = Date()
             let previousSnapshot = snapshot
             snapshot = newSnapshot
+            errorMessage = nil
             lastUpdatedAt = updatedAt
             saveCachedSnapshot(CachedQuotaSnapshot(snapshot: newSnapshot, updatedAt: updatedAt))
             await notifyQuotaCrossings(previousSnapshot, newSnapshot)
@@ -120,11 +121,19 @@ final class QuotaStore: ObservableObject {
         return quotaSucceeded
     }
 
+    func refreshFromButton() async {
+        guard !isRefreshButtonBusy else { return }
+        isRefreshButtonBusy = true
+        defer { isRefreshButtonBusy = false }
+
+        _ = await refresh()
+        await tokenActivityTask?.value
+    }
+
     private func startTokenActivityRefreshIfNeeded() {
         guard tokenActivityTask == nil else { return }
         tokenActivityGeneration += 1
         let generation = tokenActivityGeneration
-        tokenActivityErrorMessage = nil
         isTokenActivityRefreshing = true
 
         tokenActivityTask = Task { [weak self, readTokenActivity] in
@@ -140,6 +149,7 @@ final class QuotaStore: ObservableObject {
                       self.tokenActivityGeneration == generation,
                       !Task.isCancelled else { return }
                 self.tokenActivity = activity
+                self.tokenActivityErrorMessage = nil
             } catch is CancellationError {
                 return
             } catch {
