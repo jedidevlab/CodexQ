@@ -21,9 +21,12 @@ CodexQ 是一款原生 macOS 菜单栏工具。它把ChatGPT（原Codex）5 小�
 
 ## 下载与安装
 
-从 [GitHub Releases](https://github.com/jedidevlab/CodexQ/releases/latest) 下载 Apple Silicon 安装包：
+从 [GitHub Releases](https://github.com/jedidevlab/CodexQ/releases/latest) 下载与你的 Mac 匹配的安装包：
 
-`CodexQ-1.0.10-arm64.zip`
+| Mac | 安装包 |
+| --- | --- |
+| Apple Silicon | `CodexQ-1.0.10-arm64.zip` |
+| Intel | `CodexQ-1.0.10-x86_64.zip` |
 
 解压后，将 `CodexQ.app` 移入“应用程序”文件夹。
 
@@ -33,7 +36,7 @@ CodexQ 是一款原生 macOS 菜单栏工具。它把ChatGPT（原Codex）5 小�
 
 ## 使用条件
 
-- Apple Silicon Mac
+- Apple Silicon 或 Intel Mac
 - macOS 14 或更新版本
 - 已安装 ChatGPT app，支持 `/Applications` 或 `~/Applications`（同时兼容旧版 Codex app）
 - 本地构建需要 Swift 6 工具链
@@ -65,12 +68,14 @@ swift test
 
 ```bash
 ./script/package_release.sh 1.0.10 arm64
+./script/package_release.sh 1.0.10 x86_64
 ```
 
 生成文件位于：
 
 ```text
 dist/CodexQ-1.0.10-arm64.zip
+dist/CodexQ-1.0.10-x86_64.zip
 ```
 
 开发运行脚本会在 `dist/CodexQ.app` 生成本地 `.app` bundle；构建产物不会提交到 Git。

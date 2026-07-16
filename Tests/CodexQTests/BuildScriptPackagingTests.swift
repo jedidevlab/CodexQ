@@ -16,7 +16,7 @@ struct BuildScriptPackagingTests {
     func releaseScriptCreatesArchitectureZip() throws {
         let script = try String(contentsOfFile: "script/package_release.sh", encoding: .utf8)
 
-        #expect(script.contains("ARCH=\"${2:-arm64}\""))
+        #expect(script.contains("ARCH=\"${2:-$(uname -m)}\""))
         #expect(script.contains("[[ \"$VERSION\" =~ ^[0-9A-Za-z._-]+$ ]]"))
         #expect(script.contains("swift build -c release --arch \"$ARCH\""))
         #expect(script.contains("CodexQ-${VERSION}-${ARCH}.zip"))
@@ -25,8 +25,8 @@ struct BuildScriptPackagingTests {
         #expect(!script.contains("cp -R \"$RESOURCE_BUNDLE\" \"$APP_BUNDLE/\""))
     }
 
-    @Test("全球发行只声明官方依赖支持的平台")
-    func globalReleaseUsesSupportedPlatformContract() throws {
+    @Test("全球发行同时提供 Apple Silicon 与 Intel 安装包")
+    func globalReleaseDocumentsBothMacArchitectures() throws {
         let package = try String(contentsOfFile: "Package.swift", encoding: .utf8)
         let runScript = try String(contentsOfFile: "script/build_and_run.sh", encoding: .utf8)
         let releaseScript = try String(contentsOfFile: "script/package_release.sh", encoding: .utf8)
@@ -36,16 +36,19 @@ struct BuildScriptPackagingTests {
         #expect(package.contains("platforms: [.macOS(.v14)]"))
         #expect(runScript.contains("MIN_SYSTEM_VERSION=\"14.0\""))
         #expect(releaseScript.contains("MIN_SYSTEM_VERSION=\"14.0\""))
-        #expect(releaseScript.contains("arm64)"))
-        #expect(!releaseScript.contains("arm64|x86_64"))
+        #expect(releaseScript.contains("arm64|x86_64"))
         #expect(readme.contains("macOS 14"))
         #expect(readme.contains("Apple Silicon"))
-        #expect(!readme.contains("x86_64"))
+        #expect(readme.contains("CodexQ-1.0.10-arm64.zip"))
+        #expect(readme.contains("CodexQ-1.0.10-x86_64.zip"))
+        #expect(readme.contains("| Intel |"))
         #expect(readme.contains("隐私与安全"))
         #expect(readme.contains("仍要打开"))
         #expect(englishReadme.contains("macOS 14"))
         #expect(englishReadme.contains("Apple Silicon"))
-        #expect(!englishReadme.contains("x86_64"))
+        #expect(englishReadme.contains("CodexQ-1.0.10-arm64.zip"))
+        #expect(englishReadme.contains("CodexQ-1.0.10-x86_64.zip"))
+        #expect(englishReadme.contains("| Intel |"))
         #expect(englishReadme.contains("Privacy & Security"))
         #expect(englishReadme.contains("Open Anyway"))
     }

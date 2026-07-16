@@ -21,9 +21,12 @@ CodexQ is a native macOS menu bar utility. It brings ChatGPT (formerly Codex) fi
 
 ## Download and install
 
-Download the Apple Silicon archive from [GitHub Releases](https://github.com/jedidevlab/CodexQ/releases/latest):
+Download the archive for your Mac from [GitHub Releases](https://github.com/jedidevlab/CodexQ/releases/latest):
 
-`CodexQ-1.0.10-arm64.zip`
+| Mac | Archive |
+| --- | --- |
+| Apple Silicon | `CodexQ-1.0.10-arm64.zip` |
+| Intel | `CodexQ-1.0.10-x86_64.zip` |
 
 Unzip the archive, then move `CodexQ.app` to Applications.
 
@@ -33,7 +36,7 @@ If macOS blocks the first launch, try opening the app once, then go to System Se
 
 ## Requirements
 
-- Apple Silicon Mac
+- Apple Silicon or Intel Mac
 - macOS 14 or later
 - ChatGPT app installed in `/Applications` or `~/Applications` (the legacy Codex app is also supported)
 - Swift 6 toolchain for local builds
@@ -65,12 +68,14 @@ Build an ad-hoc signed archive:
 
 ```bash
 ./script/package_release.sh 1.0.10 arm64
+./script/package_release.sh 1.0.10 x86_64
 ```
 
 The archive is written to:
 
 ```text
 dist/CodexQ-1.0.10-arm64.zip
+dist/CodexQ-1.0.10-x86_64.zip
 ```
 
 The helper script builds a local `.app` bundle in `dist/CodexQ.app` for development use. Generated build artifacts are excluded from Git.

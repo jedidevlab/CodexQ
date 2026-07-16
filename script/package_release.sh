@@ -2,21 +2,21 @@
 set -euo pipefail
 
 VERSION="${1:-1.0.0}"
-ARCH="${2:-arm64}"
+ARCH="${2:-$(uname -m)}"
 APP_NAME="CodexQ"
 BUNDLE_ID="com.jun.codexq"
 MIN_SYSTEM_VERSION="14.0"
 
 if ! [[ "$VERSION" =~ ^[0-9A-Za-z._-]+$ ]]; then
-  echo "usage: $0 [version] [arm64]" >&2
+  echo "usage: $0 [version] [arm64|x86_64]" >&2
   exit 2
 fi
 
 case "$ARCH" in
-  arm64)
+  arm64|x86_64)
     ;;
   *)
-    echo "usage: $0 [version] [arm64]" >&2
+    echo "usage: $0 [version] [arm64|x86_64]" >&2
     exit 2
     ;;
 esac
