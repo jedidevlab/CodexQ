@@ -23,7 +23,7 @@ CodexQ is a native macOS menu bar utility. It brings ChatGPT (formerly Codex) fi
 
 Download the Apple Silicon archive from [GitHub Releases](https://github.com/jedidevlab/CodexQ/releases/latest):
 
-`CodexQ-1.0.9-arm64.zip`
+`CodexQ-1.0.10-arm64.zip`
 
 Unzip the archive, then move `CodexQ.app` to Applications.
 

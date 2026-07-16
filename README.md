@@ -23,7 +23,7 @@ CodexQ 是一款原生 macOS 菜单栏工具。它把ChatGPT（原Codex）5 小�
 
 从 [GitHub Releases](https://github.com/jedidevlab/CodexQ/releases/latest) 下载 Apple Silicon 安装包：
 
-`CodexQ-1.0.9-arm64.zip`
+`CodexQ-1.0.10-arm64.zip`
 
 解压后，将 `CodexQ.app` 移入“应用程序”文件夹。
 
