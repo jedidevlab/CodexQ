@@ -29,6 +29,8 @@ Unzip the archive, then move `CodexQ.app` to Applications.
 
 > v1.0.9 and earlier are ad-hoc signed and not notarized, so they are not suitable as normal global releases. Future production releases should use the Developer ID and notarization flow below.
 
+If macOS blocks the first launch, try opening the app once, then go to System Settings → Privacy & Security, click Open Anyway, and confirm. Do this only when the archive came from this repository's official Release and you trust its source. See [Apple's instructions](https://support.apple.com/en-us/102445).
+
 ## Requirements
 
 - Apple Silicon Mac

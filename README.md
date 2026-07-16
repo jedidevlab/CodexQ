@@ -29,6 +29,8 @@ CodexQ 是一款原生 macOS 菜单栏工具。它把ChatGPT（原Codex）5 小�
 
 > v1.0.9 及更早版本使用 ad-hoc 签名，未经过 notarization 公证，不适合作为正式全球发行包。后续正式版本应使用下方 Developer ID＋公证流程生成。
 
+如果首次打开时被 macOS 拦截，请先尝试打开一次，再前往“系统设置”→“隐私与安全”，点击“仍要打开”并确认。仅当安装包来自本仓库的官方 Release 且你信任其来源时这样操作。参见 [Apple 官方说明](https://support.apple.com/zh-cn/102445)。
+
 ## 使用条件
 
 - Apple Silicon Mac

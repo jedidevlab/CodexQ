@@ -41,9 +41,13 @@ struct BuildScriptPackagingTests {
         #expect(readme.contains("macOS 14"))
         #expect(readme.contains("Apple Silicon"))
         #expect(!readme.contains("x86_64"))
+        #expect(readme.contains("隐私与安全"))
+        #expect(readme.contains("仍要打开"))
         #expect(englishReadme.contains("macOS 14"))
         #expect(englishReadme.contains("Apple Silicon"))
         #expect(!englishReadme.contains("x86_64"))
+        #expect(englishReadme.contains("Privacy & Security"))
+        #expect(englishReadme.contains("Open Anyway"))
     }
 
     @Test("公开发布默认要求 Developer ID 签名与公证")
