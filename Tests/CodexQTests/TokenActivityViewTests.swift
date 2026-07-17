@@ -265,6 +265,23 @@ struct TokenActivityViewTests {
         #expect(source.contains("isSettingsExpanded = false"))
     }
 
+    @Test("只有成功定位到屏幕后才标记弹窗已展示")
+    func popoverPresentationStateFollowsSuccessfulPositioning() throws {
+        let source = try String(
+            contentsOfFile: "Sources/CodexQ/App/StatusBarController.swift",
+            encoding: .utf8
+        )
+        let toggleStart = try #require(source.range(of: "@objc private func togglePopover()"))
+        let toggleEnd = try #require(
+            source.range(of: "private func panelDidClose()", range: toggleStart.upperBound..<source.endIndex)
+        )
+        let toggleSource = source[toggleStart.lowerBound..<toggleEnd.lowerBound]
+        let screenGuard = try #require(toggleSource.range(of: "guard let anchorRect"))
+        let presentedState = try #require(toggleSource.range(of: "store.setPopoverPresented(true)"))
+
+        #expect(screenGuard.lowerBound < presentedState.lowerBound)
+    }
+
     @Test("每日路径调用共享方块、单位和等级")
     func dailyModeCallsSharedSquareFormatterAndLevel() throws {
         let source = try String(

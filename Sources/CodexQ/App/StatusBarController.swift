@@ -133,7 +133,6 @@ final class StatusBarController: NSObject {
         if panel.isVisible {
             panel.orderOut(nil)
         } else {
-            store.setPopoverPresented(true)
             let anchorRect = button.window?.convertToScreen(
                 button.convert(StatusPopoverAnchor.rect(for: button), to: nil)
             )
@@ -142,6 +141,7 @@ final class StatusBarController: NSObject {
                     ?? button.window?.screen else {
                 return
             }
+            store.setPopoverPresented(true)
             currentAnchorRect = anchorRect
             currentVisibleFrame = screen.visibleFrame
             fitPanel(anchorRect: anchorRect, visibleFrame: screen.visibleFrame)
