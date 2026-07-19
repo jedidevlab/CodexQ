@@ -134,7 +134,7 @@ struct AppServerClient: Sendable {
                     "clientInfo": [
                         "name": "codexq",
                         "title": "CodexQ",
-                        "version": "1.0.0"
+                        "version": AppVersion.current
                     ],
                     "capabilities": [
                         "experimentalApi": true,

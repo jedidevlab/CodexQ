@@ -3,6 +3,19 @@ import Testing
 @testable import CodexQ
 
 struct StatusIconRendererTests {
+    @Test("菜单栏图标只在按钮初始化时设置")
+    func statusItemImageIsNotReassignedDuringStatusUpdates() throws {
+        let source = try String(
+            contentsOfFile: "Sources/CodexQ/App/StatusBarController.swift",
+            encoding: .utf8
+        )
+        let updateStart = try #require(source.range(of: "private func updateStatusItem()"))
+        let updateSource = source[updateStart.lowerBound...]
+
+        #expect(source.contains("button.image = StatusIconRenderer.image("))
+        #expect(!updateSource.contains("statusItem.button?.image ="))
+    }
+
     @Test("菜单栏图标不随额度裁切")
     @MainActor
     func iconIsNotClippedByRemainingPercent() throws {

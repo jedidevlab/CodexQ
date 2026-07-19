@@ -13,7 +13,7 @@ struct RefreshFailureFormatterTests {
             error: error,
             updatedAt: updatedAt,
             now: now
-        ) == "Updated 5m ago · 额度接口请求失败")
+        ) == "5 分钟前更新 · 额度接口请求失败")
     }
 
     @Test("无缓存失败时使用短错误摘要")

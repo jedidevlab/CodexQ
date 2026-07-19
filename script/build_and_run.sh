@@ -7,6 +7,8 @@ BUNDLE_ID="com.jun.codexq"
 MIN_SYSTEM_VERSION="14.0"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+VERSION_FILE="$ROOT_DIR/Sources/CodexQ/Resources/Version.txt"
+VERSION="$(tr -d '[:space:]' < "$VERSION_FILE")"
 DIST_DIR="$ROOT_DIR/dist"
 APP_BUNDLE="$DIST_DIR/$APP_NAME.app"
 LEGACY_APP_BUNDLE="$DIST_DIR/codesk.app"
@@ -30,6 +32,19 @@ wait_for_process_state() {
   return 1
 }
 
+wait_for_app_binary() {
+  local expected="$1"
+  for _ in {1..50}; do
+    if pgrep -f -x "$APP_BINARY" >/dev/null 2>&1; then
+      [[ "$expected" == "running" ]] && return 0
+    else
+      [[ "$expected" == "stopped" ]] && return 0
+    fi
+    sleep 0.1
+  done
+  return 1
+}
+
 pkill -x "codesk" >/dev/null 2>&1 || true
 pkill -x "$APP_NAME" >/dev/null 2>&1 || true
 wait_for_process_state stopped
@@ -43,6 +58,7 @@ mkdir -p "$APP_MACOS" "$APP_RESOURCES" "$ICONSET"
 cp "$BUILD_BINARY" "$APP_BINARY"
 chmod +x "$APP_BINARY"
 cp "$ROOT_DIR/Sources/CodexQ/Resources/MenuBarIcon.png" "$APP_RESOURCES/MenuBarIcon.png"
+cp "$VERSION_FILE" "$APP_RESOURCES/Version.txt"
 
 SOURCE_ICON="$ROOT_DIR/Sources/CodexQ/Resources/AppIcon.png"
 for size in 16 32 128 256 512; do
@@ -68,9 +84,9 @@ cat >"$INFO_PLIST" <<PLIST
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
-  <string>1.0.0</string>
+  <string>$VERSION</string>
   <key>CFBundleVersion</key>
-  <string>1</string>
+  <string>$VERSION</string>
   <key>LSMinimumSystemVersion</key>
   <string>$MIN_SYSTEM_VERSION</string>
   <key>LSUIElement</key>
@@ -107,7 +123,7 @@ case "$MODE" in
     ;;
   --verify|verify)
     open_app
-    wait_for_process_state running
+    wait_for_app_binary running
     ;;
   *)
     echo "usage: $0 [run|--debug|--logs|--telemetry|--verify]" >&2

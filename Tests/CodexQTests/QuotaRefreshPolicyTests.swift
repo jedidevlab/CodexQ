@@ -3,6 +3,39 @@ import Testing
 @testable import CodexQ
 
 struct QuotaNotificationTests {
+    @Test("通知权限被拒绝时关闭应用内通知开关")
+    func deniedAuthorizationDisablesNotifications() {
+        #expect(!NotificationAuthorizationPolicy.effectiveEnabled(
+            requestedEnabled: true,
+            authorizationGranted: false
+        ))
+        #expect(NotificationAuthorizationPolicy.effectiveEnabled(
+            requestedEnabled: true,
+            authorizationGranted: true
+        ))
+        #expect(!NotificationAuthorizationPolicy.effectiveEnabled(
+            requestedEnabled: false,
+            authorizationGranted: true
+        ))
+    }
+
+    @Test("授权完成时以当前开关状态为准")
+    func authorizationCompletionUsesCurrentToggleState() throws {
+        let source = try String(
+            contentsOfFile: "Sources/CodexQ/Views/QuotaPopoverView.swift",
+            encoding: .utf8
+        )
+
+        #expect(source.contains(
+            "requestedEnabled: settings.notificationsEnabled,\n" +
+            "                    authorizationGranted: granted"
+        ))
+        #expect(!source.contains(
+            "requestedEnabled: requestedEnabled,\n" +
+            "                    authorizationGranted: granted"
+        ))
+    }
+
     @Test("额度必须从阈值及以上降到阈值以下才提醒")
     func detectsStrictThresholdCrossing() {
         #expect(QuotaNotificationService.crossedThreshold(previous: 20, current: 19, threshold: 20))

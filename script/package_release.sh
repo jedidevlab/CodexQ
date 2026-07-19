@@ -1,14 +1,23 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="${1:-1.0.0}"
 ARCH="${2:-$(uname -m)}"
 APP_NAME="CodexQ"
 BUNDLE_ID="com.jun.codexq"
 MIN_SYSTEM_VERSION="14.0"
 
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+VERSION_FILE="$ROOT_DIR/Sources/CodexQ/Resources/Version.txt"
+PROJECT_VERSION="$(tr -d '[:space:]' < "$VERSION_FILE")"
+VERSION="${1:-$PROJECT_VERSION}"
+
 if ! [[ "$VERSION" =~ ^[0-9A-Za-z._-]+$ ]]; then
   echo "usage: $0 [version] [arm64|x86_64]" >&2
+  exit 2
+fi
+
+if [[ "$VERSION" != "$PROJECT_VERSION" ]]; then
+  echo "version $VERSION does not match $VERSION_FILE ($PROJECT_VERSION)" >&2
   exit 2
 fi
 
@@ -21,7 +30,6 @@ case "$ARCH" in
     ;;
 esac
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIST_DIR="$ROOT_DIR/dist"
 APP_BUNDLE="$DIST_DIR/$APP_NAME.app"
 LEGACY_APP_BUNDLE="$DIST_DIR/codesk.app"

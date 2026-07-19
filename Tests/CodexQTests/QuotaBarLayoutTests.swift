@@ -32,6 +32,29 @@ struct QuotaBarLayoutTests {
         #expect(QuotaBarLayout.markerExtraHeight == 0)
     }
 
+    @Test("分段条最后一格按真实百分比部分填充")
+    func segmentFillPreservesExactPercentage() {
+        #expect(QuotaBarLayout.fillFraction(forSegment: 15, percent: 84) == 1)
+        #expect(QuotaBarLayout.fillFraction(forSegment: 16, percent: 84) == 0.8)
+        #expect(QuotaBarLayout.fillFraction(forSegment: 17, percent: 84) == 0)
+        #expect(QuotaBarLayout.fillFraction(forSegment: 0, percent: -10) == 0)
+        #expect(QuotaBarLayout.fillFraction(forSegment: 19, percent: 120) == 1)
+    }
+
+    @Test("无限制额度保留原有灰色分段条")
+    func unlimitedQuotaKeepsDisabledBar() throws {
+        let source = try String(
+            contentsOfFile: "Sources/CodexQ/Views/QuotaPopoverView.swift",
+            encoding: .utf8
+        )
+        let rowStart = try #require(source.range(of: "private struct UnavailableQuotaRow"))
+        let rowEnd = try #require(source.range(of: "private struct EmbeddedSettingsView"))
+        let rowSource = source[rowStart.lowerBound..<rowEnd.lowerBound]
+
+        #expect(rowSource.contains("Text(\"无限制\")"))
+        #expect(rowSource.contains("DisabledSegmentedBatteryBar"))
+    }
+
     @Test("右侧文案宽度不同不能改变进度条左边缘")
     func quotaRowsUseLeadingContainerAlignment() throws {
         let source = try String(

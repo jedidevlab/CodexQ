@@ -9,6 +9,18 @@ enum QuotaBarLayout {
     static let markerExtraHeight: CGFloat = 0
     static let emptySegmentOpacity = 0.28
 
+    static var segmentWidth: CGFloat {
+        (width - segmentSpacing * CGFloat(segments - 1)) / CGFloat(segments)
+    }
+
+    static func fillFraction(forSegment index: Int, percent: Double) -> CGFloat {
+        guard (0..<segments).contains(index) else { return 0 }
+        let clampedPercent = min(100, max(0, percent))
+        let percentPerSegment = 100 / Double(segments)
+        let segmentStart = Double(index) * percentPerSegment
+        return CGFloat(min(1, max(0, (clampedPercent - segmentStart) / percentPerSegment)))
+    }
+
     static func width(for period: QuotaPeriod) -> CGFloat {
         switch period {
         case .fiveHour, .weekly: return width
@@ -124,6 +136,7 @@ struct QuotaPopoverView: View {
                 }
                 .buttonStyle(.borderless)
                 .help("设置")
+                .accessibilityLabel("设置")
 
                 Button {
                     Task { await store.refreshFromButton() }
@@ -137,7 +150,8 @@ struct QuotaPopoverView: View {
                 }
                 .buttonStyle(.borderless)
                 .disabled(isAnyRefreshing)
-                .help("刷新")
+                .help("立即刷新")
+                .accessibilityLabel("立即刷新")
 
                 Button("退出") {
                     NSApplication.shared.terminate(nil)
@@ -251,7 +265,17 @@ private struct EmbeddedSettingsView: View {
         .toggleStyle(.checkbox)
         .frame(maxWidth: .infinity, alignment: .leading)
         .onChange(of: settings.launchAtLogin) { settingsDidChange() }
-        .onChange(of: settings.notificationsEnabled) { settingsDidChange() }
+        .onChange(of: settings.notificationsEnabled) { _, requestedEnabled in
+            settingsDidChange()
+            guard requestedEnabled else { return }
+            Task {
+                let granted = await QuotaNotificationService().requestAuthorization()
+                settings.notificationsEnabled = NotificationAuthorizationPolicy.effectiveEnabled(
+                    requestedEnabled: settings.notificationsEnabled,
+                    authorizationGranted: granted
+                )
+            }
+        }
         .onChange(of: settings.notifyAt20) { settingsDidChange() }
         .onChange(of: settings.notifyAt10) { settingsDidChange() }
         .onChange(of: settings.notifyAt5) { settingsDidChange() }
@@ -321,8 +345,20 @@ private struct SegmentedBatteryBar: View {
         ZStack(alignment: .leading) {
             HStack(spacing: QuotaBarLayout.segmentSpacing) {
                 ForEach(0..<QuotaBarLayout.segments, id: \.self) { index in
-                    RoundedRectangle(cornerRadius: QuotaBarLayout.cornerRadius)
-                        .fill(index < filledSegments ? barColor : Color.secondary.opacity(QuotaBarLayout.emptySegmentOpacity))
+                    ZStack(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: QuotaBarLayout.cornerRadius)
+                            .fill(Color.secondary.opacity(QuotaBarLayout.emptySegmentOpacity))
+                        Rectangle()
+                            .fill(barColor)
+                            .frame(
+                                width: QuotaBarLayout.segmentWidth * QuotaBarLayout.fillFraction(
+                                    forSegment: index,
+                                    percent: percent
+                                )
+                            )
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: QuotaBarLayout.cornerRadius))
+                    .frame(width: QuotaBarLayout.segmentWidth, height: height)
                 }
             }
 
@@ -337,10 +373,6 @@ private struct SegmentedBatteryBar: View {
             }
         }
         .frame(width: QuotaBarLayout.width(for: period), height: height)
-    }
-
-    private var filledSegments: Int {
-        Int(ceil(min(100, max(0, percent)) / (100 / Double(QuotaBarLayout.segments))))
     }
 
     private var barColor: Color {

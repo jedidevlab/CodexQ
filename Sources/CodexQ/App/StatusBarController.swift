@@ -12,7 +12,6 @@ final class StatusBarController: NSObject {
         defer: false
     )
     private let store = QuotaStore()
-    private let sourceIcon: NSImage
     private var hostingController: NSHostingController<AnyView>?
     private var cancellables = Set<AnyCancellable>()
     private var autoCloseTask: Task<Void, Never>?
@@ -28,7 +27,6 @@ final class StatusBarController: NSObject {
         guard let url = iconURL, let image = NSImage(contentsOf: url) else {
             fatalError("Missing MenuBarIcon.png")
         }
-        sourceIcon = image
         super.init()
 
         panel.isFloatingPanel = true
@@ -65,6 +63,10 @@ final class StatusBarController: NSObject {
             button.action = #selector(togglePopover)
             button.target = self
             button.imagePosition = .imageLeading
+            button.image = StatusIconRenderer.image(
+                source: image,
+                remainingPercent: 100
+            )
         }
 
         store.$snapshot
@@ -258,10 +260,6 @@ final class StatusBarController: NSObject {
             now: now
         )
 
-        statusItem.button?.image = StatusIconRenderer.image(
-            source: sourceIcon,
-            remainingPercent: remainingPercent ?? 100
-        )
         statusItem.button?.title = StatusTitleFormatter.string(
             remainingPercent: remainingPercent,
             lastUpdatedAt: store.lastUpdatedAt,

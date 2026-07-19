@@ -243,14 +243,4 @@ struct ResetCreditUISafetyTests {
         #expect(popoverSource.contains("isExpanded: $isResetCreditsExpanded"))
     }
 
-    @Test("无限制时保留灰色五小时进度条")
-    func unavailableFiveHourWindowKeepsDisabledSegments() throws {
-        let source = try String(
-            contentsOfFile: "Sources/CodexQ/Views/QuotaPopoverView.swift",
-            encoding: .utf8
-        )
-
-        #expect(source.contains("DisabledSegmentedBatteryBar"))
-        #expect(source.contains("无限制"))
-    }
 }

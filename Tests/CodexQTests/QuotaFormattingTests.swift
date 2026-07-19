@@ -460,14 +460,22 @@ struct RelativeUpdateFormatterTests {
         #expect(RelativeUpdateFormatter.string(
             since: updatedAt,
             now: updatedAt.addingTimeInterval(59)
-        ) == "Updated now")
+        ) == "刚刚更新")
         #expect(RelativeUpdateFormatter.string(
             since: updatedAt,
             now: updatedAt.addingTimeInterval(60)
-        ) == "Updated 1m ago")
+        ) == "1 分钟前更新")
         #expect(RelativeUpdateFormatter.string(
             since: updatedAt,
             now: updatedAt.addingTimeInterval(179)
-        ) == "Updated 2m ago")
+        ) == "2 分钟前更新")
+        #expect(RelativeUpdateFormatter.string(
+            since: updatedAt,
+            now: updatedAt.addingTimeInterval(2 * 60 * 60)
+        ) == "2 小时前更新")
+        #expect(RelativeUpdateFormatter.string(
+            since: updatedAt,
+            now: updatedAt.addingTimeInterval(3 * 24 * 60 * 60)
+        ) == "3 天前更新")
     }
 }

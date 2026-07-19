@@ -25,8 +25,8 @@ Download the archive for your Mac from [GitHub Releases](https://github.com/jedi
 
 | Mac | Archive |
 | --- | --- |
-| Apple Silicon | `CodexQ-1.0.10-arm64.zip` |
-| Intel | `CodexQ-1.0.10-x86_64.zip` |
+| Apple Silicon | `CodexQ-1.0.11-arm64.zip` |
+| Intel | `CodexQ-1.0.11-x86_64.zip` |
 
 Unzip the archive, then move `CodexQ.app` to Applications.
 
@@ -67,15 +67,15 @@ swift test
 Build an ad-hoc signed archive:
 
 ```bash
-./script/package_release.sh 1.0.10 arm64
-./script/package_release.sh 1.0.10 x86_64
+./script/package_release.sh 1.0.11 arm64
+./script/package_release.sh 1.0.11 x86_64
 ```
 
 The archive is written to:
 
 ```text
-dist/CodexQ-1.0.10-arm64.zip
-dist/CodexQ-1.0.10-x86_64.zip
+dist/CodexQ-1.0.11-arm64.zip
+dist/CodexQ-1.0.11-x86_64.zip
 ```
 
 The helper script builds a local `.app` bundle in `dist/CodexQ.app` for development use. Generated build artifacts are excluded from Git.

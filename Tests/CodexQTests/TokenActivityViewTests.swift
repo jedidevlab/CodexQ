@@ -149,7 +149,8 @@ struct TokenActivityViewTests {
         )
 
         #expect(!(await store.refresh()))
-        let firstError = try? #require(store.errorMessage)
+        let firstError = store.errorMessage
+        #expect(firstError != nil)
         let retryTask = Task { @MainActor in await store.refresh() }
         _ = await retryStartedIterator.next()
 
@@ -235,6 +236,19 @@ struct TokenActivityViewTests {
         #expect(source.contains("if store.isRefreshButtonBusy"))
         #expect(!source.contains("if isAnyRefreshing"))
         #expect(source.contains(".disabled(isAnyRefreshing)"))
+    }
+
+    @Test("底部图标操作提供明确的中文提示与辅助功能标签")
+    func footerActionsHaveClearChineseLabels() throws {
+        let source = try String(
+            contentsOfFile: "Sources/CodexQ/Views/QuotaPopoverView.swift",
+            encoding: .utf8
+        )
+
+        #expect(source.contains(".help(\"设置\")"))
+        #expect(source.contains(".accessibilityLabel(\"设置\")"))
+        #expect(source.contains(".help(\"立即刷新\")"))
+        #expect(source.contains(".accessibilityLabel(\"立即刷新\")"))
     }
 
     @Test("低频设置默认折叠并由底部齿轮控制")

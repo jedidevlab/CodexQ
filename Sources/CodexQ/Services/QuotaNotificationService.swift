@@ -1,6 +1,15 @@
 import Foundation
 import UserNotifications
 
+enum NotificationAuthorizationPolicy {
+    static func effectiveEnabled(
+        requestedEnabled: Bool,
+        authorizationGranted: Bool
+    ) -> Bool {
+        requestedEnabled && authorizationGranted
+    }
+}
+
 actor QuotaNotificationService {
     static func crossedThreshold(previous: Double, current: Double, threshold: Int) -> Bool {
         previous >= Double(threshold) && current < Double(threshold)
@@ -19,9 +28,13 @@ actor QuotaNotificationService {
         return previousResetsAt == currentResetsAt
     }
 
-    func requestAuthorization() async {
-        _ = try? await UNUserNotificationCenter.current()
-            .requestAuthorization(options: [.alert, .sound])
+    func requestAuthorization() async -> Bool {
+        do {
+            return try await UNUserNotificationCenter.current()
+                .requestAuthorization(options: [.alert, .sound])
+        } catch {
+            return false
+        }
     }
 
     func notifyCrossings(
