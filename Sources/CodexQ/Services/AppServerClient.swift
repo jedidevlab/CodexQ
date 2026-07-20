@@ -49,13 +49,18 @@ struct AppServerClient: Sendable {
 
     private let executableURLs: [URL]
     private let responseTimeout: TimeInterval
+    private let readResetCreditDetails: @Sendable () async throws -> ResetCreditsSummary?
 
     init(
         executableURL: URL? = nil,
-        responseTimeout: TimeInterval = 10
+        responseTimeout: TimeInterval = 10,
+        readResetCreditDetails: (@Sendable () async throws -> ResetCreditsSummary?)? = nil
     ) {
         executableURLs = executableURL.map { [$0] } ?? Self.defaultExecutableURLs
         self.responseTimeout = responseTimeout
+        self.readResetCreditDetails = readResetCreditDetails ?? {
+            try await ResetCreditDetailsClient().read()
+        }
     }
 
     static func firstExecutableURL(
@@ -66,9 +71,19 @@ struct AppServerClient: Sendable {
     }
 
     func readRateLimits() async throws -> QuotaSnapshot {
-        try await Task.detached(priority: .utility) {
+        let snapshot = try await Task.detached(priority: .utility) {
             try readRateLimitsSynchronously()
         }.value
+        guard snapshot.resetCredits?.availableCount ?? 0 > 0,
+              snapshot.resetCredits?.credits == nil,
+              let details = try? await readResetCreditDetails() else {
+            return snapshot
+        }
+        return QuotaSnapshot(
+            fiveHour: snapshot.fiveHour,
+            weekly: snapshot.weekly,
+            resetCredits: details
+        )
     }
 
     func readTokenActivity() async throws -> TokenActivitySnapshot {
@@ -241,5 +256,43 @@ struct AppServerClient: Sendable {
             Darwin.kill(process.processIdentifier, SIGKILL)
         }
         process.waitUntilExit()
+    }
+}
+
+private struct ResetCreditDetailsClient {
+    private struct AuthFile: Decodable {
+        struct Tokens: Decodable {
+            let accessToken: String
+
+            enum CodingKeys: String, CodingKey {
+                case accessToken = "access_token"
+            }
+        }
+
+        let tokens: Tokens
+    }
+
+    func read() async throws -> ResetCreditsSummary {
+        let authURL = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".codex/auth.json")
+        let authData = try Data(contentsOf: authURL)
+        let token = try JSONDecoder().decode(AuthFile.self, from: authData).tokens.accessToken
+
+        var request = URLRequest(
+            url: URL(string:
+                "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits"
+            )!
+        )
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200..<300).contains(httpResponse.statusCode) else {
+            throw URLError(.badServerResponse)
+        }
+        return try JSONDecoder()
+            .decode(RateLimitResetCreditDetailsResponse.self, from: data)
+            .summary
     }
 }

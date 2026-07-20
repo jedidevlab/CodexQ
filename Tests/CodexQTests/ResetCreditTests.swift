@@ -3,6 +3,35 @@ import Testing
 @testable import CodexQ
 
 struct ResetCreditDecodingTests {
+    @Test("独立接口的 snake_case 明细可转换为现有重置模型")
+    func decodesResetCreditDetailsFallback() throws {
+        let json = #"""
+        {
+          "available_count": 1,
+          "total_earned_count": 1,
+          "credits": [{
+            "id": "credit-1",
+            "reset_type": "codex_rate_limits",
+            "status": "available",
+            "title": "Full reset",
+            "expires_at": "2026-07-27T00:00:00.000000Z"
+          }]
+        }
+        """#.data(using: .utf8)!
+
+        let response = try JSONDecoder().decode(
+            RateLimitResetCreditDetailsResponse.self,
+            from: json
+        )
+        let credit = try #require(response.summary.credits?.first)
+
+        #expect(response.summary.availableCount == 1)
+        #expect(credit.resetType == "codexRateLimits")
+        #expect(credit.status == "available")
+        #expect(credit.title == "Full reset")
+        #expect(credit.expiresAt == Date(timeIntervalSince1970: 1_785_110_400))
+    }
+
     @Test("codex 专用额度窗口不完整时回退到顶层额度窗口")
     func fallsBackWhenCodexLimitGroupIsIncomplete() throws {
         let json = #"""
