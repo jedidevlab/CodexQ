@@ -322,6 +322,13 @@ struct QuotaFormattingTests {
 }
 
 struct AppServerClientTests {
+    @Test("有可用次数但明细数组为空时仍需要回填")
+    func emptyResetCreditDetailsNeedFallback() {
+        let summary = ResetCreditsSummary(availableCount: 1, credits: [])
+
+        #expect(AppServerClient.shouldReadResetCreditDetails(for: summary))
+    }
+
     @Test("app-server 丢失重置明细时使用只读接口回填")
     func fillsMissingResetCreditDetails() async throws {
         let directory = FileManager.default.temporaryDirectory

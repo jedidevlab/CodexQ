@@ -70,12 +70,16 @@ struct AppServerClient: Sendable {
         candidates.first { fileManager.isExecutableFile(atPath: $0.path) }
     }
 
+    static func shouldReadResetCreditDetails(for summary: ResetCreditsSummary?) -> Bool {
+        guard let summary, summary.availableCount > 0 else { return false }
+        return summary.availableCredits.isEmpty
+    }
+
     func readRateLimits() async throws -> QuotaSnapshot {
         let snapshot = try await Task.detached(priority: .utility) {
             try readRateLimitsSynchronously()
         }.value
-        guard snapshot.resetCredits?.availableCount ?? 0 > 0,
-              snapshot.resetCredits?.credits == nil,
+        guard Self.shouldReadResetCreditDetails(for: snapshot.resetCredits),
               let details = try? await readResetCreditDetails() else {
             return snapshot
         }
@@ -259,33 +263,80 @@ struct AppServerClient: Sendable {
     }
 }
 
-private struct ResetCreditDetailsClient {
+struct ResetCreditDetailsClient {
     private struct AuthFile: Decodable {
         struct Tokens: Decodable {
             let accessToken: String
+            let accountID: String?
+            let idToken: String?
 
             enum CodingKeys: String, CodingKey {
                 case accessToken = "access_token"
+                case accountID = "account_id"
+                case idToken = "id_token"
             }
         }
 
         let tokens: Tokens
     }
 
-    func read() async throws -> ResetCreditsSummary {
-        let authURL = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".codex/auth.json")
-        let authData = try Data(contentsOf: authURL)
-        let token = try JSONDecoder().decode(AuthFile.self, from: authData).tokens.accessToken
+    private struct IDTokenClaims: Decodable {
+        struct AuthClaims: Decodable {
+            let isFedRAMP: Bool?
+
+            enum CodingKeys: String, CodingKey {
+                case isFedRAMP = "chatgpt_account_is_fedramp"
+            }
+        }
+
+        let auth: AuthClaims?
+
+        enum CodingKeys: String, CodingKey {
+            case auth = "https://api.openai.com/auth"
+        }
+    }
+
+    static func makeRequest(authData: Data) throws -> URLRequest {
+        let tokens = try JSONDecoder().decode(AuthFile.self, from: authData).tokens
 
         var request = URLRequest(
             url: URL(string:
                 "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits"
             )!
         )
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue(
+            "Bearer \(tokens.accessToken)",
+            forHTTPHeaderField: "Authorization"
+        )
+        request.setValue(tokens.accountID, forHTTPHeaderField: "ChatGPT-Account-ID")
+        if isFedRAMP(idToken: tokens.idToken) {
+            request.setValue("true", forHTTPHeaderField: "X-OpenAI-Fedramp")
+        }
         request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.timeoutInterval = 5
+        return request
+    }
 
+    private static func isFedRAMP(idToken: String?) -> Bool {
+        guard let payload = idToken?.split(separator: ".").dropFirst().first else {
+            return false
+        }
+        var base64 = String(payload)
+            .replacingOccurrences(of: "-", with: "+")
+            .replacingOccurrences(of: "_", with: "/")
+        base64 += String(repeating: "=", count: (4 - base64.count % 4) % 4)
+        guard let data = Data(base64Encoded: base64),
+              let claims = try? JSONDecoder().decode(IDTokenClaims.self, from: data) else {
+            return false
+        }
+        return claims.auth?.isFedRAMP == true
+    }
+
+    func read() async throws -> ResetCreditsSummary {
+        let authURL = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".codex/auth.json")
+        let authData = try Data(contentsOf: authURL)
+        let request = try Self.makeRequest(authData: authData)
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse,
               (200..<300).contains(httpResponse.statusCode) else {

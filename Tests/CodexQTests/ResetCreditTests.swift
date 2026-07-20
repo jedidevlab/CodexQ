@@ -3,6 +3,63 @@ import Testing
 @testable import CodexQ
 
 struct ResetCreditDecodingTests {
+    @Test("独立明细请求携带当前 ChatGPT 账户范围")
+    func resetCreditDetailsRequestUsesAccountScope() throws {
+        let auth = #"""
+        {
+          "tokens": {
+            "access_token": "test-token",
+            "account_id": "workspace-123"
+          }
+        }
+        """#.data(using: .utf8)!
+
+        let request = try ResetCreditDetailsClient.makeRequest(authData: auth)
+
+        #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer test-token")
+        #expect(request.value(forHTTPHeaderField: "ChatGPT-Account-ID") == "workspace-123")
+    }
+
+    @Test("独立明细请求使用五秒超时避免阻塞额度刷新")
+    func resetCreditDetailsRequestUsesShortTimeout() throws {
+        let auth = #"""
+        {
+          "tokens": {
+            "access_token": "test-token"
+          }
+        }
+        """#.data(using: .utf8)!
+
+        let request = try ResetCreditDetailsClient.makeRequest(authData: auth)
+
+        #expect(request.timeoutInterval == 5)
+    }
+
+    @Test("FedRAMP 工作区的独立明细请求携带路由标记")
+    func resetCreditDetailsRequestUsesFedRAMPRoute() throws {
+        let claims = #"""
+        {
+          "https://api.openai.com/auth": {
+            "chatgpt_account_is_fedramp": true
+          }
+        }
+        """#.data(using: .utf8)!
+        let payload = claims.base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+        let auth = try JSONSerialization.data(withJSONObject: [
+            "tokens": [
+                "access_token": "test-token",
+                "id_token": "header.\(payload).signature"
+            ]
+        ])
+
+        let request = try ResetCreditDetailsClient.makeRequest(authData: auth)
+
+        #expect(request.value(forHTTPHeaderField: "X-OpenAI-Fedramp") == "true")
+    }
+
     @Test("独立接口的 snake_case 明细可转换为现有重置模型")
     func decodesResetCreditDetailsFallback() throws {
         let json = #"""
