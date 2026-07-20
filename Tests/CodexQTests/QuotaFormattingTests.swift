@@ -322,6 +322,57 @@ struct QuotaFormattingTests {
 }
 
 struct AppServerClientTests {
+    @Test("有可用次数但明细数组为空时仍需要回填")
+    func emptyResetCreditDetailsNeedFallback() {
+        let summary = ResetCreditsSummary(availableCount: 1, credits: [])
+
+        #expect(AppServerClient.shouldReadResetCreditDetails(for: summary))
+    }
+
+    @Test("app-server 丢失重置明细时使用只读接口回填")
+    func fillsMissingResetCreditDetails() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let executable = directory.appendingPathComponent("fake-codex")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let script = #"""
+        #!/bin/sh
+        IFS= read -r initialize_request
+        printf '%s\n' '{"id":1,"result":{}}'
+        IFS= read -r initialized_notification
+        IFS= read -r limits_request
+        printf '%s\n' '{"id":2,"result":{"rateLimits":{"primary":{"usedPercent":6,"windowDurationMins":300},"secondary":{"usedPercent":1,"windowDurationMins":10080}},"rateLimitResetCredits":{"availableCount":1,"credits":null}}}'
+        """#
+        try Data(script.utf8).write(to: executable)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o755],
+            ofItemAtPath: executable.path
+        )
+
+        let details = ResetCreditsSummary(
+            availableCount: 1,
+            credits: [
+                ResetCredit(
+                    id: "credit-1",
+                    resetType: "codexRateLimits",
+                    status: "available",
+                    title: "Full reset",
+                    expiresAt: nil
+                )
+            ]
+        )
+        let client = AppServerClient(
+            executableURL: executable,
+            readResetCreditDetails: { details }
+        )
+
+        let snapshot = try await client.readRateLimits()
+
+        #expect(snapshot.resetCredits == details)
+    }
+
     @Test("token activity 通过 account/usage/read 读取每日用量")
     func tokenActivityUsesUsageReadMethod() async throws {
         let directory = FileManager.default.temporaryDirectory

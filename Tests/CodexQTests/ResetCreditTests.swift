@@ -3,6 +3,92 @@ import Testing
 @testable import CodexQ
 
 struct ResetCreditDecodingTests {
+    @Test("独立明细请求携带当前 ChatGPT 账户范围")
+    func resetCreditDetailsRequestUsesAccountScope() throws {
+        let auth = #"""
+        {
+          "tokens": {
+            "access_token": "test-token",
+            "account_id": "workspace-123"
+          }
+        }
+        """#.data(using: .utf8)!
+
+        let request = try ResetCreditDetailsClient.makeRequest(authData: auth)
+
+        #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer test-token")
+        #expect(request.value(forHTTPHeaderField: "ChatGPT-Account-ID") == "workspace-123")
+    }
+
+    @Test("独立明细请求使用五秒超时避免阻塞额度刷新")
+    func resetCreditDetailsRequestUsesShortTimeout() throws {
+        let auth = #"""
+        {
+          "tokens": {
+            "access_token": "test-token"
+          }
+        }
+        """#.data(using: .utf8)!
+
+        let request = try ResetCreditDetailsClient.makeRequest(authData: auth)
+
+        #expect(request.timeoutInterval == 5)
+    }
+
+    @Test("FedRAMP 工作区的独立明细请求携带路由标记")
+    func resetCreditDetailsRequestUsesFedRAMPRoute() throws {
+        let claims = #"""
+        {
+          "https://api.openai.com/auth": {
+            "chatgpt_account_is_fedramp": true
+          }
+        }
+        """#.data(using: .utf8)!
+        let payload = claims.base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+        let auth = try JSONSerialization.data(withJSONObject: [
+            "tokens": [
+                "access_token": "test-token",
+                "id_token": "header.\(payload).signature"
+            ]
+        ])
+
+        let request = try ResetCreditDetailsClient.makeRequest(authData: auth)
+
+        #expect(request.value(forHTTPHeaderField: "X-OpenAI-Fedramp") == "true")
+    }
+
+    @Test("独立接口的 snake_case 明细可转换为现有重置模型")
+    func decodesResetCreditDetailsFallback() throws {
+        let json = #"""
+        {
+          "available_count": 1,
+          "total_earned_count": 1,
+          "credits": [{
+            "id": "credit-1",
+            "reset_type": "codex_rate_limits",
+            "status": "available",
+            "title": "Full reset",
+            "expires_at": "2026-07-27T00:00:00.000000Z"
+          }]
+        }
+        """#.data(using: .utf8)!
+
+        let response = try JSONDecoder().decode(
+            RateLimitResetCreditDetailsResponse.self,
+            from: json
+        )
+        let credit = try #require(response.summary.credits?.first)
+
+        #expect(response.summary.availableCount == 1)
+        #expect(credit.resetType == "codexRateLimits")
+        #expect(credit.status == "available")
+        #expect(credit.title == "Full reset")
+        #expect(credit.expiresAt == Date(timeIntervalSince1970: 1_785_110_400))
+    }
+
     @Test("codex 专用额度窗口不完整时回退到顶层额度窗口")
     func fallsBackWhenCodexLimitGroupIsIncomplete() throws {
         let json = #"""

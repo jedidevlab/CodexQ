@@ -147,6 +147,54 @@ struct RateLimitResetCreditResponse: Decodable {
     }
 }
 
+struct RateLimitResetCreditDetailsResponse: Decodable {
+    let availableCount: Int
+    let credits: [RateLimitResetCreditDetails]
+
+    enum CodingKeys: String, CodingKey {
+        case availableCount = "available_count"
+        case credits
+    }
+
+    var summary: ResetCreditsSummary {
+        ResetCreditsSummary(
+            availableCount: availableCount,
+            credits: credits.map(\.resetCredit)
+        )
+    }
+}
+
+struct RateLimitResetCreditDetails: Decodable {
+    let id: String
+    let resetType: String
+    let status: String
+    let title: String?
+    let expiresAt: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case resetType = "reset_type"
+        case status
+        case title
+        case expiresAt = "expires_at"
+    }
+
+    var resetCredit: ResetCredit {
+        let expiryFormatter = ISO8601DateFormatter()
+        expiryFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return ResetCredit(
+            id: id,
+            resetType: resetType == "codex_rate_limits" ? "codexRateLimits" : resetType,
+            status: status,
+            title: title,
+            expiresAt: expiresAt.flatMap {
+                expiryFormatter.date(from: $0)
+                    ?? ISO8601DateFormatter().date(from: $0)
+            }
+        )
+    }
+}
+
 struct RateLimitSnapshot: Decodable {
     let primary: RateLimitWindow?
     let secondary: RateLimitWindow?
