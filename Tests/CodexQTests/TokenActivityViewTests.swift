@@ -264,17 +264,23 @@ struct TokenActivityViewTests {
         #expect(!source.contains("Button(\"退出\")"))
     }
 
-    @Test("额度标题与剩余百分比共享首行并降低超额提示权重")
+    @Test("额度标题与剩余百分比共享首行并保留原有超额警示样式")
     func quotaHeaderPrioritizesRemainingPercent() throws {
         let source = try String(
             contentsOfFile: "Sources/CodexQ/Views/QuotaPopoverView.swift",
             encoding: .utf8
         )
+        let rowSource = try sourceSection(
+            source,
+            from: "private struct QuotaRow",
+            to: "private struct SegmentedBatteryBar"
+        )
 
-        #expect(source.contains("private struct QuotaRow"))
-        #expect(source.contains(".foregroundStyle(.orange)"))
-        #expect(source.contains(".font(.caption2)"))
-        #expect(source.contains("Text(\"\\(Int(window.remainingPercent.rounded()))%\")"))
+        #expect(rowSource.contains(".foregroundStyle(.red)"))
+        #expect(rowSource.contains(".font(.caption)"))
+        #expect(!rowSource.contains(".foregroundStyle(.orange)"))
+        #expect(!rowSource.contains(".font(.caption2)"))
+        #expect(rowSource.contains("Text(\"\\(Int(window.remainingPercent.rounded()))%\")"))
     }
 
     @Test("普通额度状态统一使用强调色，红橙色只保留给风险")

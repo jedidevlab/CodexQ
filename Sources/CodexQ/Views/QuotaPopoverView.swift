@@ -314,8 +314,8 @@ private struct QuotaRow: View {
                 if let projection,
                    let paceText = PaceFormatter.status(projection) {
                     Text(paceText)
-                        .font(.caption2)
-                        .foregroundStyle(.orange)
+                        .font(.caption)
+                        .foregroundStyle(.red)
                         .lineLimit(1)
                 }
                 Spacer(minLength: 8)
