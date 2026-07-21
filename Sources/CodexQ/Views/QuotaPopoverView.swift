@@ -2,23 +2,12 @@ import SwiftUI
 
 enum QuotaBarLayout {
     static let width: CGFloat = 214
-    static let segments = 20
-    static let segmentSpacing: CGFloat = 1.5
-    static let cornerRadius: CGFloat = 1.5
-    static let markerWidth: CGFloat = 5
+    static let markerWidth: CGFloat = 3
     static let markerExtraHeight: CGFloat = 0
-    static let emptySegmentOpacity = 0.28
+    static let trackOpacity = 0.28
 
-    static var segmentWidth: CGFloat {
-        (width - segmentSpacing * CGFloat(segments - 1)) / CGFloat(segments)
-    }
-
-    static func fillFraction(forSegment index: Int, percent: Double) -> CGFloat {
-        guard (0..<segments).contains(index) else { return 0 }
-        let clampedPercent = min(100, max(0, percent))
-        let percentPerSegment = 100 / Double(segments)
-        let segmentStart = Double(index) * percentPerSegment
-        return CGFloat(min(1, max(0, (clampedPercent - segmentStart) / percentPerSegment)))
+    static func fillWidth(percent: Double) -> CGFloat {
+        width * CGFloat(min(100, max(0, percent)) / 100)
     }
 
     static func width(for period: QuotaPeriod) -> CGFloat {
@@ -238,25 +227,21 @@ private struct UnavailableQuotaRow: View {
                     .font(.caption.weight(.medium))
                     .foregroundStyle(Color.primary.opacity(0.72))
             }
-            DisabledSegmentedBatteryBar(period: .fiveHour)
+            DisabledContinuousQuotaBar(period: .fiveHour)
         }
     }
 }
 
-private struct DisabledSegmentedBatteryBar: View {
+private struct DisabledContinuousQuotaBar: View {
     let period: QuotaPeriod
 
     var body: some View {
-        HStack(spacing: QuotaBarLayout.segmentSpacing) {
-            ForEach(0..<QuotaBarLayout.segments, id: \.self) { _ in
-                RoundedRectangle(cornerRadius: QuotaBarLayout.cornerRadius)
-                    .fill(Color.secondary.opacity(QuotaBarLayout.emptySegmentOpacity))
-            }
-        }
-        .frame(
-            width: QuotaBarLayout.width(for: period),
-            height: QuotaBarLayout.height(for: period)
-        )
+        Capsule()
+            .fill(Color.secondary.opacity(QuotaBarLayout.trackOpacity))
+            .frame(
+                width: QuotaBarLayout.width(for: period),
+                height: QuotaBarLayout.height(for: period)
+            )
     }
 }
 
@@ -322,7 +307,7 @@ private struct QuotaRow: View {
                     }
                 }
                 .frame(width: QuotaBarLayout.width(for: period))
-                SegmentedBatteryBar(
+                ContinuousQuotaBar(
                     period: period,
                     percent: window.remainingPercent,
                     markerPercent: projection.flatMap {
@@ -353,7 +338,7 @@ private struct QuotaRow: View {
 
 }
 
-private struct SegmentedBatteryBar: View {
+private struct ContinuousQuotaBar: View {
     let period: QuotaPeriod
     let percent: Double
     let markerPercent: Double?
@@ -362,24 +347,12 @@ private struct SegmentedBatteryBar: View {
         let height = QuotaBarLayout.height(for: period)
 
         ZStack(alignment: .leading) {
-            HStack(spacing: QuotaBarLayout.segmentSpacing) {
-                ForEach(0..<QuotaBarLayout.segments, id: \.self) { index in
-                    ZStack(alignment: .leading) {
-                        RoundedRectangle(cornerRadius: QuotaBarLayout.cornerRadius)
-                            .fill(Color.secondary.opacity(QuotaBarLayout.emptySegmentOpacity))
-                        Rectangle()
-                            .fill(barColor)
-                            .frame(
-                                width: QuotaBarLayout.segmentWidth * QuotaBarLayout.fillFraction(
-                                    forSegment: index,
-                                    percent: percent
-                                )
-                            )
-                    }
-                    .clipShape(RoundedRectangle(cornerRadius: QuotaBarLayout.cornerRadius))
-                    .frame(width: QuotaBarLayout.segmentWidth, height: height)
-                }
-            }
+            Capsule()
+                .fill(Color.secondary.opacity(QuotaBarLayout.trackOpacity))
+
+            Capsule()
+                .fill(barColor)
+                .frame(width: QuotaBarLayout.fillWidth(percent: percent))
 
             if let markerPercent {
                 Rectangle()
@@ -391,6 +364,7 @@ private struct SegmentedBatteryBar: View {
                     .offset(x: markerOffset(for: markerPercent))
             }
         }
+        .clipShape(Capsule())
         .frame(width: QuotaBarLayout.width(for: period), height: height)
     }
 

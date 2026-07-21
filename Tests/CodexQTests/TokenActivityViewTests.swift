@@ -273,7 +273,7 @@ struct TokenActivityViewTests {
         let rowSource = try sourceSection(
             source,
             from: "private struct QuotaRow",
-            to: "private struct SegmentedBatteryBar"
+            to: "private struct ContinuousQuotaBar"
         )
 
         #expect(rowSource.contains(".foregroundStyle(.red)"))
