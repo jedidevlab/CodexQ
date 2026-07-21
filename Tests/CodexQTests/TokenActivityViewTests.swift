@@ -294,8 +294,8 @@ struct TokenActivityViewTests {
         #expect(rowSource.contains("Text(\"\\(Int(window.remainingPercent.rounded()))%\")"))
     }
 
-    @Test("普通额度状态统一使用强调色，红橙色只保留给风险")
-    func normalQuotaStateUsesAccentColor() throws {
+    @Test("额度条随剩余量恢复绿橙红状态色")
+    func quotaBarUsesGreenOrangeRedStatusColors() throws {
         let quotaSource = try String(
             contentsOfFile: "Sources/CodexQ/Views/QuotaPopoverView.swift",
             encoding: .utf8
@@ -305,7 +305,9 @@ struct TokenActivityViewTests {
             encoding: .utf8
         )
 
-        #expect(quotaSource.contains("default: return .accentColor"))
+        #expect(quotaSource.contains("case 0..<20: return .red"))
+        #expect(quotaSource.contains("case 20..<50: return .orange"))
+        #expect(quotaSource.contains("default: return .green"))
         #expect(resetSource.contains("summary.availableCount > 0 ? Color.accentColor : Color.secondary"))
     }
 

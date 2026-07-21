@@ -398,7 +398,7 @@ private struct SegmentedBatteryBar: View {
         switch percent {
         case 0..<20: return .red
         case 20..<50: return .orange
-        default: return .accentColor
+        default: return .green
         }
     }
 
