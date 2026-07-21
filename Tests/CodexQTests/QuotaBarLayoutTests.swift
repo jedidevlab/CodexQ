@@ -6,12 +6,12 @@ struct QuotaBarLayoutTests {
     @Test("5 小时与周限额共用连续条尺寸")
     func quotaBarsUseSharedContinuousBarSize() {
         #expect(QuotaBarLayout.width == 214)
-        #expect(QuotaBarLayout.height(for: .fiveHour) == 11)
+        #expect(QuotaBarLayout.height(for: .fiveHour) == 8)
     }
 
     @Test("5 小时与周限额条状高度一致")
     func quotaBarsUseSameHeight() {
-        #expect(QuotaBarLayout.height(for: .fiveHour) == 11)
+        #expect(QuotaBarLayout.height(for: .fiveHour) == 8)
         #expect(QuotaBarLayout.height(for: .weekly) == QuotaBarLayout.height(for: .fiveHour))
     }
 

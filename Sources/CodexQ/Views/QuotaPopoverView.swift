@@ -18,7 +18,7 @@ enum QuotaBarLayout {
 
     static func height(for period: QuotaPeriod) -> CGFloat {
         switch period {
-        case .fiveHour, .weekly: return 11
+        case .fiveHour, .weekly: return 8
         }
     }
 }
