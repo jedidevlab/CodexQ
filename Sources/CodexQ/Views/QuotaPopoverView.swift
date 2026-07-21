@@ -1,13 +1,15 @@
+import AppKit
 import SwiftUI
 
 enum QuotaBarLayout {
     static let width: CGFloat = 214
-    static let markerWidth: CGFloat = 3
-    static let markerExtraHeight: CGFloat = 0
-    static let trackOpacity = 0.28
+    static let markerWidth: CGFloat = 2
+    static let markerExtraHeight: CGFloat = 4
 
     static func fillWidth(percent: Double) -> CGFloat {
-        width * CGFloat(min(100, max(0, percent)) / 100)
+        let fraction = min(100, max(0, percent)) / 100
+        guard fraction > 0 else { return 0 }
+        return max(height(for: .fiveHour), width * CGFloat(fraction))
     }
 
     static func width(for period: QuotaPeriod) -> CGFloat {
@@ -18,7 +20,7 @@ enum QuotaBarLayout {
 
     static func height(for period: QuotaPeriod) -> CGFloat {
         switch period {
-        case .fiveHour, .weekly: return 8
+        case .fiveHour, .weekly: return 7
         }
     }
 }
@@ -236,8 +238,7 @@ private struct DisabledContinuousQuotaBar: View {
     let period: QuotaPeriod
 
     var body: some View {
-        Capsule()
-            .fill(Color.secondary.opacity(QuotaBarLayout.trackOpacity))
+        Capsule().fill(.quaternary)
             .frame(
                 width: QuotaBarLayout.width(for: period),
                 height: QuotaBarLayout.height(for: period)
@@ -300,10 +301,15 @@ private struct QuotaRow: View {
                     Spacer()
                     if let projection,
                        let paceText = PaceFormatter.status(projection) {
-                        Text(paceText)
-                            .font(.caption)
-                            .foregroundStyle(.red)
-                            .lineLimit(1)
+                        HStack(spacing: 3) {
+                            Image(systemName: "flame.fill")
+                                .font(.system(size: 11))
+                                .foregroundStyle(Color(nsColor: .systemRed))
+                            Text(paceText)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
                     }
                 }
                 .frame(width: QuotaBarLayout.width(for: period))
@@ -314,7 +320,7 @@ private struct QuotaRow: View {
                         $0.isOnTrack ? nil : $0.expectedRemainingPercent
                     }
                 )
-                .help("红线表示按当前时间进度理论上应剩余的额度")
+                .help("刻度表示按当前时间进度理论上应剩余的额度")
             }
 
             Spacer(minLength: 8)
@@ -347,16 +353,17 @@ private struct ContinuousQuotaBar: View {
         let height = QuotaBarLayout.height(for: period)
 
         ZStack(alignment: .leading) {
-            Capsule()
-                .fill(Color.secondary.opacity(QuotaBarLayout.trackOpacity))
+            Capsule().fill(.quaternary)
 
             Capsule()
                 .fill(barColor)
                 .frame(width: QuotaBarLayout.fillWidth(percent: percent))
-
+        }
+        .frame(width: QuotaBarLayout.width(for: period), height: height)
+        .overlay(alignment: .leading) {
             if let markerPercent {
-                Rectangle()
-                    .fill(.red)
+                RoundedRectangle(cornerRadius: 1)
+                    .fill(Color.primary.opacity(0.55))
                     .frame(
                         width: QuotaBarLayout.markerWidth,
                         height: height + QuotaBarLayout.markerExtraHeight
@@ -364,15 +371,13 @@ private struct ContinuousQuotaBar: View {
                     .offset(x: markerOffset(for: markerPercent))
             }
         }
-        .clipShape(Capsule())
-        .frame(width: QuotaBarLayout.width(for: period), height: height)
     }
 
     private var barColor: Color {
         switch percent {
-        case 0..<20: return .red
-        case 20..<50: return .orange
-        default: return .green
+        case 0..<20: return Color(nsColor: .systemRed)
+        case 20..<50: return Color(nsColor: .systemYellow)
+        default: return Color(nsColor: .systemBlue)
         }
     }
 

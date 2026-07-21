@@ -6,12 +6,12 @@ struct QuotaBarLayoutTests {
     @Test("5 小时与周限额共用连续条尺寸")
     func quotaBarsUseSharedContinuousBarSize() {
         #expect(QuotaBarLayout.width == 214)
-        #expect(QuotaBarLayout.height(for: .fiveHour) == 8)
+        #expect(QuotaBarLayout.height(for: .fiveHour) == 7)
     }
 
     @Test("5 小时与周限额条状高度一致")
     func quotaBarsUseSameHeight() {
-        #expect(QuotaBarLayout.height(for: .fiveHour) == 8)
+        #expect(QuotaBarLayout.height(for: .fiveHour) == 7)
         #expect(QuotaBarLayout.height(for: .weekly) == QuotaBarLayout.height(for: .fiveHour))
     }
 
@@ -21,19 +21,16 @@ struct QuotaBarLayoutTests {
         #expect(QuotaBarLayout.width(for: .weekly) == QuotaBarLayout.width(for: .fiveHour))
     }
 
-    @Test("未使用轨道需要清晰显示完整长度")
-    func emptyTrackRemainsVisible() {
-        #expect(QuotaBarLayout.trackOpacity >= 0.28)
-    }
-
-    @Test("进度标记高度不超过额度条")
-    func markerDoesNotExceedBarHeight() {
-        #expect(QuotaBarLayout.markerExtraHeight == 0)
+    @Test("Pace 标记沿用 OpenUsage 的细刻度并上下突出")
+    func paceMarkerMatchesOpenUsageDimensions() {
+        #expect(QuotaBarLayout.markerWidth == 2)
+        #expect(QuotaBarLayout.markerExtraHeight == 4)
     }
 
     @Test("连续额度条按真实百分比填充并限制范围")
     func continuousFillPreservesExactPercentage() {
         #expect(QuotaBarLayout.fillWidth(percent: 84) == 214 * 0.84)
+        #expect(QuotaBarLayout.fillWidth(percent: 1) == 7)
         #expect(QuotaBarLayout.fillWidth(percent: -10) == 0)
         #expect(QuotaBarLayout.fillWidth(percent: 120) == 214)
     }
@@ -51,6 +48,7 @@ struct QuotaBarLayoutTests {
         #expect(rowSource.contains("Text(\"无限制\")"))
         #expect(rowSource.contains("DisabledContinuousQuotaBar"))
         #expect(rowSource.contains("Capsule()"))
+        #expect(rowSource.contains(".fill(.quaternary)"))
     }
 
     @Test("右侧文案宽度不同不能改变进度条左边缘")

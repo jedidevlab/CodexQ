@@ -264,8 +264,8 @@ struct TokenActivityViewTests {
         #expect(!source.contains("Button(\"退出\")"))
     }
 
-    @Test("超额提示保留原有样式并靠右放在进度条区域")
-    func quotaHeaderPrioritizesRemainingPercent() throws {
+    @Test("Pace 风险提示沿用 OpenUsage 的火焰与次级文字样式")
+    func paceWarningMatchesOpenUsageStyle() throws {
         let source = try String(
             contentsOfFile: "Sources/CodexQ/Views/QuotaPopoverView.swift",
             encoding: .utf8
@@ -276,10 +276,10 @@ struct TokenActivityViewTests {
             to: "private struct ContinuousQuotaBar"
         )
 
-        #expect(rowSource.contains(".foregroundStyle(.red)"))
+        #expect(rowSource.contains("Image(systemName: \"flame.fill\")"))
+        #expect(rowSource.contains(".foregroundStyle(Color(nsColor: .systemRed))"))
+        #expect(rowSource.contains(".foregroundStyle(.secondary)"))
         #expect(rowSource.contains(".font(.caption)"))
-        #expect(!rowSource.contains(".foregroundStyle(.orange)"))
-        #expect(!rowSource.contains(".font(.caption2)"))
         #expect(rowSource.contains(".frame(width: QuotaBarLayout.width(for: period))"))
         #expect(rowSource.contains("VStack(alignment: .trailing, spacing: 3)"))
         let titleIndex = try #require(rowSource.range(of: "Text(title)")?.lowerBound)
@@ -294,8 +294,8 @@ struct TokenActivityViewTests {
         #expect(rowSource.contains("Text(\"\\(Int(window.remainingPercent.rounded()))%\")"))
     }
 
-    @Test("额度条随剩余量恢复绿橙红状态色")
-    func quotaBarUsesGreenOrangeRedStatusColors() throws {
+    @Test("额度条与 Pace 刻度沿用 OpenUsage 系统样式")
+    func quotaBarAndPaceTickMatchOpenUsageStyle() throws {
         let quotaSource = try String(
             contentsOfFile: "Sources/CodexQ/Views/QuotaPopoverView.swift",
             encoding: .utf8
@@ -305,9 +305,13 @@ struct TokenActivityViewTests {
             encoding: .utf8
         )
 
-        #expect(quotaSource.contains("case 0..<20: return .red"))
-        #expect(quotaSource.contains("case 20..<50: return .orange"))
-        #expect(quotaSource.contains("default: return .green"))
+        #expect(quotaSource.contains("Capsule().fill(.quaternary)"))
+        #expect(quotaSource.contains("Color(nsColor: .systemBlue)"))
+        #expect(quotaSource.contains("Color(nsColor: .systemYellow)"))
+        #expect(quotaSource.contains("Color(nsColor: .systemRed)"))
+        #expect(quotaSource.contains(".overlay(alignment: .leading)"))
+        #expect(quotaSource.contains("RoundedRectangle(cornerRadius: 1)"))
+        #expect(quotaSource.contains(".fill(Color.primary.opacity(0.55))"))
         #expect(resetSource.contains("summary.availableCount > 0 ? Color.accentColor : Color.secondary"))
     }
 
