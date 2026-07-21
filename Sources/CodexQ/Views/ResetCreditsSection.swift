@@ -18,13 +18,13 @@ struct ResetCreditsSection: View {
                     Text(presentation.countText)
                         .font(.caption.weight(.medium))
                         .foregroundStyle(
-                            summary.availableCount > 0 ? Color.green : Color.secondary
+                            summary.availableCount > 0 ? Color.accentColor : Color.secondary
                         )
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
                         .background(
                             summary.availableCount > 0
-                                ? Color.green.opacity(0.16)
+                                ? Color.accentColor.opacity(0.14)
                                 : Color.secondary.opacity(0.12),
                             in: Capsule()
                         )

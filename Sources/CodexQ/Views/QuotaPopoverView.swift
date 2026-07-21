@@ -2,23 +2,12 @@ import SwiftUI
 
 enum QuotaBarLayout {
     static let width: CGFloat = 214
-    static let segments = 20
-    static let segmentSpacing: CGFloat = 1.5
-    static let cornerRadius: CGFloat = 1.5
-    static let markerWidth: CGFloat = 5
+    static let markerWidth: CGFloat = 3
     static let markerExtraHeight: CGFloat = 0
-    static let emptySegmentOpacity = 0.28
+    static let trackOpacity = 0.28
 
-    static var segmentWidth: CGFloat {
-        (width - segmentSpacing * CGFloat(segments - 1)) / CGFloat(segments)
-    }
-
-    static func fillFraction(forSegment index: Int, percent: Double) -> CGFloat {
-        guard (0..<segments).contains(index) else { return 0 }
-        let clampedPercent = min(100, max(0, percent))
-        let percentPerSegment = 100 / Double(segments)
-        let segmentStart = Double(index) * percentPerSegment
-        return CGFloat(min(1, max(0, (clampedPercent - segmentStart) / percentPerSegment)))
+    static func fillWidth(percent: Double) -> CGFloat {
+        width * CGFloat(min(100, max(0, percent)) / 100)
     }
 
     static func width(for period: QuotaPeriod) -> CGFloat {
@@ -29,7 +18,7 @@ enum QuotaBarLayout {
 
     static func height(for period: QuotaPeriod) -> CGFloat {
         switch period {
-        case .fiveHour, .weekly: return 11
+        case .fiveHour, .weekly: return 8
         }
     }
 }
@@ -112,7 +101,7 @@ struct QuotaPopoverView: View {
 
             Divider()
 
-            HStack {
+            HStack(spacing: 8) {
                 if let error = store.errorMessage, store.snapshot != nil {
                     Text(failureStatus(error: error))
                         .font(.caption)
@@ -125,14 +114,16 @@ struct QuotaPopoverView: View {
                         now: relativeTimeNow
                     ))
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.primary.opacity(0.72))
                     .monospacedDigit()
                 }
                 Spacer()
                 Button {
                     isSettingsExpanded.toggle()
                 } label: {
-                    Image(systemName: isSettingsExpanded ? "gearshape.fill" : "gearshape")
+                    FooterIconButtonLabel(
+                        systemName: isSettingsExpanded ? "gearshape.fill" : "gearshape"
+                    )
                 }
                 .buttonStyle(.borderless)
                 .help("设置")
@@ -144,8 +135,9 @@ struct QuotaPopoverView: View {
                     if store.isRefreshButtonBusy {
                         ProgressView()
                             .controlSize(.small)
+                            .frame(width: 24, height: 24)
                     } else {
-                        Image(systemName: "arrow.clockwise")
+                        FooterIconButtonLabel(systemName: "arrow.clockwise")
                     }
                 }
                 .buttonStyle(.borderless)
@@ -153,10 +145,14 @@ struct QuotaPopoverView: View {
                 .help("立即刷新")
                 .accessibilityLabel("立即刷新")
 
-                Button("退出") {
+                Button {
                     NSApplication.shared.terminate(nil)
+                } label: {
+                    FooterIconButtonLabel(systemName: "power")
                 }
                 .buttonStyle(.borderless)
+                .help("退出")
+                .accessibilityLabel("退出")
             }
         }
         .padding(16)
@@ -209,37 +205,43 @@ struct QuotaPopoverView: View {
     }
 }
 
+private struct FooterIconButtonLabel: View {
+    let systemName: String
+
+    var body: some View {
+        Image(systemName: systemName)
+            .font(.system(size: 13, weight: .medium))
+            .frame(width: 24, height: 24)
+            .contentShape(Rectangle())
+    }
+}
+
 private struct UnavailableQuotaRow: View {
     var body: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline) {
                 Text("5 小时")
                     .font(.headline)
-                    .frame(width: QuotaBarLayout.width(for: .fiveHour), alignment: .leading)
-                DisabledSegmentedBatteryBar(period: .fiveHour)
+                Spacer()
+                Text("无限制")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(Color.primary.opacity(0.72))
             }
-            Spacer()
-            Text("无限制")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            DisabledContinuousQuotaBar(period: .fiveHour)
         }
     }
 }
 
-private struct DisabledSegmentedBatteryBar: View {
+private struct DisabledContinuousQuotaBar: View {
     let period: QuotaPeriod
 
     var body: some View {
-        HStack(spacing: QuotaBarLayout.segmentSpacing) {
-            ForEach(0..<QuotaBarLayout.segments, id: \.self) { _ in
-                RoundedRectangle(cornerRadius: QuotaBarLayout.cornerRadius)
-                    .fill(Color.secondary.opacity(QuotaBarLayout.emptySegmentOpacity))
-            }
-        }
-        .frame(
-            width: QuotaBarLayout.width(for: period),
-            height: QuotaBarLayout.height(for: period)
-        )
+        Capsule()
+            .fill(Color.secondary.opacity(QuotaBarLayout.trackOpacity))
+            .frame(
+                width: QuotaBarLayout.width(for: period),
+                height: QuotaBarLayout.height(for: period)
+            )
     }
 }
 
@@ -301,10 +303,11 @@ private struct QuotaRow: View {
                         Text(paceText)
                             .font(.caption)
                             .foregroundStyle(.red)
+                            .lineLimit(1)
                     }
                 }
                 .frame(width: QuotaBarLayout.width(for: period))
-                SegmentedBatteryBar(
+                ContinuousQuotaBar(
                     period: period,
                     percent: window.remainingPercent,
                     markerPercent: projection.flatMap {
@@ -319,9 +322,10 @@ private struct QuotaRow: View {
             VStack(alignment: .trailing, spacing: 3) {
                 Text("\(Int(window.remainingPercent.rounded()))%")
                     .font(.system(.body, design: .rounded, weight: .semibold))
+                    .monospacedDigit()
                 Text(resetText)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.primary.opacity(0.72))
                     .lineLimit(1)
                     .fixedSize(horizontal: true, vertical: false)
             }
@@ -334,7 +338,7 @@ private struct QuotaRow: View {
 
 }
 
-private struct SegmentedBatteryBar: View {
+private struct ContinuousQuotaBar: View {
     let period: QuotaPeriod
     let percent: Double
     let markerPercent: Double?
@@ -343,24 +347,12 @@ private struct SegmentedBatteryBar: View {
         let height = QuotaBarLayout.height(for: period)
 
         ZStack(alignment: .leading) {
-            HStack(spacing: QuotaBarLayout.segmentSpacing) {
-                ForEach(0..<QuotaBarLayout.segments, id: \.self) { index in
-                    ZStack(alignment: .leading) {
-                        RoundedRectangle(cornerRadius: QuotaBarLayout.cornerRadius)
-                            .fill(Color.secondary.opacity(QuotaBarLayout.emptySegmentOpacity))
-                        Rectangle()
-                            .fill(barColor)
-                            .frame(
-                                width: QuotaBarLayout.segmentWidth * QuotaBarLayout.fillFraction(
-                                    forSegment: index,
-                                    percent: percent
-                                )
-                            )
-                    }
-                    .clipShape(RoundedRectangle(cornerRadius: QuotaBarLayout.cornerRadius))
-                    .frame(width: QuotaBarLayout.segmentWidth, height: height)
-                }
-            }
+            Capsule()
+                .fill(Color.secondary.opacity(QuotaBarLayout.trackOpacity))
+
+            Capsule()
+                .fill(barColor)
+                .frame(width: QuotaBarLayout.fillWidth(percent: percent))
 
             if let markerPercent {
                 Rectangle()
@@ -372,6 +364,7 @@ private struct SegmentedBatteryBar: View {
                     .offset(x: markerOffset(for: markerPercent))
             }
         }
+        .clipShape(Capsule())
         .frame(width: QuotaBarLayout.width(for: period), height: height)
     }
 
