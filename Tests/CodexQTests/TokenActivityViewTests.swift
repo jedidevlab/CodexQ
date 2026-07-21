@@ -264,7 +264,7 @@ struct TokenActivityViewTests {
         #expect(!source.contains("Button(\"退出\")"))
     }
 
-    @Test("额度标题与剩余百分比共享首行并保留原有超额警示样式")
+    @Test("超额提示保留原有样式并靠右放在进度条区域")
     func quotaHeaderPrioritizesRemainingPercent() throws {
         let source = try String(
             contentsOfFile: "Sources/CodexQ/Views/QuotaPopoverView.swift",
@@ -280,6 +280,17 @@ struct TokenActivityViewTests {
         #expect(rowSource.contains(".font(.caption)"))
         #expect(!rowSource.contains(".foregroundStyle(.orange)"))
         #expect(!rowSource.contains(".font(.caption2)"))
+        #expect(rowSource.contains(".frame(width: QuotaBarLayout.width(for: period))"))
+        #expect(rowSource.contains("VStack(alignment: .trailing, spacing: 3)"))
+        let titleIndex = try #require(rowSource.range(of: "Text(title)")?.lowerBound)
+        let spacerIndex = try #require(
+            rowSource.range(of: "Spacer()", range: titleIndex..<rowSource.endIndex)?.lowerBound
+        )
+        let paceIndex = try #require(
+            rowSource.range(of: "if let projection", range: titleIndex..<rowSource.endIndex)?.lowerBound
+        )
+        #expect(titleIndex < spacerIndex)
+        #expect(spacerIndex < paceIndex)
         #expect(rowSource.contains("Text(\"\\(Int(window.remainingPercent.rounded()))%\")"))
     }
 

@@ -307,24 +307,21 @@ private struct QuotaRow: View {
     let resetText: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(title)
-                    .font(.headline)
-                if let projection,
-                   let paceText = PaceFormatter.status(projection) {
-                    Text(paceText)
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                        .lineLimit(1)
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text(title)
+                        .font(.headline)
+                    Spacer()
+                    if let projection,
+                       let paceText = PaceFormatter.status(projection) {
+                        Text(paceText)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                            .lineLimit(1)
+                    }
                 }
-                Spacer(minLength: 8)
-                Text("\(Int(window.remainingPercent.rounded()))%")
-                    .font(.system(.body, design: .rounded, weight: .semibold))
-                    .monospacedDigit()
-            }
-
-            HStack(spacing: 12) {
+                .frame(width: QuotaBarLayout.width(for: period))
                 SegmentedBatteryBar(
                     period: period,
                     percent: window.remainingPercent,
@@ -333,7 +330,14 @@ private struct QuotaRow: View {
                     }
                 )
                 .help("红线表示按当前时间进度理论上应剩余的额度")
-                Spacer(minLength: 8)
+            }
+
+            Spacer(minLength: 8)
+
+            VStack(alignment: .trailing, spacing: 3) {
+                Text("\(Int(window.remainingPercent.rounded()))%")
+                    .font(.system(.body, design: .rounded, weight: .semibold))
+                    .monospacedDigit()
                 Text(resetText)
                     .font(.caption)
                     .foregroundStyle(Color.primary.opacity(0.72))
