@@ -112,7 +112,7 @@ struct QuotaPopoverView: View {
 
             Divider()
 
-            HStack {
+            HStack(spacing: 8) {
                 if let error = store.errorMessage, store.snapshot != nil {
                     Text(failureStatus(error: error))
                         .font(.caption)
@@ -125,14 +125,16 @@ struct QuotaPopoverView: View {
                         now: relativeTimeNow
                     ))
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.primary.opacity(0.72))
                     .monospacedDigit()
                 }
                 Spacer()
                 Button {
                     isSettingsExpanded.toggle()
                 } label: {
-                    Image(systemName: isSettingsExpanded ? "gearshape.fill" : "gearshape")
+                    FooterIconButtonLabel(
+                        systemName: isSettingsExpanded ? "gearshape.fill" : "gearshape"
+                    )
                 }
                 .buttonStyle(.borderless)
                 .help("设置")
@@ -144,8 +146,9 @@ struct QuotaPopoverView: View {
                     if store.isRefreshButtonBusy {
                         ProgressView()
                             .controlSize(.small)
+                            .frame(width: 24, height: 24)
                     } else {
-                        Image(systemName: "arrow.clockwise")
+                        FooterIconButtonLabel(systemName: "arrow.clockwise")
                     }
                 }
                 .buttonStyle(.borderless)
@@ -153,10 +156,14 @@ struct QuotaPopoverView: View {
                 .help("立即刷新")
                 .accessibilityLabel("立即刷新")
 
-                Button("退出") {
+                Button {
                     NSApplication.shared.terminate(nil)
+                } label: {
+                    FooterIconButtonLabel(systemName: "power")
                 }
                 .buttonStyle(.borderless)
+                .help("退出")
+                .accessibilityLabel("退出")
             }
         }
         .padding(16)
@@ -209,19 +216,29 @@ struct QuotaPopoverView: View {
     }
 }
 
+private struct FooterIconButtonLabel: View {
+    let systemName: String
+
+    var body: some View {
+        Image(systemName: systemName)
+            .font(.system(size: 13, weight: .medium))
+            .frame(width: 24, height: 24)
+            .contentShape(Rectangle())
+    }
+}
+
 private struct UnavailableQuotaRow: View {
     var body: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline) {
                 Text("5 小时")
                     .font(.headline)
-                    .frame(width: QuotaBarLayout.width(for: .fiveHour), alignment: .leading)
-                DisabledSegmentedBatteryBar(period: .fiveHour)
+                Spacer()
+                Text("无限制")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(Color.primary.opacity(0.72))
             }
-            Spacer()
-            Text("无限制")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            DisabledSegmentedBatteryBar(period: .fiveHour)
         }
     }
 }
@@ -290,20 +307,24 @@ private struct QuotaRow: View {
     let resetText: String
 
     var body: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text(title)
-                        .font(.headline)
-                    Spacer()
-                    if let projection,
-                       let paceText = PaceFormatter.status(projection) {
-                        Text(paceText)
-                            .font(.caption)
-                            .foregroundStyle(.red)
-                    }
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(title)
+                    .font(.headline)
+                if let projection,
+                   let paceText = PaceFormatter.status(projection) {
+                    Text(paceText)
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
+                        .lineLimit(1)
                 }
-                .frame(width: QuotaBarLayout.width(for: period))
+                Spacer(minLength: 8)
+                Text("\(Int(window.remainingPercent.rounded()))%")
+                    .font(.system(.body, design: .rounded, weight: .semibold))
+                    .monospacedDigit()
+            }
+
+            HStack(spacing: 12) {
                 SegmentedBatteryBar(
                     period: period,
                     percent: window.remainingPercent,
@@ -312,16 +333,10 @@ private struct QuotaRow: View {
                     }
                 )
                 .help("红线表示按当前时间进度理论上应剩余的额度")
-            }
-
-            Spacer(minLength: 8)
-
-            VStack(alignment: .trailing, spacing: 3) {
-                Text("\(Int(window.remainingPercent.rounded()))%")
-                    .font(.system(.body, design: .rounded, weight: .semibold))
+                Spacer(minLength: 8)
                 Text(resetText)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.primary.opacity(0.72))
                     .lineLimit(1)
                     .fixedSize(horizontal: true, vertical: false)
             }
@@ -379,7 +394,7 @@ private struct SegmentedBatteryBar: View {
         switch percent {
         case 0..<20: return .red
         case 20..<50: return .orange
-        default: return .green
+        default: return .accentColor
         }
     }
 

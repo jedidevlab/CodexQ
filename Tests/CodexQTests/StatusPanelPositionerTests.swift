@@ -3,6 +3,19 @@ import Testing
 @testable import CodexQ
 
 struct StatusPanelPositionerTests {
+    @Test("弹窗使用更厚的系统材质与描边隔离桌面背景")
+    func panelUsesLegibleSystemMaterial() throws {
+        let source = try String(
+            contentsOfFile: "Sources/CodexQ/App/StatusBarController.swift",
+            encoding: .utf8
+        )
+
+        #expect(source.contains("panel.hasShadow = false"))
+        #expect(source.contains(".background(.thickMaterial"))
+        #expect(source.contains(".stroke(Color.primary.opacity(0.14), lineWidth: 1)"))
+        #expect(!source.contains(".background(.regularMaterial"))
+    }
+
     @Test("面板使用内容 fitting 高度而不是初始二百五十像素")
     func fittedSizePreservesBaseActivityAndTallContentHeights() {
         let visibleFrame = NSRect(x: 0, y: 0, width: 1440, height: 900)

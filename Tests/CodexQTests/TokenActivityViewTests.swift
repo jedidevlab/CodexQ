@@ -251,6 +251,59 @@ struct TokenActivityViewTests {
         #expect(source.contains(".accessibilityLabel(\"立即刷新\")"))
     }
 
+    @Test("弹窗底部操作统一为同尺寸图标按钮")
+    func footerActionsUseConsistentIconButtons() throws {
+        let source = try String(
+            contentsOfFile: "Sources/CodexQ/Views/QuotaPopoverView.swift",
+            encoding: .utf8
+        )
+
+        #expect(source.contains("private struct FooterIconButtonLabel"))
+        #expect(source.contains("systemName: \"power\""))
+        #expect(source.contains(".frame(width: 24, height: 24)"))
+        #expect(!source.contains("Button(\"退出\")"))
+    }
+
+    @Test("额度标题与剩余百分比共享首行并降低超额提示权重")
+    func quotaHeaderPrioritizesRemainingPercent() throws {
+        let source = try String(
+            contentsOfFile: "Sources/CodexQ/Views/QuotaPopoverView.swift",
+            encoding: .utf8
+        )
+
+        #expect(source.contains("private struct QuotaRow"))
+        #expect(source.contains(".foregroundStyle(.orange)"))
+        #expect(source.contains(".font(.caption2)"))
+        #expect(source.contains("Text(\"\\(Int(window.remainingPercent.rounded()))%\")"))
+    }
+
+    @Test("普通额度状态统一使用强调色，红橙色只保留给风险")
+    func normalQuotaStateUsesAccentColor() throws {
+        let quotaSource = try String(
+            contentsOfFile: "Sources/CodexQ/Views/QuotaPopoverView.swift",
+            encoding: .utf8
+        )
+        let resetSource = try String(
+            contentsOfFile: "Sources/CodexQ/Views/ResetCreditsSection.swift",
+            encoding: .utf8
+        )
+
+        #expect(quotaSource.contains("default: return .accentColor"))
+        #expect(resetSource.contains("summary.availableCount > 0 ? Color.accentColor : Color.secondary"))
+    }
+
+    @Test("活动日历的次级标签与空方块保持可读")
+    func activitySecondaryContentKeepsReadableContrast() throws {
+        let source = try String(
+            contentsOfFile: "Sources/CodexQ/Views/TokenActivitySection.swift",
+            encoding: .utf8
+        )
+
+        #expect(source.contains("Color.primary.opacity(0.72)"))
+        #expect(source.contains("Color.secondary.opacity(0.12)"))
+        #expect(source.contains("Color.secondary.opacity(0.18)"))
+    }
+
     @Test("低频设置默认折叠并由底部齿轮控制")
     func settingsAreCollapsedBehindGearButton() throws {
         let source = try String(

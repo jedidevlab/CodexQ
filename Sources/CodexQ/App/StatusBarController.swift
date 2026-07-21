@@ -31,7 +31,7 @@ final class StatusBarController: NSObject {
 
         panel.isFloatingPanel = true
         panel.level = .popUpMenu
-        panel.hasShadow = true
+        panel.hasShadow = false
         panel.backgroundColor = .clear
         panel.isOpaque = false
         panel.collectionBehavior = [.transient, .moveToActiveSpace]
@@ -46,10 +46,10 @@ final class StatusBarController: NSObject {
                     self?.interactionDidChange(interaction, isActive: isActive)
                 }
             )
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
+            .background(.thickMaterial, in: RoundedRectangle(cornerRadius: 18))
             .overlay {
                 RoundedRectangle(cornerRadius: 18)
-                    .stroke(.separator.opacity(0.7), lineWidth: 1)
+                    .stroke(Color.primary.opacity(0.14), lineWidth: 1)
             }
         )
         let hostingController = NSHostingController(rootView: rootView)

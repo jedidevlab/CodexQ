@@ -107,7 +107,7 @@ private struct TokenActivityInlineSummary: View {
     ) -> some View {
         HStack(spacing: 3) {
             Text(label)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.primary.opacity(0.72))
             Text(tokens.map(TokenCountFormatter.compactNumber) ?? "暂无数据")
                 .fontWeight(.semibold)
                 .monospacedDigit()
@@ -142,7 +142,7 @@ private struct DailyTokenActivityGrid: View {
                 VStack(spacing: 3) {
                     Text(monthText(month.start))
                         .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.primary.opacity(0.72))
 
                     LazyVGrid(columns: TokenActivityGridLayout.columns, spacing: TokenActivityGridLayout.spacing) {
                         ForEach(0..<month.leadingBlankCount, id: \.self) { _ in
@@ -241,7 +241,7 @@ private struct TokenActivitySquare: View {
                 if level == nil {
                     RoundedRectangle(cornerRadius: 2)
                         .strokeBorder(
-                            Color.secondary.opacity(0.1),
+                            Color.secondary.opacity(0.18),
                             lineWidth: 0.5
                         )
                 }
@@ -257,7 +257,7 @@ private struct TokenActivitySquare: View {
 
     private var fillColor: Color {
         guard let level else {
-            return Color.secondary.opacity(0.07)
+            return Color.secondary.opacity(0.12)
         }
         switch level {
         case 0: return Color.secondary.opacity(0.22)
