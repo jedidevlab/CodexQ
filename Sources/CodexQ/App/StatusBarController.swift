@@ -254,11 +254,6 @@ final class StatusBarController: NSObject {
         let remainingPercent = store.snapshot?.statusRemainingPercent
         let error = store.errorMessage
         let now = Date()
-        let hasFreshQuota = StatusTitleFormatter.hasFreshQuota(
-            remainingPercent: remainingPercent,
-            lastUpdatedAt: store.lastUpdatedAt,
-            now: now
-        )
 
         statusItem.button?.title = StatusTitleFormatter.string(
             remainingPercent: remainingPercent,
@@ -266,7 +261,6 @@ final class StatusBarController: NSObject {
             error: error,
             now: now
         )
-        statusItem.button?.alphaValue = hasFreshQuota ? 1 : 0.55
         statusItem.button?.toolTip = StatusTitleFormatter.toolTip(
             remainingPercent: remainingPercent,
             lastUpdatedAt: store.lastUpdatedAt,

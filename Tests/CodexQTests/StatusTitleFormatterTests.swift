@@ -71,8 +71,8 @@ struct StatusTitleFormatterTests {
         ))
     }
 
-    @Test("数据超过十分钟时隐藏百分比")
-    func staleQuotaHidesTitle() {
+    @Test("数据超过十分钟时仍显示缓存百分比")
+    func staleQuotaStillShowsTitle() {
         let now = Date()
 
         #expect(StatusTitleFormatter.string(
@@ -80,7 +80,7 @@ struct StatusTitleFormatterTests {
             lastUpdatedAt: now.addingTimeInterval(-601),
             error: nil,
             now: now
-        ).isEmpty)
+        ) == "89%")
         #expect(StatusTitleFormatter.toolTip(
             remainingPercent: 89,
             lastUpdatedAt: now.addingTimeInterval(-601),
@@ -97,5 +97,15 @@ struct StatusTitleFormatterTests {
             error: nil,
             now: Date()
         ) == "CodexQ · 暂无额度数据")
+    }
+
+    @Test("菜单栏图标不因缓存新鲜度降低透明度")
+    func statusItemNeverDims() throws {
+        let source = try String(
+            contentsOfFile: "Sources/CodexQ/App/StatusBarController.swift",
+            encoding: .utf8
+        )
+
+        #expect(!source.contains("statusItem.button?.alphaValue"))
     }
 }

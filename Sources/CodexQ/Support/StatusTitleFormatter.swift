@@ -20,12 +20,7 @@ enum StatusTitleFormatter {
         error: String?,
         now: Date
     ) -> String {
-        guard let remainingPercent,
-              hasFreshQuota(
-                remainingPercent: remainingPercent,
-                lastUpdatedAt: lastUpdatedAt,
-                now: now
-              ) else {
+        guard let remainingPercent else {
             return ""
         }
 
