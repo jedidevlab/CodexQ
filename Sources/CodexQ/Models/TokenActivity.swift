@@ -49,19 +49,29 @@ enum TokenActivityPresentation {
     static func dailyCells(
         snapshot: TokenActivitySnapshot,
         now: Date,
-        calendar: Calendar
+        calendar: Calendar,
+        weekCount: Int
     ) -> [TokenActivityCell] {
+        guard weekCount > 0 else { return [] }
         let today = calendar.startOfDay(for: now)
-        guard let lowerMonth = calendar.date(byAdding: .month, value: -2, to: today),
-              let start = calendar.date(from: calendar.dateComponents([.year, .month], from: lowerMonth)),
-              let nextMonth = calendar.date(byAdding: .month, value: 1, to: today),
-              let nextMonthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: nextMonth)),
-              let end = calendar.date(byAdding: .day, value: -1, to: nextMonthStart) else {
+        let weekdayOffset = (
+            calendar.component(.weekday, from: today) - calendar.firstWeekday + 7
+        ) % 7
+        guard let currentWeekStart = calendar.date(
+            byAdding: .day,
+            value: -weekdayOffset,
+            to: today
+        ),
+              let start = calendar.date(
+                byAdding: .weekOfYear,
+                value: -(weekCount - 1),
+                to: currentWeekStart
+              ) else {
             return []
         }
         return cells(
             from: start,
-            through: end,
+            through: today,
             recordedThrough: today,
             snapshot: snapshot,
             calendar: calendar

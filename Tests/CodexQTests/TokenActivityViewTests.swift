@@ -264,8 +264,8 @@ struct TokenActivityViewTests {
         #expect(!source.contains("Button(\"退出\")"))
     }
 
-    @Test("Pace 风险提示沿用 OpenUsage 的火焰与次级文字样式")
-    func paceWarningMatchesOpenUsageStyle() throws {
+    @Test("5 小时与周限额按标题 Pace、进度条、额度重置三层排列")
+    func paceWarningUsesOpenUsageQuotaRowLayout() throws {
         let source = try String(
             contentsOfFile: "Sources/CodexQ/Views/QuotaPopoverView.swift",
             encoding: .utf8
@@ -280,18 +280,32 @@ struct TokenActivityViewTests {
         #expect(rowSource.contains(".foregroundStyle(Color(nsColor: .systemRed))"))
         #expect(rowSource.contains(".foregroundStyle(.secondary)"))
         #expect(rowSource.contains(".font(.caption)"))
+        #expect(rowSource.contains("HStack(alignment: .firstTextBaseline, spacing: 6)"))
+        #expect(rowSource.contains("HStack(alignment: .firstTextBaseline, spacing: 8)"))
         #expect(rowSource.contains(".frame(width: QuotaBarLayout.width(for: period))"))
-        #expect(rowSource.contains("VStack(alignment: .trailing, spacing: 3)"))
+        #expect(rowSource.contains("Button(action: toggleResetDisplay)"))
+        #expect(rowSource.contains("formatter.oppositeString("))
         let titleIndex = try #require(rowSource.range(of: "Text(title)")?.lowerBound)
-        let spacerIndex = try #require(
-            rowSource.range(of: "Spacer()", range: titleIndex..<rowSource.endIndex)?.lowerBound
-        )
         let paceIndex = try #require(
-            rowSource.range(of: "if let projection", range: titleIndex..<rowSource.endIndex)?.lowerBound
+            rowSource.range(of: "paceWarning", range: titleIndex..<rowSource.endIndex)?.lowerBound
         )
-        #expect(titleIndex < spacerIndex)
-        #expect(spacerIndex < paceIndex)
-        #expect(rowSource.contains("Text(\"\\(Int(window.remainingPercent.rounded()))%\")"))
+        let barIndex = try #require(
+            rowSource.range(of: "ContinuousQuotaBar(", range: paceIndex..<rowSource.endIndex)?.lowerBound
+        )
+        let remainingIndex = try #require(
+            rowSource.range(
+                of: "Text(\"\\(Int(window.remainingPercent.rounded()))% 剩余\")",
+                range: barIndex..<rowSource.endIndex
+            )?.lowerBound
+        )
+        let resetIndex = try #require(
+            rowSource.range(of: "private var resetLabel", range: remainingIndex..<rowSource.endIndex)?.lowerBound
+        )
+        #expect(titleIndex < paceIndex)
+        #expect(paceIndex < barIndex)
+        #expect(barIndex < remainingIndex)
+        #expect(remainingIndex < resetIndex)
+        #expect(rowSource.contains("Text(\"\\(Int(window.remainingPercent.rounded()))% 剩余\")"))
     }
 
     @Test("额度条与 Pace 刻度沿用 OpenUsage 系统样式")
@@ -327,17 +341,49 @@ struct TokenActivityViewTests {
         #expect(source.contains("Color.secondary.opacity(0.18)"))
     }
 
+    @Test("热力图按弹窗宽度自动扩展并铺满")
+    func activityHeatmapFillsPopoverWidth() throws {
+        let source = try String(
+            contentsOfFile: "Sources/CodexQ/Views/TokenActivitySection.swift",
+            encoding: .utf8
+        )
+        let gridSource = try sourceSection(
+            source,
+            from: "private struct DailyTokenActivityGrid",
+            to: "private struct ActivityMonth"
+        )
+
+        #expect(source.contains("static let contentWidth = QuotaPopoverLayout.width"))
+        #expect(source.contains("static let squareSize: CGFloat = 11"))
+        #expect(source.contains("static let minimumSpacing: CGFloat = 3"))
+        #expect(source.contains("static let weekCount = max("))
+        #expect(source.contains("static let spacing = weekCount > 1"))
+        #expect(source.contains("contentWidth - squareSize * CGFloat(weekCount)"))
+        #expect(source.contains("static let gridWidth = contentWidth"))
+        #expect(source.contains("weekCount: TokenActivityGridLayout.weekCount"))
+        #expect(gridSource.contains("ForEach(weeks)"))
+        #expect(gridSource.contains("ForEach(monthSpans)"))
+        #expect(!source.contains("monthWidth"))
+        #expect(!source.contains("monthSpacing"))
+    }
+
     @Test("低频设置默认折叠并由底部齿轮控制")
     func settingsAreCollapsedBehindGearButton() throws {
         let source = try String(
             contentsOfFile: "Sources/CodexQ/Views/QuotaPopoverView.swift",
             encoding: .utf8
         )
+        let settingsSource = try sourceSection(
+            source,
+            from: "private struct EmbeddedSettingsView",
+            to: "private struct QuotaRow"
+        )
 
         #expect(source.contains("@State private var isSettingsExpanded = false"))
         #expect(source.contains("if isSettingsExpanded"))
         #expect(source.contains("gearshape.fill"))
         #expect(source.contains("interactionDidChange(.settings, isSettingsExpanded)"))
+        #expect(settingsSource.contains("HStack(spacing: 4)"))
     }
 
     @Test("鼠标停留与展开状态会上报并在关闭后复位")
@@ -420,7 +466,7 @@ struct TokenActivityViewTests {
         #expect(source.components(separatedBy: "format.timeZone = calendar.timeZone").count - 1 == 2)
     }
 
-    @Test("Token 活动只保留三个月每日入口")
+    @Test("Token 活动只保留自适应范围的每日入口")
     func activityUIHasNoWeeklyControlsOrRenderer() throws {
         let source = try String(
             contentsOfFile: "Sources/CodexQ/Views/TokenActivitySection.swift",
@@ -453,8 +499,11 @@ struct TokenActivityViewTests {
         #expect(gridIndex.lowerBound < emptyIndex.lowerBound)
     }
 
-    @Test("设计与计划只保留近三个月每日口径")
+    @Test("设计与计划采用按弹窗宽度扩展的合并热力图")
     func docsContainNoSupersededWeeklyOrSwitchingLanguage() throws {
+        let readme = try String(contentsOfFile: "README.md", encoding: .utf8)
+        #expect(readme.contains("按弹窗宽度自动扩展的每日热力图"))
+
         for path in [
             "docs/superpowers/specs/2026-07-13-token-activity-design.md",
             "docs/superpowers/plans/2026-07-13-token-activity.md"
@@ -465,6 +514,7 @@ struct TokenActivityViewTests {
             #expect(!lowercased.contains("week-grouped"))
             #expect(!lowercased.contains("both modes"))
             #expect(!source.contains("切换"))
+            #expect(source.contains("弹窗宽度") || lowercased.contains("popover width"))
         }
     }
 

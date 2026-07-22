@@ -25,74 +25,78 @@ struct QuotaFormattingTests {
         ).remainingPercent == 100)
     }
 
-    @Test("5 小时重置时间跨日期时仍只显示时间")
-    func fiveHourAlwaysShowsTimeOnly() {
-        let formatter = ResetTimeFormatter(locale: locale, timeZone: timeZone)
-        let now = date(2026, 6, 15, 23, 0)
-        let reset = date(2026, 6, 16, 2, 15)
-
-        #expect(formatter.string(for: reset, period: .fiveHour, now: now) == "02:15")
-    }
-
-    @Test("周限额小于 24 小时显示距离重置的小时分钟")
-    func weeklyUnder24HoursShowsRelativeResetTime() {
+    @Test("重置倒计时沿用 OpenUsage 的紧凑双单位")
+    func resetCountdownUsesOpenUsageCompactUnits() {
         let formatter = ResetTimeFormatter(locale: locale, timeZone: timeZone)
         let now = date(2026, 6, 15, 10, 0)
-        let reset = date(2026, 6, 15, 23, 59)
 
-        #expect(formatter.string(for: reset, period: .weekly, now: now) == "13h59m")
+        #expect(formatter.string(
+            for: now.addingTimeInterval(13 * 60 * 60 + 59 * 60),
+            mode: .relative,
+            now: now
+        ) == "13h 59m 后重置")
+        #expect(formatter.string(
+            for: now.addingTimeInterval(4 * 24 * 60 * 60 + 52 * 60),
+            mode: .relative,
+            now: now
+        ) == "4d 0h 后重置")
     }
 
-    @Test("周限额跨日但小于 24 小时仍显示距离重置的小时分钟")
-    func weeklyUnder24HoursOnFutureDayShowsRelativeResetTime() {
+    @Test("重置时间可切换为今天、明天或日期的绝对时间")
+    func absoluteResetUsesOpenUsageDayBuckets() {
         let formatter = ResetTimeFormatter(locale: locale, timeZone: timeZone)
         let now = date(2026, 6, 15, 10, 0)
-        let reset = date(2026, 6, 16, 9, 59)
 
-        #expect(formatter.string(for: reset, period: .weekly, now: now) == "23h59m")
+        #expect(formatter.string(
+            for: date(2026, 6, 15, 14, 30),
+            mode: .absolute,
+            now: now
+        ) == "今天 14:30 重置")
+        #expect(formatter.string(
+            for: date(2026, 6, 16, 9, 0),
+            mode: .absolute,
+            now: now
+        ) == "明天 09:00 重置")
+        let later = formatter.string(
+            for: date(2026, 6, 20, 9, 0),
+            mode: .absolute,
+            now: now
+        )
+        #expect(later.contains("6"))
+        #expect(later.contains("20"))
+        #expect(later.hasSuffix("09:00 重置"))
     }
 
-    @Test("周限额等于 24 小时显示距离重置的小时分钟")
-    func weeklyAt24HoursShowsRelativeResetTime() {
+    @Test("五分钟内或已过去的重置统一显示即将重置")
+    func imminentOrPastResetShowsSoon() {
         let formatter = ResetTimeFormatter(locale: locale, timeZone: timeZone)
         let now = date(2026, 6, 15, 10, 0)
-        let reset = date(2026, 6, 16, 10, 0)
 
-        #expect(formatter.string(for: reset, period: .weekly, now: now) == "24h0m")
+        #expect(formatter.string(
+            for: now.addingTimeInterval(5 * 60),
+            mode: .relative,
+            now: now
+        ) == "即将重置")
+        #expect(formatter.string(
+            for: now.addingTimeInterval(-60),
+            mode: .absolute,
+            now: now
+        ) == "即将重置")
     }
 
-    @Test("已经过去的重置时间不显示为零小时零分钟")
-    func pastResetShowsCompletedState() {
+    @Test("重置提示展示当前模式并提供相反模式文案")
+    func resetTooltipOffersOppositeDisplayMode() {
         let formatter = ResetTimeFormatter(locale: locale, timeZone: timeZone)
         let now = date(2026, 6, 15, 10, 0)
-        let reset = date(2026, 6, 15, 9, 59)
+        let reset = date(2026, 6, 16, 9, 0)
 
-        #expect(formatter.string(for: reset, period: .weekly, now: now) == "已重置")
+        #expect(formatter.string(for: reset, mode: .relative, now: now) == "23h 后重置")
+        #expect(formatter.oppositeString(for: reset, mode: .relative, now: now) == "明天 09:00 重置")
+        #expect(formatter.oppositeString(for: reset, mode: .absolute, now: now) == "23h 后重置")
     }
 
-    @Test("已过去的五小时重置时间也显示为已重置")
-    func pastFiveHourResetShowsCompletedState() {
-        let formatter = ResetTimeFormatter(locale: locale, timeZone: timeZone)
-        let now = date(2026, 6, 15, 10, 0)
-        let reset = date(2026, 6, 15, 9, 59)
-
-        #expect(formatter.string(for: reset, period: .fiveHour, now: now) == "已重置")
-    }
-
-    @Test("周限额大于 24 小时显示绝对日期")
-    func weeklyOver24HoursShowsDateOnly() {
-        let formatter = ResetTimeFormatter(locale: locale, timeZone: timeZone)
-        let now = date(2026, 6, 15, 10, 0)
-        let reset = date(2026, 6, 16, 10, 1)
-        let result = formatter.string(for: reset, period: .weekly, now: now)
-
-        #expect(result.contains("6"))
-        #expect(result.contains("16"))
-        #expect(!result.contains(":"))
-    }
-
-    @Test("非公历地区设置仍使用公历显示周限额日期")
-    func weeklyAbsoluteDateUsesGregorianCalendar() throws {
+    @Test("非公历地区设置仍使用公历显示绝对重置日期")
+    func absoluteResetUsesGregorianCalendar() throws {
         let formatter = ResetTimeFormatter(
             locale: Locale(identifier: "en_US@calendar=islamic"),
             timeZone: try #require(TimeZone(identifier: "America/Los_Angeles"))
@@ -101,9 +105,22 @@ struct QuotaFormattingTests {
 
         #expect(formatter.string(
             for: reset,
-            period: .weekly,
-            now: reset.addingTimeInterval(-25 * 60 * 60)
-        ) == "Jul 16")
+            mode: .absolute,
+            now: reset.addingTimeInterval(-5 * 24 * 60 * 60)
+        ).contains("Jul 16"))
+    }
+
+    @Test("绝对时间跟随地区的十二或二十四小时格式")
+    func absoluteResetUsesLocaleTimeFormat() throws {
+        let formatter = ResetTimeFormatter(
+            locale: Locale(identifier: "en_US"),
+            timeZone: try #require(TimeZone(identifier: "America/Los_Angeles"))
+        )
+        let now = Date(timeIntervalSince1970: 1_784_226_000)
+        let reset = now.addingTimeInterval(2 * 60 * 60)
+        let result = formatter.string(for: reset, mode: .absolute, now: now)
+
+        #expect(result.contains("PM"))
     }
 
     @Test("额度窗口按时长识别，不依赖 primary 和 secondary 顺序")
@@ -156,147 +173,84 @@ struct QuotaFormattingTests {
         #expect(snapshot.statusRemainingPercent == 78)
     }
 
-    @Test("预计余量与红线均按 CodexBar Pace 计算")
-    func projectionUsesCurrentAverageRate() throws {
+    @Test("Pace 按 OpenUsage 的 90% 与 100% 投影阈值分级")
+    func paceUsesOpenUsageProjectionThresholds() {
         let now = Date(timeIntervalSince1970: 10_000)
-        let window = QuotaWindow(
-            usedPercent: 25,
-            resetsAt: now.addingTimeInterval(3 * 60 * 60),
-            durationMinutes: 300
-        )
-        let projection = try #require(window.projection(at: now))
+        let reset = now.addingTimeInterval(2.5 * 60 * 60)
 
-        #expect(abs(projection.expectedRemainingPercent - 60) < 0.001)
-        #expect(abs(projection.reservePercent - 15) < 0.001)
-        #expect(abs(projection.displayPercent - 15) < 0.001)
-        #expect(projection.isInDeficit == false)
+        #expect(QuotaWindow(usedPercent: 44, resetsAt: reset, durationMinutes: 300).paceState(at: now).isHealthy)
+        #expect(QuotaWindow(usedPercent: 46, resetsAt: reset, durationMinutes: 300).paceState(at: now).sparePercent == 8)
+        #expect(QuotaWindow(usedPercent: 60, resetsAt: reset, durationMinutes: 300).paceState(at: now).isRunningOut)
     }
 
-    @Test("预测会在当前速率提前耗尽时归零")
-    func projectionClampsEarlyExhaustionToZero() throws {
+    @Test("Pace 等待窗口开始至少一分钟且达到 1%")
+    func paceWaitsForOpenUsageMinimumElapsedTime() {
         let now = Date(timeIntervalSince1970: 10_000)
-        let window = QuotaWindow(
-            usedPercent: 60,
-            resetsAt: now.addingTimeInterval(3 * 60 * 60),
-            durationMinutes: 300
-        )
-        let projection = try #require(window.projection(at: now))
-
-        #expect(projection.expectedRemainingPercent == 60)
-        #expect(projection.reservePercent == 0)
-        #expect(projection.displayPercent == 20)
-        #expect(projection.isInDeficit)
-    }
-
-    @Test("剩余低于 Pace 红线时预测提前耗尽")
-    func belowPaceMarkerRunsOutEarly() throws {
-        let now = Date(timeIntervalSince1970: 10_000)
-        let window = QuotaWindow(
-            usedPercent: 50,
-            resetsAt: now.addingTimeInterval(3 * 60 * 60),
-            durationMinutes: 300
-        )
-        let projection = try #require(window.projection(at: now))
-
-        #expect(window.remainingPercent < projection.expectedRemainingPercent)
-        #expect(projection.reservePercent == 0)
-        #expect(projection.isInDeficit)
-    }
-
-    @Test("剩余高于 Pace 红线时预测能撑到重置")
-    func abovePaceMarkerLastsToReset() throws {
-        let now = Date(timeIntervalSince1970: 10_000)
-        let window = QuotaWindow(
+        let tooEarly = QuotaWindow(
             usedPercent: 10,
-            resetsAt: now.addingTimeInterval(3 * 60 * 60),
+            resetsAt: now.addingTimeInterval(4 * 60 * 60 + 58 * 60),
             durationMinutes: 300
-        )
-        let projection = try #require(window.projection(at: now))
+        ).paceState(at: now)
+        let ready = QuotaWindow(
+            usedPercent: 10,
+            resetsAt: now.addingTimeInterval(4 * 60 * 60 + 57 * 60),
+            durationMinutes: 300
+        ).paceState(at: now)
 
-        #expect(window.remainingPercent > projection.expectedRemainingPercent)
-        #expect(projection.reservePercent > 0)
-        #expect(projection.isInDeficit == false)
+        #expect(tooEarly.isPlainLevel)
+        #expect(ready.isRunningOut)
     }
 
-    @Test("周期进度不足 3% 时隐藏 Pace")
-    func hidesPaceAtStartOfWindow() {
+    @Test("用量低于 5% 时不显示不可靠的提前耗尽 Pace")
+    func tinyUsageSuppressesFalseRunOutWarning() {
         let now = Date(timeIntervalSince1970: 10_000)
         let window = QuotaWindow(
-            usedPercent: 1,
-            resetsAt: now.addingTimeInterval(4.9 * 60 * 60),
+            usedPercent: 2,
+            resetsAt: now.addingTimeInterval(4 * 60 * 60 + 56 * 60),
             durationMinutes: 300
         )
 
-        #expect(window.projection(at: now) == nil)
+        #expect(window.paceState(at: now).isPlainLevel)
     }
 
-    @Test("偏差在正负 2% 内视为正常进度")
-    func treatsSmallDeltaAsOnTrack() throws {
-        let now = Date(timeIntervalSince1970: 10_000)
-        let window = QuotaWindow(
-            usedPercent: 41.5,
-            resetsAt: now.addingTimeInterval(3 * 60 * 60),
-            durationMinutes: 300
+    @Test("健康、临界、提前耗尽与用完状态使用 OpenUsage 提示")
+    func paceStatusMatchesOpenUsageEscalation() throws {
+        let formatter = ResetTimeFormatter(locale: locale, timeZone: timeZone)
+        let now = date(2026, 6, 15, 10, 0)
+
+        #expect(PaceFormatter.status(.healthy(projectedUsedPercent: 60), mode: .relative, formatter: formatter, now: now) == nil)
+        #expect(PaceFormatter.status(
+            .closeToLimit(sparePercent: 8, projectedUsedPercent: 92, markerPercent: 50),
+            mode: .relative,
+            formatter: formatter,
+            now: now
+        ) == PaceStatus(text: "~8% 余量", showsFlame: false))
+        #expect(PaceFormatter.status(
+            .runningOut(
+                runOutAt: now.addingTimeInterval(45 * 60),
+                projectedUsedPercent: 120,
+                markerPercent: 50
+            ),
+            mode: .relative,
+            formatter: formatter,
+            now: now
+        ) == PaceStatus(text: "45m 后用完", showsFlame: true))
+        #expect(PaceFormatter.status(.spent, mode: .relative, formatter: formatter, now: now)
+                == PaceStatus(text: "额度已用完", showsFlame: true))
+    }
+
+    @Test("提前耗尽时间跟随重置时间的相对绝对模式")
+    func runOutTimeFollowsResetDisplayMode() throws {
+        let formatter = ResetTimeFormatter(locale: locale, timeZone: timeZone)
+        let now = date(2026, 6, 15, 10, 0)
+        let state = QuotaPaceState.runningOut(
+            runOutAt: date(2026, 6, 15, 10, 45),
+            projectedUsedPercent: 120,
+            markerPercent: 50
         )
-        let projection = try #require(window.projection(at: now))
 
-        #expect(projection.isOnTrack)
-        #expect(projection.isInDeficit == false)
-    }
-
-    @Test("正常与余量状态不显示 Pace 文案")
-    func quietPaceHidesNonDeficitCopy() {
-        #expect(PaceFormatter.status(.init(
-            reservePercent: 0,
-            expectedRemainingPercent: 60,
-            deltaPercent: 1,
-            etaSeconds: nil
-        )) == nil)
-        #expect(PaceFormatter.status(.init(
-            reservePercent: 8,
-            expectedRemainingPercent: 60,
-            deltaPercent: -8,
-            etaSeconds: nil
-        )) == nil)
-    }
-
-    @Test("超额状态保留风险 Pace 文案")
-    func deficitPaceKeepsRiskCopy() {
-        #expect(PaceFormatter.status(.init(
-            reservePercent: 0,
-            expectedRemainingPercent: 60,
-            deltaPercent: 5,
-            etaSeconds: 45 * 60
-        )) == "超额 5% · 0h45m 后用完")
-    }
-
-    @Test("超额使用时给出早于重置的耗尽时间")
-    func providesRunOutETA() throws {
-        let now = Date(timeIntervalSince1970: 10_000)
-        let window = QuotaWindow(
-            usedPercent: 80,
-            resetsAt: now.addingTimeInterval(2 * 60 * 60),
-            durationMinutes: 300
-        )
-        let projection = try #require(window.projection(at: now))
-
-        #expect(abs((projection.etaSeconds ?? 0) - 45 * 60) < 1)
-        #expect(PaceFormatter.eta(projection.etaSeconds ?? 0) == "0h45m 后用完")
-    }
-
-    @Test("耗尽时间小于二十四小时显示小时分钟")
-    func paceEtaUnder24HoursShowsHoursAndMinutes() {
-        #expect(PaceFormatter.eta(23 * 60 * 60 + 59 * 60) == "23h59m 后用完")
-    }
-
-    @Test("耗尽时间达到二十四小时显示天和小时")
-    func paceEtaAt24HoursShowsDaysAndHours() {
-        #expect(PaceFormatter.eta(24 * 60 * 60) == "1d0h 后用完")
-    }
-
-    @Test("耗尽时间超过二十四小时忽略分钟显示天和小时")
-    func paceEtaOver24HoursShowsDaysAndHours() {
-        #expect(PaceFormatter.eta(119 * 60 * 60 + 12 * 60) == "4d23h 后用完")
+        #expect(PaceFormatter.status(state, mode: .relative, formatter: formatter, now: now)?.text == "45m 后用完")
+        #expect(PaceFormatter.status(state, mode: .absolute, formatter: formatter, now: now)?.text == "今天 10:45 用完")
     }
 
 

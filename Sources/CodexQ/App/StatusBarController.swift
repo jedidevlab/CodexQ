@@ -6,7 +6,7 @@ import SwiftUI
 final class StatusBarController: NSObject {
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let panel = StatusPanel(
-        contentRect: NSRect(x: 0, y: 0, width: 316, height: 250),
+        contentRect: NSRect(x: 0, y: 0, width: QuotaPopoverLayout.width, height: 250),
         styleMask: [.borderless, .nonactivatingPanel],
         backing: .buffered,
         defer: false
@@ -233,7 +233,7 @@ final class StatusBarController: NSObject {
     private func fitPanel(anchorRect: NSRect, visibleFrame: NSRect) {
         guard let hostingController else { return }
         let contentSize = hostingController.sizeThatFits(in: NSSize(
-            width: 316,
+            width: QuotaPopoverLayout.width,
             height: visibleFrame.height
         ))
         let fittedSize = StatusPanelPositioner.fittedSize(

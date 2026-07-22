@@ -68,6 +68,7 @@ struct StatusPanelPositionerTests {
         #expect(source.contains("store.$tokenActivity"))
         #expect(source.contains("store.$tokenActivityErrorMessage"))
         #expect(source.contains("schedulePanelRefit()"))
+        #expect(source.components(separatedBy: "width: QuotaPopoverLayout.width").count - 1 == 2)
         let fitIndex = try #require(source.range(of: "fitPanel(anchorRect:"))
         let showIndex = try #require(source.range(of: "panel.orderFrontRegardless()"))
         #expect(fitIndex.lowerBound < showIndex.lowerBound)

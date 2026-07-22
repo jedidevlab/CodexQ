@@ -1,13 +1,18 @@
 import AppKit
 import SwiftUI
 
+enum QuotaPopoverLayout {
+    static let width: CGFloat = 256
+    static let horizontalPadding: CGFloat = 16
+}
+
 enum QuotaBarLayout {
-    static let width: CGFloat = 214
+    static let width = QuotaPopoverLayout.width - QuotaPopoverLayout.horizontalPadding * 2
     static let markerWidth: CGFloat = 2
     static let markerExtraHeight: CGFloat = 4
 
     static func fillWidth(percent: Double) -> CGFloat {
-        let fraction = min(100, max(0, percent)) / 100
+        let fraction = min(100, max(0, percent)).rounded() / 100
         guard fraction > 0 else { return 0 }
         return max(height(for: .fiveHour), width * CGFloat(fraction))
     }
@@ -20,7 +25,7 @@ enum QuotaBarLayout {
 
     static func height(for period: QuotaPeriod) -> CGFloat {
         switch period {
-        case .fiveHour, .weekly: return 7
+        case .fiveHour, .weekly: return 6
         }
     }
 }
@@ -33,6 +38,7 @@ struct QuotaPopoverView: View {
     @State private var relativeTimeNow = Date()
     @State private var isResetCreditsExpanded = false
     @State private var isSettingsExpanded = false
+    @AppStorage("quotaResetDisplayMode") private var resetDisplayModeRawValue = ResetDisplayMode.relative.rawValue
     private let formatter = ResetTimeFormatter()
 
     var body: some View {
@@ -44,10 +50,9 @@ struct QuotaPopoverView: View {
                         period: .fiveHour,
                         window: fiveHour,
                         now: projectionNow,
-                        resetText: formatter.string(
-                            for: fiveHour.resetsAt,
-                            period: .fiveHour
-                        )
+                        resetDisplayMode: resetDisplayMode,
+                        formatter: formatter,
+                        toggleResetDisplay: toggleResetDisplay
                     )
                 } else {
                     UnavailableQuotaRow()
@@ -57,10 +62,9 @@ struct QuotaPopoverView: View {
                     period: .weekly,
                     window: snapshot.weekly,
                     now: projectionNow,
-                    resetText: formatter.string(
-                        for: snapshot.weekly.resetsAt,
-                        period: .weekly
-                    )
+                    resetDisplayMode: resetDisplayMode,
+                    formatter: formatter,
+                    toggleResetDisplay: toggleResetDisplay
                 )
             } else if store.isRefreshing {
                 ProgressView("正在读取额度...")
@@ -157,8 +161,8 @@ struct QuotaPopoverView: View {
                 .accessibilityLabel("退出")
             }
         }
-        .padding(16)
-        .frame(width: 316)
+        .padding(QuotaPopoverLayout.horizontalPadding)
+        .frame(width: QuotaPopoverLayout.width)
         .onHover { isHovering in
             interactionDidChange(.pointer, isHovering)
         }
@@ -180,7 +184,7 @@ struct QuotaPopoverView: View {
             relativeTimeNow = Date()
 
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(60))
+                try? await Task.sleep(for: .seconds(30))
                 guard !Task.isCancelled else { return }
                 relativeTimeNow = Date()
             }
@@ -192,6 +196,14 @@ struct QuotaPopoverView: View {
             return relativeTimeNow
         }
         return max(relativeTimeNow, lastUpdatedAt)
+    }
+
+    private var resetDisplayMode: ResetDisplayMode {
+        ResetDisplayMode(rawValue: resetDisplayModeRawValue) ?? .relative
+    }
+
+    private func toggleResetDisplay() {
+        resetDisplayModeRawValue = resetDisplayMode.opposite.rawValue
     }
 
     private var isAnyRefreshing: Bool {
@@ -254,7 +266,7 @@ private struct EmbeddedSettingsView: View {
         VStack(alignment: .leading, spacing: 10) {
             Toggle("登录时启动", isOn: $settings.launchAtLogin)
 
-            HStack(spacing: 8) {
+            HStack(spacing: 4) {
                 Toggle("额度预警通知", isOn: $settings.notificationsEnabled)
                 if settings.notificationsEnabled {
                     Toggle("20%", isOn: $settings.notifyAt20)
@@ -290,56 +302,106 @@ private struct QuotaRow: View {
     let period: QuotaPeriod
     let window: QuotaWindow
     let now: Date
-    let resetText: String
+    let resetDisplayMode: ResetDisplayMode
+    let formatter: ResetTimeFormatter
+    let toggleResetDisplay: () -> Void
 
     var body: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text(title)
-                        .font(.headline)
-                    Spacer()
-                    if let projection,
-                       let paceText = PaceFormatter.status(projection) {
-                        HStack(spacing: 3) {
-                            Image(systemName: "flame.fill")
-                                .font(.system(size: 11))
-                                .foregroundStyle(Color(nsColor: .systemRed))
-                            Text(paceText)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                        }
-                    }
-                }
-                .frame(width: QuotaBarLayout.width(for: period))
-                ContinuousQuotaBar(
-                    period: period,
-                    percent: window.remainingPercent,
-                    markerPercent: projection.flatMap {
-                        $0.isOnTrack ? nil : $0.expectedRemainingPercent
-                    }
-                )
-                .help("刻度表示按当前时间进度理论上应剩余的额度")
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(title)
+                    .font(.headline)
+
+                Spacer(minLength: 8)
+
+                paceWarning
             }
 
-            Spacer(minLength: 8)
+            ContinuousQuotaBar(
+                period: period,
+                percent: window.remainingPercent,
+                markerPercent: paceState.markerPercent,
+                severity: paceState.severity
+            )
+            .help(paceTooltip)
 
-            VStack(alignment: .trailing, spacing: 3) {
-                Text("\(Int(window.remainingPercent.rounded()))%")
-                    .font(.system(.body, design: .rounded, weight: .semibold))
-                    .monospacedDigit()
-                Text(resetText)
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text("\(Int(window.remainingPercent.rounded()))% 剩余")
                     .font(.caption)
-                    .foregroundStyle(Color.primary.opacity(0.72))
-                    .lineLimit(1)
-                    .fixedSize(horizontal: true, vertical: false)
+                    .monospacedDigit()
+
+                Spacer(minLength: 8)
+
+                if window.resetsAt != nil {
+                    Button(action: toggleResetDisplay) { resetLabel }
+                        .buttonStyle(.plain)
+                        .help(formatter.oppositeString(
+                            for: window.resetsAt,
+                            mode: resetDisplayMode,
+                            now: now
+                        ))
+                } else {
+                    resetLabel
+                }
+            }
+        }
+        .frame(width: QuotaBarLayout.width(for: period))
+    }
+
+    private var paceState: QuotaPaceState { window.paceState(at: now) }
+
+    private var paceStatus: PaceStatus? {
+        PaceFormatter.status(paceState, mode: resetDisplayMode, formatter: formatter, now: now)
+    }
+
+    @ViewBuilder
+    private var paceWarning: some View {
+        if let paceStatus {
+            if case .runningOut(let runOutAt, _, _) = paceState, runOutAt != nil {
+                Button(action: toggleResetDisplay) { paceLabel(paceStatus) }
+                    .buttonStyle(.plain)
+            } else {
+                paceLabel(paceStatus)
             }
         }
     }
 
-    private var projection: QuotaProjection? {
-        window.projection(at: now)
+    private func paceLabel(_ status: PaceStatus) -> some View {
+        HStack(spacing: 3) {
+            if status.showsFlame {
+                Image(systemName: "flame.fill")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Color(nsColor: .systemRed))
+            }
+            if let text = status.text {
+                Text(text)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+            }
+        }
+        .help(paceTooltip)
+    }
+
+    private var resetLabel: some View {
+        Text(formatter.string(for: window.resetsAt, mode: resetDisplayMode, now: now))
+            .font(.caption)
+            .foregroundStyle(Color.primary.opacity(0.72))
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
+    }
+
+    private var paceTooltip: String {
+        switch paceState {
+        case .spent: return "额度已用完"
+        case .healthy(let projected): return "重置时预计剩余 ~\(Int((100 - projected).rounded()))%"
+        case .closeToLimit(_, let projected, _): return "重置时预计已用 ~\(Int(projected.rounded()))%"
+        case .runningOut(_, let projected, _):
+            guard projected > 100 else { return "重置时预计已用 ~100%" }
+            return "重置时预计超出 ~\(max(1, Int((projected - 100).rounded())))%"
+        case .level: return "刻度表示按当前时间进度理论上应剩余的额度"
+        }
     }
 
 }
@@ -348,6 +410,7 @@ private struct ContinuousQuotaBar: View {
     let period: QuotaPeriod
     let percent: Double
     let markerPercent: Double?
+    let severity: QuotaPaceSeverity
 
     var body: some View {
         let height = QuotaBarLayout.height(for: period)
@@ -374,10 +437,10 @@ private struct ContinuousQuotaBar: View {
     }
 
     private var barColor: Color {
-        switch percent {
-        case 0..<20: return Color(nsColor: .systemRed)
-        case 20..<50: return Color(nsColor: .systemYellow)
-        default: return Color(nsColor: .systemBlue)
+        switch severity {
+        case .normal: return Color(nsColor: .systemBlue)
+        case .warning: return Color(nsColor: .systemYellow)
+        case .critical: return Color(nsColor: .systemRed)
         }
     }
 

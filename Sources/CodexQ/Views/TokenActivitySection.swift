@@ -8,10 +8,10 @@ struct TokenActivitySection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text("Token 活动")
                     .font(.headline)
-                Spacer(minLength: 8)
+                Spacer(minLength: 6)
                 if let snapshot {
                     let latestDay = TokenActivityPresentation.latestRecordedDay(
                         before: now,
@@ -49,7 +49,8 @@ struct TokenActivitySection: View {
             let cells = TokenActivityPresentation.dailyCells(
                 snapshot: snapshot,
                 now: now,
-                calendar: calendar
+                calendar: calendar,
+                weekCount: TokenActivityGridLayout.weekCount
             )
             DailyTokenActivityGrid(
                 cells: cells,
@@ -87,7 +88,7 @@ private struct TokenActivityInlineSummary: View {
     let lifetimeTokens: Int64?
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             metric(
                 label: completedDayLabel,
                 accessibilityLabel: "\(completedDayLabel) Token",
@@ -119,16 +120,18 @@ private struct TokenActivityInlineSummary: View {
 }
 
 private enum TokenActivityGridLayout {
-    static let squareSize: CGFloat = 10
-    static let spacing: CGFloat = 2
-    static let monthSpacing: CGFloat = 8
-
-    static var columns: [GridItem] {
-        Array(
-            repeating: GridItem(.fixed(squareSize), spacing: spacing),
-            count: 7
-        )
-    }
+    static let contentWidth = QuotaPopoverLayout.width
+        - QuotaPopoverLayout.horizontalPadding * 2
+    static let squareSize: CGFloat = 11
+    static let minimumSpacing: CGFloat = 3
+    static let weekCount = max(
+        1,
+        Int((contentWidth + minimumSpacing) / (squareSize + minimumSpacing))
+    )
+    static let spacing = weekCount > 1
+        ? (contentWidth - squareSize * CGFloat(weekCount)) / CGFloat(weekCount - 1)
+        : 0
+    static let gridWidth = contentWidth
 }
 
 private struct DailyTokenActivityGrid: View {
@@ -137,22 +140,11 @@ private struct DailyTokenActivityGrid: View {
     let calendar: Calendar
 
     var body: some View {
-        HStack(alignment: .top, spacing: TokenActivityGridLayout.monthSpacing) {
-            ForEach(months) { month in
-                VStack(spacing: 3) {
-                    Text(monthText(month.start))
-                        .font(.caption2)
-                        .foregroundStyle(Color.primary.opacity(0.72))
-
-                    LazyVGrid(columns: TokenActivityGridLayout.columns, spacing: TokenActivityGridLayout.spacing) {
-                        ForEach(0..<month.leadingBlankCount, id: \.self) { _ in
-                            Color.clear
-                                .frame(
-                                    width: TokenActivityGridLayout.squareSize,
-                                    height: TokenActivityGridLayout.squareSize
-                                )
-                        }
-                        ForEach(month.cells, id: \.date) { cell in
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: TokenActivityGridLayout.spacing) {
+                ForEach(weeks) { week in
+                    VStack(spacing: TokenActivityGridLayout.spacing) {
+                        ForEach(week.cells, id: \.date) { cell in
                             DailyActivitySquare(
                                 cell: cell,
                                 peakTokens: peakTokens,
@@ -162,42 +154,65 @@ private struct DailyTokenActivityGrid: View {
                     }
                 }
             }
+
+            HStack(spacing: TokenActivityGridLayout.spacing) {
+                ForEach(monthSpans) { span in
+                    Text(monthText(span.start))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(width: span.width)
+                }
+            }
+            .frame(width: TokenActivityGridLayout.gridWidth, alignment: .leading)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var months: [ActivityMonth] {
-        var result: [ActivityMonth] = []
-        for cell in cells {
-            let components = calendar.dateComponents([.year, .month], from: cell.date)
-            guard let start = calendar.date(from: components) else { continue }
+    private var weeks: [ActivityWeek] {
+        stride(from: 0, to: cells.count, by: 7).map { offset in
+            let end = min(offset + 7, cells.count)
+            let weekCells = Array(cells[offset..<end])
+            return ActivityWeek(start: weekCells[0].date, cells: weekCells)
+        }
+    }
+
+    private var monthSpans: [ActivityMonthSpan] {
+        weeks.reduce(into: []) { result, week in
+            let components = calendar.dateComponents([.year, .month], from: week.start)
+            guard let start = calendar.date(from: components) else { return }
             if result.last?.start == start {
-                result[result.count - 1].cells.append(cell)
+                result[result.count - 1].weekCount += 1
             } else {
-                result.append(ActivityMonth(
-                    start: start,
-                    leadingBlankCount: (calendar.component(.weekday, from: start) + 5) % 7,
-                    cells: [cell]
-                ))
+                result.append(ActivityMonthSpan(start: start, weekCount: 1))
             }
         }
-        return result
     }
 
     private func monthText(_ date: Date) -> String {
-        var format = Date.FormatStyle.dateTime.year().month(.abbreviated)
+        var format = Date.FormatStyle.dateTime.month(.abbreviated)
         format.calendar = calendar
         format.timeZone = calendar.timeZone
         return date.formatted(format)
     }
 }
 
-private struct ActivityMonth: Identifiable {
+private struct ActivityWeek: Identifiable {
     let start: Date
-    let leadingBlankCount: Int
-    var cells: [TokenActivityCell]
+    let cells: [TokenActivityCell]
 
     var id: Date { start }
+}
+
+private struct ActivityMonthSpan: Identifiable {
+    let start: Date
+    var weekCount: Int
+
+    var id: Date { start }
+
+    var width: CGFloat {
+        TokenActivityGridLayout.squareSize * CGFloat(weekCount)
+            + TokenActivityGridLayout.spacing * CGFloat(weekCount - 1)
+    }
 }
 
 private struct DailyActivitySquare: View {
@@ -235,11 +250,11 @@ private struct TokenActivitySquare: View {
     let accessibilityValue: String
 
     var body: some View {
-        RoundedRectangle(cornerRadius: 2)
+        RoundedRectangle(cornerRadius: 3)
             .fill(fillColor)
             .overlay {
                 if level == nil {
-                    RoundedRectangle(cornerRadius: 2)
+                    RoundedRectangle(cornerRadius: 3)
                         .strokeBorder(
                             Color.secondary.opacity(0.18),
                             lineWidth: 0.5

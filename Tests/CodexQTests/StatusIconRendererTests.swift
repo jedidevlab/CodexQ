@@ -34,6 +34,28 @@ struct StatusIconRendererTests {
         #expect(lowQuotaAlpha.contains { $0 > 0 })
     }
 
+    @Test("菜单栏图标使用接近系统图标的可读尺寸")
+    @MainActor
+    func iconUsesLegibleStatusBarSize() throws {
+        let source = NSImage(size: NSSize(width: 10, height: 10))
+        source.lockFocus()
+        NSColor.white.setFill()
+        NSRect(origin: .zero, size: source.size).fill()
+        source.unlockFocus()
+
+        let rendered = StatusIconRenderer.image(source: source, remainingPercent: 100)
+        #expect(rendered.size == NSSize(width: 20, height: 20))
+        let data = try #require(rendered.tiffRepresentation)
+        let bitmap = try #require(NSBitmapImageRep(data: data))
+        let visibleColumns = (0..<bitmap.pixelsWide).filter { x in
+            (0..<bitmap.pixelsHigh).contains { y in
+                (bitmap.colorAt(x: x, y: y)?.alphaComponent ?? 0) > 0
+            }
+        }
+
+        #expect(visibleColumns.count >= 19)
+    }
+
     private func alphaPixels(of image: NSImage) throws -> [UInt8] {
         let data = try #require(image.tiffRepresentation)
         let bitmap = try #require(NSBitmapImageRep(data: data))

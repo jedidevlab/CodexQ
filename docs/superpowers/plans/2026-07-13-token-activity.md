@@ -2,15 +2,15 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add the latest three calendar months of daily account Token activity blocks to the existing CodexQ menu bar popover.
+**Goal:** Fill the CodexQ menu bar popover width with daily account Token activity blocks.
 
-**Architecture:** Read `account/usage/read` from the same local Codex app-server used for rate limits, decode its daily buckets, and keep activity loading/error state independent from quota state. Pure calendar presentation logic produces three-month daily cells; a focused SwiftUI section renders them with one formatter and color scale.
+**Architecture:** Read `account/usage/read` from the same local Codex app-server used for rate limits, decode its daily buckets, and keep activity loading/error state independent from quota state. The SwiftUI layout derives its visible week count from the popover width, then pure calendar presentation logic produces that many weeks of daily cells for one continuous heatmap.
 
 **Tech Stack:** Swift 6, SwiftUI, Foundation `Calendar`, Swift Testing, local Codex app-server JSON-RPC.
 
 ## Global Constraints
 
-- Daily mode shows only the latest 3 calendar months.
+- Daily mode derives the visible week count from the popover width and fills missing older data with empty cells.
 - All daily cells use the same token unit, formatter, and color thresholds.
 - Missing dates render empty cells; no data may be fabricated.
 - Token activity failure must not prevent quota display or refresh.
@@ -37,10 +37,10 @@
     #expect(value.days == [.init(startDate: "2026-07-12", tokens: 1200)])
 }
 
-@Test func dailyCellsKeepThreeCalendarMonthsAndFillMissingDays() throws {
+@Test func dailyCellsExpandToVisibleWeekCountAndEndToday() throws {
     let cells = TokenActivityPresentation.dailyCells(snapshot: fixture, now: july13, calendar: utcCalendar)
-    #expect(cells.first?.date == may1)
-    #expect(cells.last?.date == july31)
+    #expect(cells.first?.date == eightWeekWindowStart)
+    #expect(cells.last?.date == july13)
     #expect(cells.first(where: { $0.date == missingDate })?.tokens == nil)
     #expect(cells.first(where: { $0.date == july14 })?.tokens == nil)
 }
@@ -55,7 +55,7 @@ Expected: compilation fails because the Token activity types do not exist.
 
 - [ ] **Step 3: Implement the minimal models and pure presentation logic**
 
-Decode `startDate` as the server-provided Gregorian `yyyy-MM-dd` value in the local time zone, normalize all comparisons with `Calendar.startOfDay(for:)`, compute the daily lower bound as the first day of the month two months before `now`, and end the visible grid on the current month's final day. Dates after `now` remain present with `tokens == nil`.
+Decode `startDate` as the server-provided Gregorian `yyyy-MM-dd` value in the local time zone, normalize all comparisons with `Calendar.startOfDay(for:)`, compute the lower bound from the visible week count derived from the popover width, and end the visible grid on today. The current 256 pt popover fits 16 week columns; the current column ends on today.
 
 Use one formatter for every daily cell:
 
@@ -161,7 +161,7 @@ In `QuotaStore.refresh()`, preserve the existing quota request and error behavio
 
 - [ ] **Step 4: Implement the SwiftUI section**
 
-Add a compact “Token 活动” header and render the daily cells as a compact three-month calendar grid without a mode picker. In the header's trailing space, show the latest completed daily bucket and “累计 Token” as one compact line with no background or border; label the latest bucket as “昨日” when it matches the previous local calendar day, otherwise show its month/day. Omit the repeated `tokens` suffix from these two visible values, while missing values display “暂无数据”. Use semantic SwiftUI colors, a single square size/spacing, shared formatter/levels, `.help(...)` for date and token count, and an explicit unavailable state. Insert the section below quota/reset-credit content and above embedded settings; widen or height-adjust the popover only as required to prevent clipping.
+Add a compact “Token 活动” header and render the daily cells as one continuous heatmap that fills the popover content width, without a mode picker or separate month grids. Derive the week count and exact inter-column spacing from the popover width. Put month labels below the heatmap, centered across their week spans. In the header's trailing space, show the latest completed daily bucket and “累计 Token” as one compact line with no background or border; label the latest bucket as “昨日” when it matches the previous local calendar day, otherwise show its month/day. Omit the repeated `tokens` suffix from these two visible values, while missing values display “暂无数据”. Use semantic SwiftUI colors, a single square size/spacing, shared formatter/levels, `.help(...)` for date and token count, and an explicit unavailable state. Insert the section below quota/reset-credit content and above embedded settings; adjust the compact popover only as required to prevent clipping.
 
 - [ ] **Step 5: Run tests, build, and launch verification**
 

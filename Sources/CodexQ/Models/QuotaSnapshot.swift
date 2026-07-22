@@ -46,52 +46,98 @@ struct QuotaWindow: Codable, Equatable, Sendable {
         min(100, max(0, 100 - usedPercent))
     }
 
-    func projection(at now: Date = Date()) -> QuotaProjection? {
+    func paceState(at now: Date = Date()) -> QuotaPaceState {
+        if remainingPercent.rounded() <= 0 { return .spent }
         guard let resetsAt,
               let durationMinutes,
               durationMinutes > 0 else {
-            return nil
+            return absoluteLevelState
         }
 
         let duration = TimeInterval(durationMinutes * 60)
         let remainingTime = resetsAt.timeIntervalSince(now)
         let elapsedTime = duration - remainingTime
-        guard remainingTime > 0, elapsedTime > 0 else { return nil }
+        let minimumElapsed = max(60, duration * 0.01)
+        guard remainingTime > 0, elapsedTime >= minimumElapsed else { return absoluteLevelState }
 
         let expectedUsedPercent = min(100, max(0, elapsedTime / duration * 100))
-        guard expectedUsedPercent >= 3 else { return nil }
-
         let expectedRemainingPercent = 100 - expectedUsedPercent
-        let deltaPercent = usedPercent - expectedUsedPercent
+        if usedPercent <= 0 { return .healthy(projectedUsedPercent: 0) }
+
+        let projectedUsedPercent = usedPercent / elapsedTime * duration
+        if projectedUsedPercent <= 90 {
+            return .healthy(projectedUsedPercent: projectedUsedPercent)
+        }
+        guard usedPercent >= 5 else { return absoluteLevelState }
+        if projectedUsedPercent <= 100 {
+            let spare = Int((100 - projectedUsedPercent).rounded())
+            guard spare >= 1 else {
+                return .runningOut(
+                    runOutAt: nil,
+                    projectedUsedPercent: projectedUsedPercent,
+                    markerPercent: expectedRemainingPercent
+                )
+            }
+            return .closeToLimit(
+                sparePercent: spare,
+                projectedUsedPercent: projectedUsedPercent,
+                markerPercent: expectedRemainingPercent
+            )
+        }
+
         let rate = usedPercent / elapsedTime
-        let etaSeconds = rate > 0 ? remainingPercent / rate : nil
-        return QuotaProjection(
-            reservePercent: max(0, -deltaPercent),
-            expectedRemainingPercent: expectedRemainingPercent,
-            deltaPercent: deltaPercent,
-            etaSeconds: etaSeconds.flatMap { $0 < remainingTime ? $0 : nil }
+        let eta = rate > 0 ? remainingPercent / rate : nil
+        let runOutAt = eta.flatMap { seconds in
+            seconds > 0 && seconds < remainingTime ? now.addingTimeInterval(seconds) : nil
+        }
+        return .runningOut(
+            runOutAt: runOutAt,
+            projectedUsedPercent: projectedUsedPercent,
+            markerPercent: expectedRemainingPercent
         )
     }
 
+    private var absoluteLevelState: QuotaPaceState {
+        let roundedUsed = min(100, max(0, usedPercent)).rounded()
+        if roundedUsed >= 90 { return .level(.critical) }
+        if roundedUsed >= 80 { return .level(.warning) }
+        return .level(.normal)
+    }
 }
 
-struct QuotaProjection: Equatable, Sendable {
-    let reservePercent: Double
-    let expectedRemainingPercent: Double
-    let deltaPercent: Double
-    let etaSeconds: TimeInterval?
+enum QuotaPaceSeverity: Equatable, Sendable { case normal, warning, critical }
 
-    var isOnTrack: Bool {
-        abs(deltaPercent) <= 2
+enum QuotaPaceState: Equatable, Sendable {
+    case spent
+    case runningOut(runOutAt: Date?, projectedUsedPercent: Double, markerPercent: Double)
+    case closeToLimit(sparePercent: Int, projectedUsedPercent: Double, markerPercent: Double)
+    case healthy(projectedUsedPercent: Double)
+    case level(QuotaPaceSeverity)
+
+    var severity: QuotaPaceSeverity {
+        switch self {
+        case .spent, .runningOut: return .critical
+        case .closeToLimit: return .warning
+        case .healthy, .level(.normal): return .normal
+        case .level(let severity): return severity
+        }
     }
 
-    var isInDeficit: Bool {
-        deltaPercent > 2
+    var markerPercent: Double? {
+        switch self {
+        case .runningOut(_, _, let marker), .closeToLimit(_, _, let marker): return marker
+        case .spent, .healthy, .level: return nil
+        }
     }
 
-    var displayPercent: Double {
-        abs(deltaPercent)
+    var sparePercent: Int? {
+        if case .closeToLimit(let spare, _, _) = self { return spare }
+        return nil
     }
+
+    var isHealthy: Bool { if case .healthy = self { return true }; return false }
+    var isRunningOut: Bool { if case .runningOut = self { return true }; return false }
+    var isPlainLevel: Bool { if case .level = self { return true }; return false }
 }
 
 struct RateLimitsResponse: Decodable {

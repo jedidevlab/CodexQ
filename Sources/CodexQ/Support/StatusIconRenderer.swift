@@ -3,8 +3,8 @@ import AppKit
 @MainActor
 enum StatusIconRenderer {
     static func image(source: NSImage, remainingPercent _: Double) -> NSImage {
-        let canvasSize = NSSize(width: 18, height: 18)
-        let iconSize = NSSize(width: 15, height: 15)
+        let canvasSize = NSSize(width: 20, height: 20)
+        let iconSize = NSSize(width: 20, height: 20)
         let iconRect = NSRect(
             x: (canvasSize.width - iconSize.width) / 2,
             y: (canvasSize.height - iconSize.height) / 2,
