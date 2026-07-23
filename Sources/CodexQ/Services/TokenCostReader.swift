@@ -27,6 +27,11 @@ actor TokenCostReader {
         let records: [TokenUsageRecord]
     }
 
+    private struct SessionFileListing {
+        let files: [URL]
+        let skippedCount: Int
+    }
+
     private let sessionsDirectory: URL
     private let authURL: URL
     private let fileManager: FileManager
@@ -42,30 +47,40 @@ actor TokenCostReader {
     }
 
     func read(now: Date = Date()) throws -> TokenCostSnapshot {
-        let files = try sessionFiles()
+        let listing = try sessionFiles()
+        let files = listing.files
         guard !files.isEmpty else { throw ReaderError.sessionsUnavailable }
 
         var records: [TokenUsageRecord] = []
+        var skippedSessionFileCount = listing.skippedCount
         var liveFiles = Set<URL>()
         for url in files {
             try Task.checkCancellation()
             liveFiles.insert(url)
-            let attributes = try fileManager.attributesOfItem(atPath: url.path)
-            let size = (attributes[.size] as? NSNumber)?.uint64Value ?? 0
-            let modificationDate = attributes[.modificationDate] as? Date ?? .distantPast
-            if let cached = cache[url],
-               cached.size == size,
-               cached.modificationDate == modificationDate {
-                records.append(contentsOf: cached.records)
-                continue
+
+            do {
+                let attributes = try fileManager.attributesOfItem(atPath: url.path)
+                let size = (attributes[.size] as? NSNumber)?.uint64Value ?? 0
+                let modificationDate = attributes[.modificationDate] as? Date ?? .distantPast
+                if let cached = cache[url],
+                   cached.size == size,
+                   cached.modificationDate == modificationDate {
+                    records.append(contentsOf: cached.records)
+                    continue
+                }
+                let parsed = try TokenCostSessionParser.records(in: url)
+                cache[url] = CachedFile(
+                    size: size,
+                    modificationDate: modificationDate,
+                    records: parsed
+                )
+                records.append(contentsOf: parsed)
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                cache.removeValue(forKey: url)
+                skippedSessionFileCount += 1
             }
-            let parsed = try TokenCostSessionParser.records(in: url)
-            cache[url] = CachedFile(
-                size: size,
-                modificationDate: modificationDate,
-                records: parsed
-            )
-            records.append(contentsOf: parsed)
         }
         cache = cache.filter { liveFiles.contains($0.key) }
 
@@ -81,11 +96,12 @@ actor TokenCostReader {
             records: uniqueRecords,
             now: now,
             calendar: calendar,
-            subscriptionPeriod: subscriptionPeriod
+            subscriptionPeriod: subscriptionPeriod,
+            skippedSessionFileCount: skippedSessionFileCount
         )
     }
 
-    private func sessionFiles() throws -> [URL] {
+    private func sessionFiles() throws -> SessionFileListing {
         guard let enumerator = fileManager.enumerator(
             at: sessionsDirectory,
             includingPropertiesForKeys: [.isRegularFileKey],
@@ -93,11 +109,21 @@ actor TokenCostReader {
         ) else {
             throw ReaderError.sessionsUnavailable
         }
-        return enumerator.compactMap { item in
-            guard let url = item as? URL, url.pathExtension == "jsonl" else { return nil }
-            return url
+        var skippedCount = 0
+        var files: [URL] = []
+        for item in enumerator {
+            guard let url = item as? URL, url.pathExtension == "jsonl" else { continue }
+            guard let values = try? url.resourceValues(forKeys: [.isRegularFileKey]),
+                  values.isRegularFile == true else {
+                skippedCount += 1
+                continue
+            }
+            files.append(url)
         }
-        .sorted { $0.path < $1.path }
+        return SessionFileListing(
+            files: files.sorted { $0.path < $1.path },
+            skippedCount: skippedCount
+        )
     }
 
     private func subscriptionPeriod(now: Date) throws -> DateInterval {

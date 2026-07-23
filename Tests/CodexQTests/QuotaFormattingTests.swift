@@ -173,6 +173,34 @@ struct QuotaFormattingTests {
         #expect(snapshot.statusRemainingPercent == 78)
     }
 
+    @Test("套餐类型从 app-server 额度响应进入快照")
+    func quotaSnapshotCarriesPlanType() throws {
+        let json = #"""
+        {
+          "rateLimits": {
+            "planType": "pro",
+            "primary": {"usedPercent": 6, "windowDurationMins": 300},
+            "secondary": {"usedPercent": 1, "windowDurationMins": 10080}
+          },
+          "rateLimitsByLimitId": {
+            "codex": {
+              "planType": "prolite",
+              "primary": {"usedPercent": 7, "windowDurationMins": 300},
+              "secondary": {"usedPercent": 2, "windowDurationMins": 10080}
+            }
+          }
+        }
+        """#.data(using: .utf8)!
+
+        let response = try JSONDecoder().decode(RateLimitsResponse.self, from: json)
+        let snapshot = try #require(response.quotaSnapshot)
+
+        #expect(snapshot.fiveHour?.usedPercent == 7)
+        #expect(snapshot.weekly.usedPercent == 2)
+        #expect(snapshot.planType == "prolite")
+        #expect(PlanTypeFormatter.displayName(for: snapshot.planType) == "Pro 5x")
+    }
+
     @Test("Pace 按 OpenUsage 的 90% 与 100% 投影阈值分级")
     func paceUsesOpenUsageProjectionThresholds() {
         let now = Date(timeIntervalSince1970: 10_000)
@@ -360,6 +388,93 @@ struct AppServerClientTests {
         #expect(snapshot.days.first?.tokens == 1_200)
     }
 
+    @Test("额度与 Token 活动通过同一个 app-server 会话读取")
+    func readsQuotaAndTokenActivityFromSingleServerSession() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let executable = directory.appendingPathComponent("fake-codex")
+        let countFile = directory.appendingPathComponent("launch-count")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let script = #"""
+        #!/bin/sh
+        count=0
+        if [ -f "$COUNT_FILE" ]; then
+          count=$(cat "$COUNT_FILE")
+        fi
+        count=$((count + 1))
+        printf '%s' "$count" > "$COUNT_FILE"
+        IFS= read -r initialize_request
+        printf '%s\n' '{"id":1,"result":{}}'
+        IFS= read -r initialized_notification
+        IFS= read -r limits_request
+        printf '%s\n' '{"id":2,"result":{"rateLimits":{"planType":"prolite","primary":{"usedPercent":6,"windowDurationMins":300},"secondary":{"usedPercent":1,"windowDurationMins":10080}}}}'
+        IFS= read -r usage_request
+        printf '%s\n' '{"id":3,"result":{"summary":{"peakDailyTokens":1200},"dailyUsageBuckets":[{"startDate":"2026-07-12","tokens":1200}]}}'
+        """#
+        try script.write(to: executable, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o755],
+            ofItemAtPath: executable.path
+        )
+
+        let snapshot = try await AppServerClient(
+            executableURL: executable,
+            environment: ["COUNT_FILE": countFile.path]
+        ).readDashboardSnapshots()
+
+        #expect(snapshot.quota.planType == "prolite")
+        #expect(snapshot.tokenActivity.days.first?.tokens == 1_200)
+        #expect(try String(contentsOf: countFile, encoding: .utf8) == "1")
+    }
+
+    @Test("取消刷新会及时终止阻塞中的 app-server")
+    func cancellationTerminatesBlockedServerProcess() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let executable = directory.appendingPathComponent("fake-codex")
+        let startedFile = directory.appendingPathComponent("started")
+        let terminatedFile = directory.appendingPathComponent("terminated")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let script = """
+        #!/bin/sh
+        trap 'printf terminated > \(shellQuotedPath(terminatedFile.path)); exit 0' TERM
+        printf started > \(shellQuotedPath(startedFile.path))
+        while :; do sleep 0.1; done
+        """
+        try script.write(to: executable, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o755],
+            ofItemAtPath: executable.path
+        )
+        let client = AppServerClient(
+            executableURL: executable,
+            responseTimeout: 5
+        )
+
+        let task = Task {
+            try await client.readRateLimits()
+        }
+        try await waitForFile(startedFile, timeout: 2)
+        let cancelledAt = Date()
+        task.cancel()
+
+        do {
+            _ = try await task.value
+            Issue.record("取消后仍返回了额度快照")
+        } catch is CancellationError {
+            // Expected: cancellation should stop the blocking app-server request.
+        } catch {
+            Issue.record("返回了错误的失败类型：\(error)")
+        }
+
+        try await waitForFile(terminatedFile, timeout: 1.5)
+        #expect(Date().timeIntervalSince(cancelledAt) < 0.8)
+    }
+
     @Test("缺少候选程序时错误提示同时涵盖新旧应用")
     func missingExecutableMessageCoversCurrentAndLegacyApps() {
         #expect(AppServerClient.ClientError.executableMissing.errorDescription
@@ -454,6 +569,19 @@ struct AppServerClientTests {
         }
 
         #expect(Date().timeIntervalSince(startedAt) < 2)
+    }
+
+    private func waitForFile(_ url: URL, timeout: TimeInterval) async throws {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if FileManager.default.fileExists(atPath: url.path) { return }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        Issue.record("等待文件超时：\(url.path)")
+    }
+
+    private func shellQuotedPath(_ path: String) -> String {
+        "'\(path.replacingOccurrences(of: "'", with: "'\\''"))'"
     }
 }
 

@@ -49,7 +49,7 @@ struct TokenActivityViewTests {
         let release = AsyncStream<Void>.makeStream()
         var startedIterator = started.stream.makeAsyncIterator()
         var refreshResult: Bool?
-        var activityCallCount = 0
+        let activityCallCount = ActivityCounter()
         let quota = QuotaSnapshot(
             fiveHour: .init(usedPercent: 25, resetsAt: nil, durationMinutes: 300),
             weekly: .init(usedPercent: 40, resetsAt: nil, durationMinutes: 10_080)
@@ -57,7 +57,7 @@ struct TokenActivityViewTests {
         let store = QuotaStore(
             readRateLimits: { quota },
             readTokenActivity: {
-                activityCallCount += 1
+                _ = await activityCallCount.increment()
                 started.continuation.yield()
                 for await _ in release.stream { break }
                 throw ActivityFixtureError.unavailable
@@ -84,7 +84,7 @@ struct TokenActivityViewTests {
         #expect(!quotaRefreshingBeforeRelease)
         #expect(activityRefreshingBeforeRelease)
         #expect(secondQuotaResult)
-        #expect(activityCallCount == 1)
+        #expect(await activityCallCount.value == 1)
     }
 
     @Test("挂起的 Token 活动不阻塞并发 Token 成本结果")
@@ -118,6 +118,41 @@ struct TokenActivityViewTests {
         #expect(store.tokenCost == expectedCost)
         #expect(store.isTokenActivityRefreshing)
         releaseActivity.continuation.yield()
+    }
+
+    @Test("挂起的 Token 成本不阻塞 Token 活动结果")
+    @MainActor
+    func suspendedCostDoesNotDelayTokenActivity() async {
+        let costGate = ActivityGate()
+        let activityStarted = AsyncStream<Void>.makeStream()
+        var activityStartedIterator = activityStarted.stream.makeAsyncIterator()
+        let expectedActivity = TokenActivitySnapshot(peakDailyTokens: 20, days: [])
+        let quota = QuotaSnapshot(
+            fiveHour: .init(usedPercent: 25, resetsAt: nil, durationMinutes: 300),
+            weekly: .init(usedPercent: 40, resetsAt: nil, durationMinutes: 10_080)
+        )
+        let store = QuotaStore(
+            readRateLimits: { quota },
+            readTokenActivity: {
+                activityStarted.continuation.yield()
+                return expectedActivity
+            },
+            readTokenCost: {
+                await costGate.wait()
+                return emptyTokenCostSnapshot()
+            },
+            loadCachedSnapshot: { nil },
+            saveCachedSnapshot: { _ in },
+            notifyQuotaCrossings: { _, _ in }
+        )
+
+        #expect(await store.refresh())
+        _ = await activityStartedIterator.next()
+        await Task.yield()
+
+        #expect(store.tokenActivity == expectedActivity)
+        #expect(store.isTokenActivityRefreshing)
+        costGate.open()
     }
 
     @Test("Token 活动失败不回滚额度缓存和通知")
@@ -154,6 +189,52 @@ struct TokenActivityViewTests {
         #expect(store.tokenActivityErrorMessage != nil)
         #expect(cacheSaveCount == 1)
         #expect(notificationCallCount == 1)
+        withExtendedLifetime(cancellable) {}
+    }
+
+    @Test("临时失败保留上次成功的 Token 活动和成本")
+    @MainActor
+    func transientTokenFailuresKeepPreviousSnapshots() async {
+        let activityCalls = ActivityCounter()
+        let costCalls = ActivityCounter()
+        let activity = TokenActivitySnapshot(peakDailyTokens: 20, days: [])
+        let cost = emptyTokenCostSnapshot()
+        let quota = QuotaSnapshot(
+            fiveHour: .init(usedPercent: 25, resetsAt: nil, durationMinutes: 300),
+            weekly: .init(usedPercent: 40, resetsAt: nil, durationMinutes: 10_080)
+        )
+        let store = QuotaStore(
+            readRateLimits: { quota },
+            readTokenActivity: {
+                if await activityCalls.increment() == 1 { return activity }
+                throw ActivityFixtureError.unavailable
+            },
+            readTokenCost: {
+                if await costCalls.increment() == 1 { return cost }
+                throw ActivityFixtureError.unavailable
+            },
+            loadCachedSnapshot: { nil },
+            saveCachedSnapshot: { _ in },
+            notifyQuotaCrossings: { _, _ in }
+        )
+        let activityFinished = AsyncStream<Void>.makeStream()
+        var activityFinishedIterator = activityFinished.stream.makeAsyncIterator()
+        let cancellable = store.$isTokenActivityRefreshing
+            .dropFirst()
+            .filter { !$0 }
+            .sink { _ in activityFinished.continuation.yield() }
+
+        #expect(await store.refresh())
+        _ = await activityFinishedIterator.next()
+        #expect(store.tokenActivity == activity)
+        #expect(store.tokenCost == cost)
+
+        #expect(await store.refresh())
+        _ = await activityFinishedIterator.next()
+        #expect(store.tokenActivity == activity)
+        #expect(store.tokenCost == cost)
+        #expect(store.tokenActivityErrorMessage != nil)
+        #expect(store.tokenCostErrorMessage != nil)
         withExtendedLifetime(cancellable) {}
     }
 
@@ -202,15 +283,15 @@ struct TokenActivityViewTests {
         let retryGate = ActivityGate()
         let retryStarted = AsyncStream<Void>.makeStream()
         var retryStartedIterator = retryStarted.stream.makeAsyncIterator()
-        var quotaCallCount = 0
+        let quotaCallCount = ActivityCounter()
         let quota = QuotaSnapshot(
             fiveHour: .init(usedPercent: 25, resetsAt: nil, durationMinutes: 300),
             weekly: .init(usedPercent: 40, resetsAt: nil, durationMinutes: 10_080)
         )
         let store = QuotaStore(
             readRateLimits: {
-                quotaCallCount += 1
-                if quotaCallCount == 1 {
+                let quotaCallNumber = await quotaCallCount.increment()
+                if quotaCallNumber == 1 {
                     throw ActivityFixtureError.unavailable
                 }
                 retryStarted.continuation.yield()
@@ -247,7 +328,7 @@ struct TokenActivityViewTests {
         let secondStarted = AsyncStream<Void>.makeStream()
         var firstStartedIterator = firstStarted.stream.makeAsyncIterator()
         var secondStartedIterator = secondStarted.stream.makeAsyncIterator()
-        var callCount = 0
+        let activityCallCount = ActivityCounter()
         let quota = QuotaSnapshot(
             fiveHour: nil,
             weekly: .init(usedPercent: 40, resetsAt: nil, durationMinutes: 10_080)
@@ -255,8 +336,8 @@ struct TokenActivityViewTests {
         let store = QuotaStore(
             readRateLimits: { quota },
             readTokenActivity: {
-                callCount += 1
-                if callCount == 1 {
+                let activityCallNumber = await activityCallCount.increment()
+                if activityCallNumber == 1 {
                     firstStarted.continuation.yield()
                     await firstGate.wait()
                 } else {
@@ -282,7 +363,7 @@ struct TokenActivityViewTests {
         await Task.yield()
 
         #expect(store.isTokenActivityRefreshing)
-        #expect(callCount == 2)
+        #expect(await activityCallCount.value == 2)
         secondGate.open()
     }
 
@@ -301,6 +382,65 @@ struct TokenActivityViewTests {
         #expect(costIndex.lowerBound < resetCreditsIndex.lowerBound)
         #expect(activityIndex.lowerBound < settingsIndex.lowerBound)
         #expect(resetCreditsIndex.lowerBound < settingsIndex.lowerBound)
+    }
+
+    @Test("弹窗顶部显示 app-server 返回的套餐类型")
+    func popoverShowsDecodedPlanType() throws {
+        let source = try String(
+            contentsOfFile: "Sources/CodexQ/Views/QuotaPopoverView.swift",
+            encoding: .utf8
+        )
+
+        #expect(source.contains("PlanTypeFormatter.displayName(for: snapshot.planType)"))
+        #expect(source.contains("PlanHeader(planName: planName)"))
+        #expect(source.contains("private struct PlanHeader"))
+        #expect(source.contains("private struct PlanBadge"))
+        #expect(source.contains("struct InsetSeparator"))
+        #expect(source.contains("Text(planName)"))
+        #expect(source.contains("Capsule().fill(.thinMaterial)"))
+        #expect(source.contains("Circle().fill(Color.accentColor)"))
+        #expect(source.contains("VStack(spacing: 5)"))
+        #expect(source.contains("InsetSeparator()"))
+        #expect(source.contains("LinearGradient("))
+        #expect(source.contains("Color.primary.opacity(0.08)"))
+        #expect(source.contains("Color.primary.opacity(0.035)"))
+        #expect(source.contains("Color(nsColor: .textBackgroundColor).opacity(0.16)"))
+        #expect(!source.contains(".padding(.bottom, 1)"))
+        let headerIndex = try #require(source.range(of: "PlanHeader(planName: planName)")?.lowerBound)
+        let dividerIndex = try #require(
+            source.range(
+                of: "InsetSeparator()",
+                range: headerIndex..<source.endIndex
+            )?.lowerBound
+        )
+        let quotaIndex = try #require(
+            source.range(
+                of: "QuotaRow(",
+                range: dividerIndex..<source.endIndex
+            )?.lowerBound
+        )
+        #expect(headerIndex < dividerIndex)
+        #expect(dividerIndex < quotaIndex)
+        #expect(!source.contains("Text(\"套餐\")"))
+    }
+
+    @Test("弹窗所有分隔线使用嵌入式样式")
+    func popoverUsesInsetSeparatorsEverywhere() throws {
+        let paths = [
+            "Sources/CodexQ/Views/QuotaPopoverView.swift",
+            "Sources/CodexQ/Views/ResetCreditsSection.swift"
+        ]
+        let sources = try paths.map {
+            try String(contentsOfFile: $0, encoding: .utf8)
+        }
+        let defaultDividerLines = sources.flatMap { source in
+            source
+                .split(separator: "\n", omittingEmptySubsequences: false)
+                .filter { $0.trimmingCharacters(in: .whitespaces) == "Divider()" }
+        }
+
+        #expect(defaultDividerLines.isEmpty)
+        #expect(sources.joined(separator: "\n").contains("InsetSeparator()"))
     }
 
     @Test("只有手动刷新让按钮转圈，后台刷新只负责禁用按钮")
@@ -615,6 +755,19 @@ private final class ActivityGate {
     func open() {
         continuation?.resume()
         continuation = nil
+    }
+}
+
+private actor ActivityCounter {
+    private var count = 0
+
+    func increment() -> Int {
+        count += 1
+        return count
+    }
+
+    var value: Int {
+        count
     }
 }
 

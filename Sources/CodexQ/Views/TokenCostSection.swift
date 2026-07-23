@@ -37,13 +37,7 @@ struct TokenCostSection: View {
 
     @ViewBuilder
     private var content: some View {
-        if let errorMessage {
-            Text("Token 成本暂不可用")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, minHeight: 56)
-                .help(errorMessage)
-        } else if let snapshot {
+        if let snapshot {
             VStack(spacing: 8) {
                 HStack(spacing: 6) {
                     periodButton(summary: snapshot.yesterday)
@@ -61,7 +55,25 @@ struct TokenCostSection: View {
                         subscriptionPeriod: snapshot.subscriptionPeriod
                     )
                 }
+                if snapshot.skippedSessionFileCount > 0 {
+                    Text("有 \(snapshot.skippedSessionFileCount) 个会话文件未纳入成本")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .help("这些本机 session 文件无法读取或不是普通 JSONL 文件，总金额可能偏低。")
+                }
             }
+            if let errorMessage {
+                Text("Token 成本刷新失败，显示上次数据")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .help(errorMessage)
+            }
+        } else if let errorMessage {
+            Text("Token 成本暂不可用")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, minHeight: 56)
+                .help(errorMessage)
         } else if isRefreshing {
             ProgressView("正在计算 Token 成本...")
                 .controlSize(.small)
@@ -219,13 +231,8 @@ private struct TokenCostDetailCard: View {
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, minHeight: 28)
             } else {
-                ForEach(summary.models.prefix(6)) { model in
+                ForEach(summary.models) { model in
                     modelRow(model)
-                }
-                if summary.models.count > 6 {
-                    Text("另有 \(summary.models.count - 6) 个模型")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
                 }
             }
 
@@ -253,7 +260,7 @@ private struct TokenCostDetailCard: View {
                     .font(.caption.weight(.semibold))
                     .lineLimit(1)
                 Spacer(minLength: 6)
-                Text(TokenCostFormatter.amount(model.estimatedCostUSD))
+                Text(TokenCostFormatter.amount(model))
                     .font(.caption)
                     .monospacedDigit()
             }
@@ -294,8 +301,7 @@ private struct TokenCostDetailCard: View {
     }
 
     private var footerText: String {
-        let unpriced = summary.hasUnpricedTokens ? "；未计价模型未纳入金额" : ""
-        return "本机数据，按官方 API 价估算，非实际账单\(unpriced)"
+        "本机数据，按官方 API 价估算，非实际账单"
     }
 
     private var displayedAmount: String {

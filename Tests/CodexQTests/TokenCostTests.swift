@@ -70,40 +70,182 @@ struct TokenCostTests {
         #expect(TokenPricingCatalog.estimatedCost(for: priority) == 1)
     }
 
-    @Test("未知模型保留 Token 占比但不猜测金额")
-    func preservesUnknownModelsWithoutInventingPrice() throws {
-        let now = try date("2026-07-23T12:00:00Z")
-        let snapshot = TokenCostCalculator.snapshot(
-            records: [record(model: "codex-auto-review", at: now, tokens: 500)],
-            now: now,
-            calendar: utcCalendar,
-            subscriptionPeriod: nil
+    @Test("GPT-5.4 按官方标准价、长上下文和 Priority 计价")
+    func pricesGPT54WithOfficialRates() throws {
+        let timestamp = try date("2026-07-23T02:00:00Z")
+        let standard = TokenUsageRecord(
+            timestamp: timestamp,
+            model: "gpt-5.4",
+            inputTokens: 200_000,
+            cachedInputTokens: 100_000,
+            cacheWriteInputTokens: 0,
+            outputTokens: 100_000,
+            totalTokens: 300_000
+        )
+        let longContext = TokenUsageRecord(
+            timestamp: timestamp,
+            model: "gpt-5.4-2026-03-05",
+            inputTokens: 300_000,
+            cachedInputTokens: 0,
+            cacheWriteInputTokens: 0,
+            outputTokens: 10_000,
+            totalTokens: 310_000
+        )
+        let priority = TokenUsageRecord(
+            timestamp: timestamp,
+            model: "gpt-5.4",
+            inputTokens: 100_000,
+            cachedInputTokens: 0,
+            cacheWriteInputTokens: 0,
+            outputTokens: 0,
+            totalTokens: 100_000,
+            serviceTier: .priority
         )
 
-        #expect(snapshot.today.totalTokens == 500)
-        #expect(snapshot.today.models.first?.estimatedCostUSD == nil)
-        #expect(snapshot.today.hasUnpricedTokens)
+        #expect(TokenPricingCatalog.estimatedCost(for: standard) == 1.775)
+        #expect(TokenPricingCatalog.estimatedCost(for: longContext) == 1.725)
+        #expect(TokenPricingCatalog.estimatedCost(for: priority) == 0.5)
     }
 
-    @Test("累计剔除未计价模型和未计价金额标记")
-    func lifetimeExcludesUnpricedModels() throws {
+    @Test("官方文档列价的文本模型和快照都有本地价格")
+    func officialTextModelsAndSnapshotsHaveLocalPricing() {
+        let models = [
+            "gpt-5.6", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
+            "gpt-5.5", "gpt-5.5-2026-04-23", "gpt-5.5-pro", "gpt-5.5-pro-2026-04-23",
+            "gpt-5.4", "gpt-5.4-2026-03-05", "gpt-5.4-mini", "gpt-5.4-mini-2026-03-17",
+            "gpt-5.4-nano", "gpt-5.4-nano-2026-03-17", "gpt-5.4-pro", "gpt-5.4-pro-2026-03-05",
+            "gpt-5.3-codex", "gpt-5.2", "gpt-5.2-2025-12-11", "gpt-5.2-pro",
+            "gpt-5.2-pro-2025-12-11", "gpt-5.2-codex", "gpt-5.1", "gpt-5.1-2025-11-13",
+            "gpt-5.1-codex", "gpt-5.1-codex-max", "gpt-5.1-codex-mini",
+            "gpt-5", "gpt-5-2025-08-07", "gpt-5-mini", "gpt-5-mini-2025-08-07",
+            "gpt-5-nano", "gpt-5-nano-2025-08-07", "gpt-5-pro", "gpt-5-pro-2025-10-06",
+            "gpt-5-chat-latest", "gpt-5.1-chat-latest", "gpt-5.2-chat-latest",
+            "gpt-5.3-chat-latest", "chat-latest", "codex-mini-latest",
+            "o3-pro", "o3-pro-2025-06-10", "o3", "o3-2025-04-16",
+            "o4-mini", "o4-mini-2025-04-16", "o3-mini", "o3-mini-2025-01-31",
+            "o1", "o1-2024-12-17", "o1-preview", "o1-preview-2024-09-12",
+            "o1-mini", "o1-mini-2024-09-12", "o1-pro", "o1-pro-2025-03-19",
+            "gpt-4.1", "gpt-4.1-2025-04-14", "gpt-4.1-mini", "gpt-4.1-mini-2025-04-14",
+            "gpt-4.1-nano", "gpt-4.1-nano-2025-04-14", "gpt-4o", "gpt-4o-2024-08-06",
+            "gpt-4o-2024-11-20", "gpt-4o-2024-05-13", "gpt-4o-mini", "gpt-4o-mini-2024-07-18",
+            "gpt-4.5-preview", "gpt-4.5-preview-2025-02-27", "gpt-4", "gpt-4-0613",
+            "gpt-4-0314", "gpt-4-turbo", "gpt-4-turbo-2024-04-09", "gpt-4-turbo-preview",
+            "gpt-4-0125-preview", "gpt-4-1106-vision-preview", "gpt-3.5-turbo",
+            "gpt-3.5-turbo-0125", "gpt-3.5-turbo-1106", "gpt-3.5-turbo-instruct",
+            "gpt-3.5-turbo-16k", "gpt-3.5-turbo-16k-0613",
+            "davinci-002", "babbage-002", "chatgpt-4o-latest",
+            "computer-use-preview", "computer-use-preview-2025-03-11",
+            "o3-deep-research", "o3-deep-research-2025-06-26",
+            "o4-mini-deep-research", "o4-mini-deep-research-2025-06-26"
+        ]
+
+        #expect(models.allSatisfy { TokenPricingCatalog.pricing(for: $0) != nil })
+    }
+
+    @Test("独立的 Instruct 和 16K 旧模型使用各自的官方价格")
+    func pricesLegacyGPT35ModelsIndividually() throws {
+        let timestamp = try date("2026-07-23T02:00:00Z")
+        let instruct = TokenUsageRecord(
+            timestamp: timestamp,
+            model: "gpt-3.5-turbo-instruct",
+            inputTokens: 1_000_000,
+            cachedInputTokens: 0,
+            cacheWriteInputTokens: 0,
+            outputTokens: 1_000_000,
+            totalTokens: 2_000_000
+        )
+        let longContext = TokenUsageRecord(
+            timestamp: timestamp,
+            model: "gpt-3.5-turbo-16k-0613",
+            inputTokens: 1_000_000,
+            cachedInputTokens: 0,
+            cacheWriteInputTokens: 0,
+            outputTokens: 1_000_000,
+            totalTokens: 2_000_000
+        )
+
+        #expect(TokenPricingCatalog.estimatedCost(for: instruct) == 3.5)
+        #expect(TokenPricingCatalog.estimatedCost(for: longContext) == 7)
+    }
+
+    @Test("同一模型别名按记录时间使用当时价格")
+    func pricesMutableModelAliasAtRecordTimestamp() throws {
+        let launchAlias = TokenUsageRecord(
+            timestamp: try date("2024-06-01T00:00:00Z"),
+            model: "gpt-4o",
+            inputTokens: 1_000_000,
+            cachedInputTokens: 0,
+            cacheWriteInputTokens: 0,
+            outputTokens: 1_000_000,
+            totalTokens: 2_000_000
+        )
+        let discountedAlias = TokenUsageRecord(
+            timestamp: try date("2024-09-01T00:00:00Z"),
+            model: "gpt-4o",
+            inputTokens: 1_000_000,
+            cachedInputTokens: 0,
+            cacheWriteInputTokens: 0,
+            outputTokens: 1_000_000,
+            totalTokens: 2_000_000
+        )
+        let launchSnapshot = TokenUsageRecord(
+            timestamp: try date("2026-07-23T00:00:00Z"),
+            model: "gpt-4o-2024-05-13",
+            inputTokens: 1_000_000,
+            cachedInputTokens: 0,
+            cacheWriteInputTokens: 0,
+            outputTokens: 1_000_000,
+            totalTokens: 2_000_000
+        )
+
+        #expect(TokenPricingCatalog.estimatedCost(for: launchAlias) == 20)
+        #expect(TokenPricingCatalog.estimatedCost(for: discountedAlias) == 12.5)
+        #expect(TokenPricingCatalog.estimatedCost(for: launchSnapshot) == 20)
+    }
+
+    @Test("非 OpenAI 或无官方价格的模型完全不纳入成本")
+    func excludesModelsWithoutOfficialPricing() throws {
         let now = try date("2026-07-23T12:00:00Z")
         let snapshot = TokenCostCalculator.snapshot(
             records: [
                 record(model: "gpt-5.6-sol", at: now, tokens: 100),
-                record(model: "codex-auto-review", at: now, tokens: 500)
+                record(model: "codex-auto-review", at: now, tokens: 500),
+                record(model: "MiniMax-M3", at: now, tokens: 1_000)
             ],
             now: now,
             calendar: utcCalendar,
             subscriptionPeriod: nil
         )
 
-        #expect(snapshot.today.totalTokens == 600)
-        #expect(snapshot.today.hasUnpricedTokens)
+        #expect(snapshot.today.totalTokens == 100)
+        #expect(snapshot.today.models.map(\.model) == ["gpt-5.6-sol"])
         #expect(snapshot.lifetime.totalTokens == 100)
-        #expect(snapshot.lifetime.models.map(\.model) == ["gpt-5.6-sol"])
-        #expect(!snapshot.lifetime.hasUnpricedTokens)
         #expect(TokenCostFormatter.amount(snapshot.lifetime) == "$0.00")
+    }
+
+    @Test("同一 OpenAI 模型缺少历史定价的记录不纳入成本")
+    func excludesRecordsWithoutHistoricalPricing() throws {
+        let snapshot = TokenCostCalculator.snapshot(
+            records: [
+                record(
+                    model: "gpt-4o",
+                    at: try date("2024-01-01T00:00:00Z"),
+                    tokens: 1_000_000
+                ),
+                record(
+                    model: "gpt-4o",
+                    at: try date("2024-09-01T00:00:00Z"),
+                    tokens: 1_000_000
+                )
+            ],
+            now: try date("2026-07-23T12:00:00Z"),
+            calendar: utcCalendar,
+            subscriptionPeriod: nil
+        )
+
+        #expect(snapshot.lifetime.estimatedCostUSD == 2.5)
+        #expect(snapshot.lifetime.totalTokens == 1_000_000)
+        #expect(TokenCostFormatter.amount(snapshot.lifetime) == "$2.50")
     }
 
     @Test("今日、昨日、订阅周期和累计使用各自准确分组")
@@ -252,6 +394,32 @@ struct TokenCostTests {
         #expect(snapshot.today.totalTokens == 110)
     }
 
+    @Test("成本读取器跳过单个不可读会话文件并报告部分数据")
+    func readerSkipsUnreadableSessionFilesAndReportsPartialData() async throws {
+        let home = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let sessions = home.appendingPathComponent(".codex/sessions/2026/07/23", isDirectory: true)
+        try FileManager.default.createDirectory(at: sessions, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: home) }
+
+        let session = """
+        {"timestamp":"2026-07-23T18:00:00.000Z","type":"turn_context","payload":{"model":"gpt-5.6-sol"}}
+        {"timestamp":"2026-07-23T18:00:01.000Z","type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":100,"cached_input_tokens":50,"output_tokens":10,"total_tokens":110}}}}
+        """
+        try session.write(to: sessions.appendingPathComponent("valid.jsonl"), atomically: true, encoding: .utf8)
+        try FileManager.default.createDirectory(
+            at: sessions.appendingPathComponent("unreadable.jsonl", isDirectory: true),
+            withIntermediateDirectories: true
+        )
+
+        let snapshot = try await TokenCostReader(homeDirectory: home).read(
+            now: try date("2026-07-23T20:00:00Z")
+        )
+
+        #expect(snapshot.today.totalTokens == 110)
+        #expect(snapshot.skippedSessionFileCount == 1)
+    }
+
     @Test("成本界面悬浮只高亮并由点击稳定展开面板内模型明细")
     func costSectionKeepsRequestedCompactInteraction() throws {
         let source = try String(
@@ -280,6 +448,9 @@ struct TokenCostTests {
         #expect(!source.contains(".transition("))
         #expect(source.contains("TokenCostDetailCard"))
         #expect(!source.contains(".popover("))
+        #expect(source.contains("ForEach(summary.models) { model in"))
+        #expect(!source.contains("summary.models.prefix(6)"))
+        #expect(!source.contains("另有 \\(summary.models.count - 6) 个模型"))
         #expect(source.contains("非实际账单"))
         #expect(source.contains("本机数据，按官方 API 价估算"))
         #expect(!source.contains("accountLifetimeTokens"))

@@ -44,6 +44,12 @@ struct QuotaPopoverView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             if let snapshot = store.snapshot {
+                if let planName = PlanTypeFormatter.displayName(for: snapshot.planType) {
+                    VStack(spacing: 5) {
+                        PlanHeader(planName: planName)
+                        InsetSeparator()
+                    }
+                }
                 if let fiveHour = snapshot.fiveHour {
                     QuotaRow(
                         title: "5 小时",
@@ -80,7 +86,7 @@ struct QuotaPopoverView: View {
                     .frame(maxWidth: .infinity, minHeight: 80)
             }
 
-            Divider()
+            InsetSeparator()
 
             TokenActivitySection(
                 snapshot: store.tokenActivity,
@@ -89,7 +95,7 @@ struct QuotaPopoverView: View {
                 now: relativeTimeNow
             )
 
-            Divider()
+            InsetSeparator()
 
             TokenCostSection(
                 snapshot: store.tokenCost,
@@ -100,7 +106,7 @@ struct QuotaPopoverView: View {
             )
 
             if let resetCredits = store.snapshot?.resetCredits {
-                Divider()
+                InsetSeparator()
                 ResetCreditsSection(
                     summary: resetCredits,
                     isExpanded: $isResetCreditsExpanded
@@ -108,14 +114,14 @@ struct QuotaPopoverView: View {
             }
 
             if isSettingsExpanded {
-                Divider()
+                InsetSeparator()
                 EmbeddedSettingsView(
                     settings: settings,
                     settingsDidChange: contentDidChange
                 )
             }
 
-            Divider()
+            InsetSeparator()
 
             HStack(spacing: 8) {
                 if let error = store.errorMessage, store.snapshot != nil {
@@ -226,6 +232,81 @@ struct QuotaPopoverView: View {
             updatedAt: store.lastUpdatedAt,
             now: relativeTimeNow
         )
+    }
+}
+
+private struct PlanHeader: View {
+    let planName: String
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 8) {
+            Text("Codex")
+                .font(.system(size: 19, weight: .semibold, design: .rounded))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+
+            Spacer(minLength: 8)
+
+            PlanBadge(planName: planName)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct PlanBadge: View {
+    let planName: String
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Circle().fill(Color.accentColor)
+                .frame(width: 6, height: 6)
+
+            Text(planName)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background {
+            Capsule().fill(.thinMaterial)
+        }
+        .overlay {
+            Capsule()
+                .strokeBorder(Color.primary.opacity(0.10), lineWidth: 1)
+        }
+        .accessibilityLabel("套餐 \(planName)")
+    }
+}
+
+struct InsetSeparator: View {
+    var body: some View {
+        ZStack(alignment: .top) {
+            LinearGradient(
+                colors: [
+                    Color.primary.opacity(0.035),
+                    Color.primary.opacity(0.08),
+                    Color.primary.opacity(0.035)
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+            .frame(height: 1)
+
+            LinearGradient(
+                colors: [
+                    Color(nsColor: .textBackgroundColor).opacity(0.16),
+                    Color(nsColor: .textBackgroundColor).opacity(0.35),
+                    Color(nsColor: .textBackgroundColor).opacity(0.16)
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+            .frame(height: 1)
+            .offset(y: 1)
+        }
+        .frame(height: 2)
     }
 }
 

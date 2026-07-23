@@ -42,6 +42,23 @@ struct TokenCostSnapshot: Equatable, Sendable {
     let subscription: TokenCostPeriodSummary?
     let lifetime: TokenCostPeriodSummary
     let subscriptionPeriod: DateInterval?
+    let skippedSessionFileCount: Int
+
+    init(
+        today: TokenCostPeriodSummary,
+        yesterday: TokenCostPeriodSummary,
+        subscription: TokenCostPeriodSummary?,
+        lifetime: TokenCostPeriodSummary,
+        subscriptionPeriod: DateInterval?,
+        skippedSessionFileCount: Int = 0
+    ) {
+        self.today = today
+        self.yesterday = yesterday
+        self.subscription = subscription
+        self.lifetime = lifetime
+        self.subscriptionPeriod = subscriptionPeriod
+        self.skippedSessionFileCount = skippedSessionFileCount
+    }
 }
 
 struct TokenCostPeriodSummary: Equatable, Sendable, Identifiable {
@@ -58,10 +75,7 @@ struct TokenCostPeriodSummary: Equatable, Sendable, Identifiable {
     var id: Kind { kind }
     var totalTokens: Int64 { models.reduce(0) { $0 + $1.totalTokens } }
     var estimatedCostUSD: Double {
-        models.compactMap(\.estimatedCostUSD).reduce(0, +)
-    }
-    var hasUnpricedTokens: Bool {
-        models.contains { $0.estimatedCostUSD == nil && $0.totalTokens > 0 }
+        models.reduce(0) { $0 + $1.estimatedCostUSD }
     }
 }
 
@@ -72,7 +86,7 @@ struct TokenCostModelSummary: Equatable, Sendable, Identifiable {
     let cacheWriteInputTokens: Int64
     let outputTokens: Int64
     let totalTokens: Int64
-    let estimatedCostUSD: Double?
+    let estimatedCostUSD: Double
 
     var id: String { model }
 }
@@ -87,54 +101,143 @@ struct TokenPricing: Equatable, Sendable {
 }
 
 enum TokenPricingCatalog {
-    static let effectiveDate = "2026-07-09"
+    static let effectiveDate = "2026-07-23"
     static let longContextThreshold: Int64 = 272_000
 
     static func pricing(for model: String) -> TokenPricing? {
-        switch model.lowercased() {
-        case "gpt-5.6", "gpt-5.6-sol":
-            return .init(
-                inputPerMillion: 5,
-                cachedInputPerMillion: 0.5,
-                cacheWritePerMillion: 6.25,
-                outputPerMillion: 30,
-                priorityMultiplier: 2,
-                appliesLongContextPremium: true
-            )
-        case "gpt-5.6-terra":
-            return .init(
-                inputPerMillion: 2.5,
-                cachedInputPerMillion: 0.25,
-                cacheWritePerMillion: 3.125,
-                outputPerMillion: 15,
-                priorityMultiplier: 2,
-                appliesLongContextPremium: true
-            )
-        case "gpt-5.6-luna":
-            return .init(
-                inputPerMillion: 1,
-                cachedInputPerMillion: 0.1,
-                cacheWritePerMillion: 1.25,
-                outputPerMillion: 6,
-                priorityMultiplier: 2,
-                appliesLongContextPremium: true
-            )
-        case "gpt-5.5":
-            return .init(
-                inputPerMillion: 5,
-                cachedInputPerMillion: 0.5,
-                cacheWritePerMillion: 5,
-                outputPerMillion: 30,
-                priorityMultiplier: 2.5,
-                appliesLongContextPremium: true
-            )
-        default:
-            return nil
+        pricing(for: model, at: nil)
+    }
+
+    static func pricing(for model: String, at timestamp: Date?) -> TokenPricing? {
+        let key = model.lowercased()
+        if let timestamp, let history = historicalCatalog[key] {
+            return history.last { $0.effectiveAt <= timestamp }?.pricing
         }
+        return catalog[key]
+    }
+
+    private struct HistoricalPricing: Sendable {
+        let effectiveAt: Date
+        let pricing: TokenPricing
+    }
+
+    private static let catalog: [String: TokenPricing] = {
+        var result: [String: TokenPricing] = [:]
+
+        func add(
+            _ aliases: [String],
+            input: Double,
+            cached: Double? = nil,
+            cacheWrite: Double? = nil,
+            output: Double,
+            priorityMultiplier: Double? = nil,
+            longContext: Bool = false
+        ) {
+            let pricing = TokenPricing(
+                inputPerMillion: input,
+                cachedInputPerMillion: cached ?? input,
+                cacheWritePerMillion: cacheWrite ?? input,
+                outputPerMillion: output,
+                priorityMultiplier: priorityMultiplier ?? 1,
+                appliesLongContextPremium: longContext
+            )
+            for alias in aliases {
+                result[alias.lowercased()] = pricing
+            }
+        }
+
+        add(["gpt-5.6", "gpt-5.6-sol"], input: 5, cached: 0.5, cacheWrite: 6.25, output: 30, priorityMultiplier: 2, longContext: true)
+        add(["gpt-5.6-terra"], input: 2.5, cached: 0.25, cacheWrite: 3.125, output: 15, priorityMultiplier: 2, longContext: true)
+        add(["gpt-5.6-luna"], input: 1, cached: 0.1, cacheWrite: 1.25, output: 6, priorityMultiplier: 2, longContext: true)
+        add(["gpt-5.5", "gpt-5.5-2026-04-23"], input: 5, cached: 0.5, output: 30, priorityMultiplier: 2.5, longContext: true)
+        add(["gpt-5.5-pro", "gpt-5.5-pro-2026-04-23"], input: 30, output: 180, longContext: true)
+        add(["gpt-5.4", "gpt-5.4-2026-03-05"], input: 2.5, cached: 0.25, output: 15, priorityMultiplier: 2, longContext: true)
+        add(["gpt-5.4-mini", "gpt-5.4-mini-2026-03-17"], input: 0.75, cached: 0.075, output: 4.5, priorityMultiplier: 2)
+        add(["gpt-5.4-nano", "gpt-5.4-nano-2026-03-17"], input: 0.2, cached: 0.02, output: 1.25)
+        add(["gpt-5.4-pro", "gpt-5.4-pro-2026-03-05"], input: 30, output: 180, longContext: true)
+        add(["gpt-5.3-codex"], input: 1.75, cached: 0.175, output: 14, priorityMultiplier: 2)
+        add(["gpt-5.2", "gpt-5.2-2025-12-11"], input: 1.75, cached: 0.175, output: 14)
+        add(["gpt-5.2-pro", "gpt-5.2-pro-2025-12-11"], input: 21, output: 168)
+        add(["gpt-5.2-codex"], input: 1.75, cached: 0.175, output: 14)
+        add(["gpt-5.1", "gpt-5.1-2025-11-13"], input: 1.25, cached: 0.125, output: 10)
+        add(["gpt-5.1-codex"], input: 1.25, cached: 0.125, output: 10)
+        add(["gpt-5.1-codex-max"], input: 1.25, cached: 0.125, output: 10)
+        add(["gpt-5.1-codex-mini"], input: 0.25, cached: 0.025, output: 2)
+        add(["gpt-5", "gpt-5-2025-08-07"], input: 1.25, cached: 0.125, output: 10)
+        add(["gpt-5-mini", "gpt-5-mini-2025-08-07"], input: 0.25, cached: 0.025, output: 2)
+        add(["gpt-5-nano", "gpt-5-nano-2025-08-07"], input: 0.05, cached: 0.005, output: 0.4)
+        add(["gpt-5-pro", "gpt-5-pro-2025-10-06"], input: 15, output: 120)
+        add(["gpt-5-chat-latest"], input: 1.25, cached: 0.125, output: 10)
+        add(["gpt-5.1-chat-latest"], input: 1.25, cached: 0.125, output: 10)
+        add(["gpt-5.2-chat-latest"], input: 1.75, cached: 0.175, output: 14)
+        add(["gpt-5.3-chat-latest"], input: 1.75, cached: 0.175, output: 14)
+        add(["chat-latest"], input: 5, cached: 0.5, output: 30)
+
+        add(["codex-mini-latest"], input: 1.5, cached: 0.375, output: 6)
+        add(["o3-pro", "o3-pro-2025-06-10"], input: 20, output: 80)
+        add(["o3", "o3-2025-04-16"], input: 2, cached: 0.5, output: 8)
+        add(["o4-mini", "o4-mini-2025-04-16"], input: 1.1, cached: 0.275, output: 4.4)
+        add(["o3-mini", "o3-mini-2025-01-31"], input: 1.1, cached: 0.55, output: 4.4)
+        add(["o1", "o1-2024-12-17", "o1-preview", "o1-preview-2024-09-12"], input: 15, cached: 7.5, output: 60)
+        add(["o1-mini", "o1-mini-2024-09-12"], input: 1.1, cached: 0.55, output: 4.4)
+        add(["o1-pro", "o1-pro-2025-03-19"], input: 150, output: 600)
+
+        add(["gpt-4.1", "gpt-4.1-2025-04-14"], input: 2, cached: 0.5, output: 8)
+        add(["gpt-4.1-mini", "gpt-4.1-mini-2025-04-14"], input: 0.4, cached: 0.1, output: 1.6)
+        add(["gpt-4.1-nano", "gpt-4.1-nano-2025-04-14"], input: 0.1, cached: 0.025, output: 0.4)
+        add(["gpt-4o", "gpt-4o-2024-08-06", "gpt-4o-2024-11-20"], input: 2.5, cached: 1.25, output: 10)
+        add(["gpt-4o-2024-05-13"], input: 5, output: 15)
+        add(["gpt-4o-mini", "gpt-4o-mini-2024-07-18"], input: 0.15, cached: 0.075, output: 0.6)
+        add(["gpt-4.5-preview", "gpt-4.5-preview-2025-02-27"], input: 75, cached: 37.5, output: 150)
+        add(["gpt-4", "gpt-4-0613", "gpt-4-0314"], input: 30, output: 60)
+        add(["gpt-4-turbo", "gpt-4-turbo-2024-04-09", "gpt-4-turbo-preview", "gpt-4-0125-preview", "gpt-4-1106-vision-preview"], input: 10, output: 30)
+        add(["gpt-3.5-turbo", "gpt-3.5-turbo-0125", "gpt-3.5-turbo-1106"], input: 0.5, output: 1.5)
+        add(["gpt-3.5-turbo-instruct"], input: 1.5, output: 2)
+        add(["gpt-3.5-turbo-16k", "gpt-3.5-turbo-16k-0613"], input: 3, output: 4)
+        add(["davinci-002"], input: 2, output: 2)
+        add(["babbage-002"], input: 0.4, output: 0.4)
+        add(["chatgpt-4o-latest"], input: 5, output: 15)
+
+        add(["computer-use-preview", "computer-use-preview-2025-03-11"], input: 3, output: 12)
+        add(["o3-deep-research", "o3-deep-research-2025-06-26"], input: 10, cached: 2.5, output: 40)
+        add(["o4-mini-deep-research", "o4-mini-deep-research-2025-06-26"], input: 2, cached: 0.5, output: 8)
+
+        return result
+    }()
+
+    private static let historicalCatalog: [String: [HistoricalPricing]] = [
+        "gpt-4o": [
+            HistoricalPricing(
+                effectiveAt: date("2024-05-13T00:00:00Z"),
+                pricing: TokenPricing(
+                    inputPerMillion: 5,
+                    cachedInputPerMillion: 5,
+                    cacheWritePerMillion: 5,
+                    outputPerMillion: 15,
+                    priorityMultiplier: 1,
+                    appliesLongContextPremium: false
+                )
+            ),
+            HistoricalPricing(
+                effectiveAt: date("2024-08-06T00:00:00Z"),
+                pricing: TokenPricing(
+                    inputPerMillion: 2.5,
+                    cachedInputPerMillion: 1.25,
+                    cacheWritePerMillion: 2.5,
+                    outputPerMillion: 10,
+                    priorityMultiplier: 1,
+                    appliesLongContextPremium: false
+                )
+            )
+        ]
+    ]
+
+    private static func date(_ value: String) -> Date {
+        ISO8601DateFormatter().date(from: value)!
     }
 
     static func estimatedCost(for record: TokenUsageRecord) -> Double? {
-        guard let pricing = pricing(for: record.model) else { return nil }
+        guard let pricing = pricing(for: record.model, at: record.timestamp) else { return nil }
         let cached = min(record.cachedInputTokens, record.inputTokens)
         let cacheWrite = min(
             record.cacheWriteInputTokens,
@@ -168,7 +271,8 @@ enum TokenCostCalculator {
         records: [TokenUsageRecord],
         now: Date,
         calendar: Calendar,
-        subscriptionPeriod: DateInterval?
+        subscriptionPeriod: DateInterval?,
+        skippedSessionFileCount: Int = 0
     ) -> TokenCostSnapshot {
         let todayStart = calendar.startOfDay(for: now)
         let tomorrow = calendar.date(byAdding: .day, value: 1, to: todayStart) ?? now
@@ -196,9 +300,10 @@ enum TokenCostCalculator {
             },
             lifetime: summary(
                 kind: .lifetime,
-                records: records.filter { TokenPricingCatalog.pricing(for: $0.model) != nil }
+                records: records
             ),
-            subscriptionPeriod: subscriptionPeriod
+            subscriptionPeriod: subscriptionPeriod,
+            skippedSessionFileCount: skippedSessionFileCount
         )
     }
 
@@ -213,22 +318,18 @@ enum TokenCostCalculator {
             var output: Int64 = 0
             var total: Int64 = 0
             var cost: Double = 0
-            var isPriced = true
         }
 
         var byModel: [String: Accumulator] = [:]
         for record in records {
+            guard let cost = TokenPricingCatalog.estimatedCost(for: record) else { continue }
             var value = byModel[record.model, default: Accumulator()]
             value.input += record.inputTokens
             value.cached += record.cachedInputTokens
             value.cacheWrite += record.cacheWriteInputTokens
             value.output += record.outputTokens
             value.total += record.totalTokens
-            if let cost = TokenPricingCatalog.estimatedCost(for: record) {
-                value.cost += cost
-            } else {
-                value.isPriced = false
-            }
+            value.cost += cost
             byModel[record.model] = value
         }
 
@@ -240,7 +341,7 @@ enum TokenCostCalculator {
                 cacheWriteInputTokens: value.cacheWrite,
                 outputTokens: value.output,
                 totalTokens: value.total,
-                estimatedCostUSD: value.isPriced ? value.cost : nil
+                estimatedCostUSD: value.cost
             )
         }
         .sorted {
@@ -283,13 +384,16 @@ enum SubscriptionPeriodResolver {
 enum TokenCostFormatter {
     static func amount(_ summary: TokenCostPeriodSummary) -> String {
         guard !summary.models.isEmpty else { return "$0.00" }
-        let formatted = dollarAmount(summary.estimatedCostUSD)
-        return summary.hasUnpricedTokens ? formatted + "+" : formatted
+        return dollarAmount(summary.estimatedCostUSD)
     }
 
     static func amount(_ value: Double?) -> String {
         guard let value else { return "未计价" }
         return dollarAmount(value)
+    }
+
+    static func amount(_ model: TokenCostModelSummary) -> String {
+        dollarAmount(model.estimatedCostUSD)
     }
 
     private static func dollarAmount(_ value: Double) -> String {

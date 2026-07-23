@@ -1,5 +1,10 @@
 import Foundation
 
+private enum TokenRefreshResult: Sendable {
+    case activity(TokenActivitySnapshot?, String?)
+    case cost(TokenCostSnapshot?, String?)
+}
+
 @MainActor
 final class QuotaStore: ObservableObject {
     @Published private(set) var snapshot: QuotaSnapshot?
@@ -14,9 +19,10 @@ final class QuotaStore: ObservableObject {
     @Published private(set) var lastUpdatedAt: Date?
     @Published private(set) var isPopoverPresented = false
 
-    private let readRateLimits: () async throws -> QuotaSnapshot
-    private let readTokenActivity: () async throws -> TokenActivitySnapshot
-    private let readTokenCost: () async throws -> TokenCostSnapshot
+    private let readDashboardSnapshots: (@Sendable () async throws -> AppServerSnapshots)?
+    private let readRateLimits: @Sendable () async throws -> QuotaSnapshot
+    private let readTokenActivity: @Sendable () async throws -> TokenActivitySnapshot
+    private let readTokenCost: @Sendable () async throws -> TokenCostSnapshot
     private let saveCachedSnapshot: (CachedQuotaSnapshot) -> Void
     private let notifyQuotaCrossings: (QuotaSnapshot?, QuotaSnapshot) async -> Void
     private var refreshTask: Task<Void, Never>?
@@ -24,21 +30,32 @@ final class QuotaStore: ObservableObject {
     private var tokenActivityGeneration = 0
 
     init(
-        readRateLimits: @escaping () async throws -> QuotaSnapshot = {
-            try await AppServerClient().readRateLimits()
-        },
-        readTokenActivity: @escaping () async throws -> TokenActivitySnapshot = {
-            try await AppServerClient().readTokenActivity()
-        },
-        readTokenCost: @escaping () async throws -> TokenCostSnapshot = {
+        readDashboardSnapshots: (@Sendable () async throws -> AppServerSnapshots)? = nil,
+        readRateLimits: (@Sendable () async throws -> QuotaSnapshot)? = nil,
+        readTokenActivity: (@Sendable () async throws -> TokenActivitySnapshot)? = nil,
+        readTokenCost: @escaping @Sendable () async throws -> TokenCostSnapshot = {
             try await readCurrentTokenCost()
         },
         loadCachedSnapshot: () -> CachedQuotaSnapshot? = SnapshotCache.load,
         saveCachedSnapshot: @escaping (CachedQuotaSnapshot) -> Void = SnapshotCache.save,
         notifyQuotaCrossings: ((QuotaSnapshot?, QuotaSnapshot) async -> Void)? = nil
     ) {
-        self.readRateLimits = readRateLimits
-        self.readTokenActivity = readTokenActivity
+        let hasSeparateAppServerReaders = readRateLimits != nil || readTokenActivity != nil
+        if let readDashboardSnapshots {
+            self.readDashboardSnapshots = readDashboardSnapshots
+        } else if hasSeparateAppServerReaders {
+            self.readDashboardSnapshots = nil
+        } else {
+            self.readDashboardSnapshots = { @Sendable in
+                try await AppServerClient().readDashboardSnapshots()
+            }
+        }
+        self.readRateLimits = readRateLimits ?? {
+            try await AppServerClient().readRateLimits()
+        }
+        self.readTokenActivity = readTokenActivity ?? {
+            try await AppServerClient().readTokenActivity()
+        }
         self.readTokenCost = readTokenCost
         self.saveCachedSnapshot = saveCachedSnapshot
         self.notifyQuotaCrossings = notifyQuotaCrossings ?? { previous, current in
@@ -113,11 +130,23 @@ final class QuotaStore: ObservableObject {
         guard !isRefreshing else { return false }
         isRefreshing = true
         defer { isRefreshing = false }
-        startTokenActivityRefreshIfNeeded()
+        if readDashboardSnapshots != nil {
+            startTokenCostRefreshIfNeeded()
+        } else {
+            startTokenActivityRefreshIfNeeded()
+        }
 
         var quotaSucceeded = false
         do {
-            let newSnapshot = try await readRateLimits()
+            let newSnapshot: QuotaSnapshot
+            if let readDashboardSnapshots {
+                let dashboard = try await readDashboardSnapshots()
+                newSnapshot = dashboard.quota
+                tokenActivity = dashboard.tokenActivity
+                tokenActivityErrorMessage = nil
+            } else {
+                newSnapshot = try await readRateLimits()
+            }
             let updatedAt = Date()
             let previousSnapshot = snapshot
             let resolvedSnapshot = Self.preservingRecentResetCreditDetails(
@@ -163,7 +192,8 @@ final class QuotaStore: ObservableObject {
             resetCredits: ResetCreditsSummary(
                 availableCount: summary.availableCount,
                 credits: recentCredits
-            )
+            ),
+            planType: snapshot.planType
         )
     }
 
@@ -173,7 +203,6 @@ final class QuotaStore: ObservableObject {
         defer { isRefreshButtonBusy = false }
 
         _ = await refresh()
-        await tokenActivityTask?.value
     }
 
     private func startTokenActivityRefreshIfNeeded() {
@@ -189,8 +218,65 @@ final class QuotaStore: ObservableObject {
                     self.tokenActivityTask = nil
                 }
             }
-            async let activityResult = readTokenActivity()
+            await withTaskGroup(of: TokenRefreshResult.self) { group in
+                group.addTask {
+                    do {
+                        return .activity(try await readTokenActivity(), nil)
+                    } catch is CancellationError {
+                        return .activity(nil, nil)
+                    } catch {
+                        return .activity(nil, error.localizedDescription)
+                    }
+                }
+                group.addTask {
+                    do {
+                        return .cost(try await readTokenCost(), nil)
+                    } catch is CancellationError {
+                        return .cost(nil, nil)
+                    } catch {
+                        return .cost(nil, error.localizedDescription)
+                    }
+                }
 
+                for await result in group {
+                    guard let self,
+                          self.tokenActivityGeneration == generation,
+                          !Task.isCancelled else { return }
+
+                    switch result {
+                    case let .activity(activity, errorMessage):
+                        if let activity {
+                            self.tokenActivity = activity
+                            self.tokenActivityErrorMessage = nil
+                        } else if let errorMessage {
+                            self.tokenActivityErrorMessage = errorMessage
+                        }
+                    case let .cost(cost, errorMessage):
+                        if let cost {
+                            self.tokenCost = cost
+                            self.tokenCostErrorMessage = nil
+                        } else if let errorMessage {
+                            self.tokenCostErrorMessage = errorMessage
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func startTokenCostRefreshIfNeeded() {
+        guard tokenActivityTask == nil else { return }
+        tokenActivityGeneration += 1
+        let generation = tokenActivityGeneration
+        isTokenActivityRefreshing = true
+
+        tokenActivityTask = Task { [weak self, readTokenCost] in
+            defer {
+                if let self, self.tokenActivityGeneration == generation {
+                    self.isTokenActivityRefreshing = false
+                    self.tokenActivityTask = nil
+                }
+            }
             do {
                 let cost = try await readTokenCost()
                 guard let self,
@@ -204,25 +290,7 @@ final class QuotaStore: ObservableObject {
                 guard let self,
                       self.tokenActivityGeneration == generation,
                       !Task.isCancelled else { return }
-                self.tokenCost = nil
                 self.tokenCostErrorMessage = error.localizedDescription
-            }
-
-            do {
-                let activity = try await activityResult
-                guard let self,
-                      self.tokenActivityGeneration == generation,
-                      !Task.isCancelled else { return }
-                self.tokenActivity = activity
-                self.tokenActivityErrorMessage = nil
-            } catch is CancellationError {
-                return
-            } catch {
-                guard let self,
-                      self.tokenActivityGeneration == generation,
-                      !Task.isCancelled else { return }
-                self.tokenActivity = nil
-                self.tokenActivityErrorMessage = error.localizedDescription
             }
         }
     }

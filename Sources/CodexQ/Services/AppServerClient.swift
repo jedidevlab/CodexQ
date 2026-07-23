@@ -1,6 +1,11 @@
 import Darwin
 import Foundation
 
+struct AppServerSnapshots: Sendable {
+    let quota: QuotaSnapshot
+    let tokenActivity: TokenActivitySnapshot
+}
+
 struct AppServerClient: Sendable {
     enum ClientError: LocalizedError {
         case executableMissing
@@ -49,15 +54,18 @@ struct AppServerClient: Sendable {
 
     private let executableURLs: [URL]
     private let responseTimeout: TimeInterval
+    private let environment: [String: String]
     private let readResetCreditDetails: @Sendable () async throws -> ResetCreditsSummary?
 
     init(
         executableURL: URL? = nil,
         responseTimeout: TimeInterval = 10,
+        environment: [String: String] = [:],
         readResetCreditDetails: (@Sendable () async throws -> ResetCreditsSummary?)? = nil
     ) {
         executableURLs = executableURL.map { [$0] } ?? Self.defaultExecutableURLs
         self.responseTimeout = responseTimeout
+        self.environment = environment
         self.readResetCreditDetails = readResetCreditDetails ?? {
             try await ResetCreditDetailsClient().read()
         }
@@ -76,9 +84,9 @@ struct AppServerClient: Sendable {
     }
 
     func readRateLimits() async throws -> QuotaSnapshot {
-        let snapshot = try await Task.detached(priority: .utility) {
+        let snapshot = try await runSynchronously {
             try readRateLimitsSynchronously()
-        }.value
+        }
         guard Self.shouldReadResetCreditDetails(for: snapshot.resetCredits),
               let details = try? await readResetCreditDetails() else {
             return snapshot
@@ -86,18 +94,39 @@ struct AppServerClient: Sendable {
         return QuotaSnapshot(
             fiveHour: snapshot.fiveHour,
             weekly: snapshot.weekly,
-            resetCredits: details
+            resetCredits: details,
+            planType: snapshot.planType
         )
     }
 
     func readTokenActivity() async throws -> TokenActivitySnapshot {
-        try await Task.detached(priority: .utility) {
+        try await runSynchronously {
             try readTokenActivitySynchronously()
-        }.value
+        }
+    }
+
+    func readDashboardSnapshots() async throws -> AppServerSnapshots {
+        try await runSynchronously {
+            try readDashboardSnapshotsSynchronously()
+        }
+    }
+
+    private func runSynchronously<T: Sendable>(
+        _ operation: @escaping @Sendable () throws -> T
+    ) async throws -> T {
+        let task = Task.detached(priority: .utility) {
+            try Task.checkCancellation()
+            return try operation()
+        }
+        return try await withTaskCancellationHandler {
+            try await task.value
+        } onCancel: {
+            task.cancel()
+        }
     }
 
     private func readRateLimitsSynchronously() throws -> QuotaSnapshot {
-        guard let result = try readResult(method: "account/rateLimits/read") else {
+        guard let result = try readResults(methods: ["account/rateLimits/read"])["account/rateLimits/read"] else {
             throw ClientError.serverError("未知错误")
         }
 
@@ -111,7 +140,7 @@ struct AppServerClient: Sendable {
     }
 
     private func readTokenActivitySynchronously() throws -> TokenActivitySnapshot {
-        guard let result = try readResult(method: "account/usage/read") else {
+        guard let result = try readResults(methods: ["account/usage/read"])["account/usage/read"] else {
             throw ClientError.missingTokenActivity
         }
 
@@ -119,7 +148,29 @@ struct AppServerClient: Sendable {
         return try JSONDecoder().decode(TokenActivitySnapshot.self, from: data)
     }
 
-    private func readResult(method: String) throws -> Any? {
+    private func readDashboardSnapshotsSynchronously() throws -> AppServerSnapshots {
+        let results = try readResults(methods: [
+            "account/rateLimits/read",
+            "account/usage/read"
+        ])
+        guard let rateLimitsResult = results["account/rateLimits/read"] else {
+            throw ClientError.serverError("未知错误")
+        }
+        guard let usageResult = results["account/usage/read"] else {
+            throw ClientError.missingTokenActivity
+        }
+
+        let rateLimitsData = try JSONSerialization.data(withJSONObject: rateLimitsResult)
+        let usageData = try JSONSerialization.data(withJSONObject: usageResult)
+        let decodedRateLimits = try JSONDecoder().decode(RateLimitsResponse.self, from: rateLimitsData)
+        let tokenActivity = try JSONDecoder().decode(TokenActivitySnapshot.self, from: usageData)
+        guard let quota = decodedRateLimits.quotaSnapshot else {
+            throw ClientError.missingRateLimits
+        }
+        return AppServerSnapshots(quota: quota, tokenActivity: tokenActivity)
+    }
+
+    private func readResults(methods: [String]) throws -> [String: Any] {
         guard let executableURL = Self.firstExecutableURL(in: executableURLs) else {
             throw ClientError.executableMissing
         }
@@ -133,6 +184,7 @@ struct AppServerClient: Sendable {
         process.standardInput = inputPipe
         process.standardOutput = outputPipe
         process.standardError = FileHandle.nullDevice
+        process.environment = ProcessInfo.processInfo.environment.merging(environment) { _, new in new }
 
         do {
             try process.run()
@@ -167,14 +219,21 @@ struct AppServerClient: Sendable {
         try validate(initializeResponse)
 
         try write(["method": "initialized"], to: inputPipe.fileHandleForWriting)
-        try write(
-            ["method": method, "id": 2],
-            to: inputPipe.fileHandleForWriting
-        )
+        var results: [String: Any] = [:]
+        for (index, method) in methods.enumerated() {
+            let id = index + 2
+            try write(
+                ["method": method, "id": id],
+                to: inputPipe.fileHandleForWriting
+            )
 
-        let response = try readResponse(id: 2, from: outputPipe.fileHandleForReading)
-        try validate(response)
-        return response["result"]
+            let response = try readResponse(id: id, from: outputPipe.fileHandleForReading)
+            try validate(response)
+            if let result = response["result"] {
+                results[method] = result
+            }
+        }
+        return results
     }
 
     private func write(_ object: [String: Any], to handle: FileHandle) throws {
@@ -191,6 +250,7 @@ struct AppServerClient: Sendable {
         let deadline = ProcessInfo.processInfo.systemUptime + responseTimeout
 
         while true {
+            try Task.checkCancellation()
             let remaining = deadline - ProcessInfo.processInfo.systemUptime
             guard remaining > 0 else {
                 throw ClientError.responseTimedOut
@@ -204,12 +264,10 @@ struct AppServerClient: Sendable {
             let pollResult = Darwin.poll(
                 &descriptor,
                 1,
-                Int32(min(remaining * 1_000, Double(Int32.max)))
+                Int32(min(remaining * 1_000, 100))
             )
 
-            if pollResult == 0 {
-                throw ClientError.responseTimedOut
-            }
+            if pollResult == 0 { continue }
             if pollResult < 0 {
                 if errno == EINTR { continue }
                 throw ClientError.serverClosed

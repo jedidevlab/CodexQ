@@ -4,6 +4,7 @@ struct QuotaSnapshot: Codable, Equatable, Sendable {
     let fiveHour: QuotaWindow?
     let weekly: QuotaWindow
     let resetCredits: ResetCreditsSummary?
+    let planType: String?
 
     var statusRemainingPercent: Double {
         fiveHour?.remainingPercent ?? weekly.remainingPercent
@@ -12,11 +13,29 @@ struct QuotaSnapshot: Codable, Equatable, Sendable {
     init(
         fiveHour: QuotaWindow?,
         weekly: QuotaWindow,
-        resetCredits: ResetCreditsSummary? = nil
+        resetCredits: ResetCreditsSummary? = nil,
+        planType: String? = nil
     ) {
         self.fiveHour = fiveHour
         self.weekly = weekly
         self.resetCredits = resetCredits
+        self.planType = planType
+    }
+}
+
+enum PlanTypeFormatter {
+    static func displayName(for planType: String?) -> String? {
+        guard let planType, !planType.isEmpty else { return nil }
+        switch planType.lowercased() {
+        case "prolite": return "Pro 5x"
+        case "pro": return "Pro 20x"
+        case "plus": return "Plus"
+        case "free": return "Free"
+        case "team": return "Team"
+        case "business": return "Business"
+        case "enterprise": return "Enterprise"
+        default: return planType
+        }
     }
 }
 
@@ -158,7 +177,8 @@ struct RateLimitsResponse: Decodable {
         return QuotaSnapshot(
             fiveHour: limits.fiveHour,
             weekly: limits.weekly,
-            resetCredits: rateLimitResetCredits?.summary
+            resetCredits: rateLimitResetCredits?.summary,
+            planType: limits.planType
         )
     }
 }
@@ -242,8 +262,19 @@ struct RateLimitResetCreditDetails: Decodable {
 }
 
 struct RateLimitSnapshot: Decodable {
+    let planType: String?
     let primary: RateLimitWindow?
     let secondary: RateLimitWindow?
+
+    init(
+        planType: String? = nil,
+        primary: RateLimitWindow?,
+        secondary: RateLimitWindow?
+    ) {
+        self.planType = planType
+        self.primary = primary
+        self.secondary = secondary
+    }
 
     var quotaSnapshot: QuotaSnapshot? {
         let windows = [primary, secondary].compactMap { $0 }
@@ -255,7 +286,8 @@ struct RateLimitSnapshot: Decodable {
         guard let weekly else { return nil }
         return QuotaSnapshot(
             fiveHour: fiveHour?.quotaWindow,
-            weekly: weekly.quotaWindow
+            weekly: weekly.quotaWindow,
+            planType: planType
         )
     }
 }

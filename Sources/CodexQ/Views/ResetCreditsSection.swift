@@ -60,7 +60,7 @@ struct ResetCreditsSection: View {
                             .padding(.vertical, 6)
 
                             if row.id != presentation.rows.last?.id {
-                                Divider()
+                                InsetSeparator()
                             }
                         }
                     }
