@@ -89,6 +89,16 @@ struct QuotaPopoverView: View {
                 now: relativeTimeNow
             )
 
+            Divider()
+
+            TokenCostSection(
+                snapshot: store.tokenCost,
+                errorMessage: store.tokenCostErrorMessage,
+                isRefreshing: store.isTokenActivityRefreshing,
+                isPresented: store.isPopoverPresented,
+                contentDidChange: contentDidChange
+            )
+
             if let resetCredits = store.snapshot?.resetCredits {
                 Divider()
                 ResetCreditsSection(

@@ -104,6 +104,18 @@ final class StatusBarController: NSObject {
             }
             .store(in: &cancellables)
 
+        store.$tokenCost
+            .sink { [weak self] _ in
+                self?.schedulePanelRefit()
+            }
+            .store(in: &cancellables)
+
+        store.$tokenCostErrorMessage
+            .sink { [weak self] _ in
+                self?.schedulePanelRefit()
+            }
+            .store(in: &cancellables)
+
         store.$isTokenActivityRefreshing
             .removeDuplicates()
             .sink { [weak self] _ in
