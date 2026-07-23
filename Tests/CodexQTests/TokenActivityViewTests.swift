@@ -25,6 +25,7 @@ struct TokenActivityViewTests {
                 await activityGate.wait()
                 return .init(peakDailyTokens: 0, days: [])
             },
+            readTokenCost: { emptyTokenCostSnapshot() },
             loadCachedSnapshot: { nil },
             saveCachedSnapshot: { _ in },
             notifyQuotaCrossings: { _, _ in }
@@ -61,6 +62,7 @@ struct TokenActivityViewTests {
                 for await _ in release.stream { break }
                 throw ActivityFixtureError.unavailable
             },
+            readTokenCost: { emptyTokenCostSnapshot() },
             loadCachedSnapshot: { nil },
             saveCachedSnapshot: { _ in },
             notifyQuotaCrossings: { _, _ in }
@@ -85,6 +87,39 @@ struct TokenActivityViewTests {
         #expect(activityCallCount == 1)
     }
 
+    @Test("挂起的 Token 活动不阻塞并发 Token 成本结果")
+    @MainActor
+    func suspendedActivityDoesNotDelayTokenCost() async {
+        let activityStarted = AsyncStream<Void>.makeStream()
+        let releaseActivity = AsyncStream<Void>.makeStream()
+        var activityStartedIterator = activityStarted.stream.makeAsyncIterator()
+        let expectedCost = emptyTokenCostSnapshot()
+        let quota = QuotaSnapshot(
+            fiveHour: .init(usedPercent: 25, resetsAt: nil, durationMinutes: 300),
+            weekly: .init(usedPercent: 40, resetsAt: nil, durationMinutes: 10_080)
+        )
+        let store = QuotaStore(
+            readRateLimits: { quota },
+            readTokenActivity: {
+                activityStarted.continuation.yield()
+                for await _ in releaseActivity.stream { break }
+                return .init(peakDailyTokens: 0, days: [])
+            },
+            readTokenCost: { expectedCost },
+            loadCachedSnapshot: { nil },
+            saveCachedSnapshot: { _ in },
+            notifyQuotaCrossings: { _, _ in }
+        )
+
+        #expect(await store.refresh())
+        _ = await activityStartedIterator.next()
+        await Task.yield()
+
+        #expect(store.tokenCost == expectedCost)
+        #expect(store.isTokenActivityRefreshing)
+        releaseActivity.continuation.yield()
+    }
+
     @Test("Token 活动失败不回滚额度缓存和通知")
     @MainActor
     func activityFailurePreservesQuotaSideEffects() async {
@@ -97,6 +132,7 @@ struct TokenActivityViewTests {
         let store = QuotaStore(
             readRateLimits: { quota },
             readTokenActivity: { throw ActivityFixtureError.unavailable },
+            readTokenCost: { emptyTokenCostSnapshot() },
             loadCachedSnapshot: { nil },
             saveCachedSnapshot: { _ in cacheSaveCount += 1 },
             notifyQuotaCrossings: { _, _ in notificationCallCount += 1 }
@@ -121,6 +157,45 @@ struct TokenActivityViewTests {
         withExtendedLifetime(cancellable) {}
     }
 
+    @Test("重置明细瞬时缺失时保留同次数下尚未到期的最近明细")
+    @MainActor
+    func transientMissingResetCreditDetailsPreserveRecentDetails() async {
+        let now = Date()
+        let credit = ResetCredit(
+            id: "credit-1",
+            resetType: "codexRateLimits",
+            status: "available",
+            title: "完整额度重置",
+            expiresAt: now.addingTimeInterval(3_600)
+        )
+        let cachedSnapshot = QuotaSnapshot(
+            fiveHour: .init(usedPercent: 25, resetsAt: nil, durationMinutes: 300),
+            weekly: .init(usedPercent: 40, resetsAt: nil, durationMinutes: 10_080),
+            resetCredits: .init(availableCount: 1, credits: [credit])
+        )
+        let incompleteSnapshot = QuotaSnapshot(
+            fiveHour: .init(usedPercent: 30, resetsAt: nil, durationMinutes: 300),
+            weekly: .init(usedPercent: 45, resetsAt: nil, durationMinutes: 10_080),
+            resetCredits: .init(availableCount: 1, credits: nil)
+        )
+        var savedSnapshot: CachedQuotaSnapshot?
+        let store = QuotaStore(
+            readRateLimits: { incompleteSnapshot },
+            readTokenActivity: { .init(peakDailyTokens: 0, days: []) },
+            readTokenCost: { emptyTokenCostSnapshot() },
+            loadCachedSnapshot: {
+                CachedQuotaSnapshot(snapshot: cachedSnapshot, updatedAt: now)
+            },
+            saveCachedSnapshot: { savedSnapshot = $0 },
+            notifyQuotaCrossings: { _, _ in }
+        )
+
+        #expect(await store.refresh())
+        #expect(store.snapshot?.fiveHour?.usedPercent == 30)
+        #expect(store.snapshot?.resetCredits?.availableCredits == [credit])
+        #expect(savedSnapshot?.snapshot.resetCredits?.availableCredits == [credit])
+    }
+
     @Test("后台重试期间保留已有错误，直到刷新真正恢复")
     @MainActor
     func retryKeepsExistingFailureVisibleUntilSuccess() async {
@@ -143,6 +218,7 @@ struct TokenActivityViewTests {
                 return quota
             },
             readTokenActivity: { throw ActivityFixtureError.unavailable },
+            readTokenCost: { emptyTokenCostSnapshot() },
             loadCachedSnapshot: { nil },
             saveCachedSnapshot: { _ in },
             notifyQuotaCrossings: { _, _ in }
@@ -189,6 +265,7 @@ struct TokenActivityViewTests {
                 }
                 return .init(peakDailyTokens: 0, days: [])
             },
+            readTokenCost: { emptyTokenCostSnapshot() },
             loadCachedSnapshot: { nil },
             saveCachedSnapshot: { _ in },
             notifyQuotaCrossings: { _, _ in }
@@ -209,17 +286,19 @@ struct TokenActivityViewTests {
         secondGate.open()
     }
 
-    @Test("弹窗依次展示 Token 活动、限额重置和设置")
-    func popoverOrdersTokenActivityBeforeResetCreditsAndSettings() throws {
+    @Test("弹窗依次展示 Token 活动、Token 成本、限额重置和设置")
+    func popoverOrdersTokenActivityAndCostBeforeResetCreditsAndSettings() throws {
         let source = try String(
             contentsOfFile: "Sources/CodexQ/Views/QuotaPopoverView.swift",
             encoding: .utf8
         )
         let activityIndex = try #require(source.range(of: "TokenActivitySection("))
+        let costIndex = try #require(source.range(of: "TokenCostSection("))
         let resetCreditsIndex = try #require(source.range(of: "ResetCreditsSection("))
         let settingsIndex = try #require(source.range(of: "EmbeddedSettingsView("))
 
-        #expect(activityIndex.lowerBound < resetCreditsIndex.lowerBound)
+        #expect(activityIndex.lowerBound < costIndex.lowerBound)
+        #expect(costIndex.lowerBound < resetCreditsIndex.lowerBound)
         #expect(activityIndex.lowerBound < settingsIndex.lowerBound)
         #expect(resetCreditsIndex.lowerBound < settingsIndex.lowerBound)
     }
@@ -541,4 +620,15 @@ private final class ActivityGate {
 
 private enum ActivityFixtureError: Error {
     case unavailable
+}
+
+private func emptyTokenCostSnapshot() -> TokenCostSnapshot {
+    let today = TokenCostPeriodSummary(kind: .today, models: [])
+    return TokenCostSnapshot(
+        today: today,
+        yesterday: TokenCostPeriodSummary(kind: .yesterday, models: []),
+        subscription: nil,
+        lifetime: TokenCostPeriodSummary(kind: .lifetime, models: []),
+        subscriptionPeriod: nil
+    )
 }

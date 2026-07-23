@@ -9,13 +9,14 @@
   <a href="https://github.com/jedidevlab/CodexQ/releases/latest">Download latest</a>
 </p>
 
-CodexQ is a native macOS menu bar utility. It brings ChatGPT (formerly Codex) five-hour and weekly quota, remaining capacity, projected run-out time, and the past three months of Token activity into one floating panel.
+CodexQ is a native macOS menu bar utility. It brings ChatGPT (formerly Codex) five-hour and weekly quota, remaining capacity, projected run-out time, Token activity, and local Token cost estimates into one floating panel.
 
 ## Your usage pace at a glance
 
 - **Quota progress:** follow five-hour and weekly limits together; a temporarily absent five-hour window is clearly shown as unlimited.
 - **Run-out projection:** see whether your current pace is sustainable and when the quota may run out.
 - **Token activity:** review three months of daily activity plus the latest completed day and lifetime Token usage.
+- **Token cost:** estimate yesterday, the current subscription period, and lifetime cost from local session usage, with model details on demand.
 - **Timely alerts:** enable automatic refresh, launch at login, and quota warnings at 20%, 10%, or 5%.
 - **Native experience:** built with SwiftUI and AppKit to stay available without interrupting your work.
 
@@ -25,8 +26,8 @@ Download the archive for your Mac from [GitHub Releases](https://github.com/jedi
 
 | Mac | Archive |
 | --- | --- |
-| Apple Silicon | `CodexQ-1.0.15-arm64.zip` |
-| Intel | `CodexQ-1.0.15-x86_64.zip` |
+| Apple Silicon | `CodexQ-1.0.16-arm64.zip` |
+| Intel | `CodexQ-1.0.16-x86_64.zip` |
 
 Unzip the archive, then move `CodexQ.app` to Applications.
 
@@ -67,15 +68,15 @@ swift test
 Build an ad-hoc signed archive:
 
 ```bash
-./script/package_release.sh 1.0.15 arm64
-./script/package_release.sh 1.0.15 x86_64
+./script/package_release.sh 1.0.16 arm64
+./script/package_release.sh 1.0.16 x86_64
 ```
 
 The archive is written to:
 
 ```text
-dist/CodexQ-1.0.15-arm64.zip
-dist/CodexQ-1.0.15-x86_64.zip
+dist/CodexQ-1.0.16-arm64.zip
+dist/CodexQ-1.0.16-x86_64.zip
 ```
 
 The helper script builds a local `.app` bundle in `dist/CodexQ.app` for development use. Generated build artifacts are excluded from Git.

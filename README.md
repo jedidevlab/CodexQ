@@ -9,13 +9,14 @@
   <a href="https://github.com/jedidevlab/CodexQ/releases/latest">下载最新版</a>
 </p>
 
-CodexQ 是一款原生 macOS 菜单栏工具。它把ChatGPT（原Codex）5 小时与周限额、剩余额度、预计耗尽时间和每日 Token 活动集中在一个浮动面板中显示。
+CodexQ 是一款原生 macOS 菜单栏工具。它把ChatGPT（原Codex）5 小时与周限额、剩余额度、预计耗尽时间、每日 Token 活动和本机 Token 成本集中在一个浮动面板中显示。
 
 ## 一眼掌握使用节奏
 
 - **额度进度**：同时查看 5 小时与周限额；临时没有 5 小时限制时会明确显示“无限制”。
 - **耗尽预测**：根据当前使用节奏判断额度是否够用，并显示预计耗尽时间。
 - **Token 活动**：查看按弹窗宽度自动扩展的每日热力图、最近完整日与累计 Token 用量。
+- **Token 成本**：按本机会话用量估算昨日、本订阅周期与累计成本，并可查看模型明细。
 - **及时提醒**：支持自动刷新、登录时启动，以及 20% / 10% / 5% 额度预警。
 - **原生体验**：使用 SwiftUI 与 AppKit 构建，常驻菜单栏，不打断当前工作。
 
@@ -25,8 +26,8 @@ CodexQ 是一款原生 macOS 菜单栏工具。它把ChatGPT（原Codex）5 小�
 
 | Mac | 安装包 |
 | --- | --- |
-| Apple Silicon | `CodexQ-1.0.15-arm64.zip` |
-| Intel | `CodexQ-1.0.15-x86_64.zip` |
+| Apple Silicon | `CodexQ-1.0.16-arm64.zip` |
+| Intel | `CodexQ-1.0.16-x86_64.zip` |
 
 解压后，将 `CodexQ.app` 移入“应用程序”文件夹。
 
@@ -67,15 +68,15 @@ swift test
 生成 ad-hoc 签名的安装包：
 
 ```bash
-./script/package_release.sh 1.0.15 arm64
-./script/package_release.sh 1.0.15 x86_64
+./script/package_release.sh 1.0.16 arm64
+./script/package_release.sh 1.0.16 x86_64
 ```
 
 生成文件位于：
 
 ```text
-dist/CodexQ-1.0.15-arm64.zip
-dist/CodexQ-1.0.15-x86_64.zip
+dist/CodexQ-1.0.16-arm64.zip
+dist/CodexQ-1.0.16-x86_64.zip
 ```
 
 开发运行脚本会在 `dist/CodexQ.app` 生成本地 `.app` bundle；构建产物不会提交到 Git。
