@@ -380,14 +380,10 @@ private struct EmbeddedSettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
-            Toggle("iCloud 成本同步", isOn: costSyncBinding)
-
-            if settings.icloudCostSyncEnabled {
-                HStack(spacing: 6) {
-                    Text(settings.icloudCostSyncFolderName ?? "未选择文件夹")
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                    Spacer(minLength: 4)
+            HStack(spacing: 6) {
+                Toggle("iCloud 同步", isOn: costSyncBinding)
+                Spacer(minLength: 4)
+                if settings.icloudCostSyncEnabled {
                     Button("更换文件夹…") {
                         chooseCostSyncFolder()
                     }
@@ -459,14 +455,9 @@ private struct CostSyncImpactCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            impactRow(
-                title: "Token 活动",
-                detail: isEnabled && isDelayed
-                    ? "账号数据，仍可正常刷新"
-                    : "账号数据，不受此设置影响"
-            )
-            impactRow(title: "Token 成本", detail: costDetail)
-            Text("只同步模型、时间和 Token 数，不同步会话内容或登录信息。")
+            Text(impactSummary)
+                .fixedSize(horizontal: false, vertical: true)
+            Text("仅同步模型、时间和 Token 数；不含会话内容和登录信息。")
                 .font(.system(size: 9))
                 .foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -486,15 +477,6 @@ private struct CostSyncImpactCard: View {
         }
     }
 
-    private func impactRow(title: String, detail: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 6) {
-            Text(title)
-                .fontWeight(.semibold)
-            Text(detail)
-                .foregroundStyle(.secondary)
-        }
-    }
-
     private var isDelayed: Bool {
         switch dataScope {
         case .syncDelayed, .syncBlocked: return true
@@ -502,14 +484,16 @@ private struct CostSyncImpactCard: View {
         }
     }
 
-    private var costDetail: String {
-        guard isEnabled else { return "仅统计这台 Mac" }
+    private var impactSummary: String {
+        guard isEnabled else {
+            return "未开启：Token 活动不受影响；Token 成本仅统计本机。"
+        }
         if case .syncBlocked = dataScope {
-            return "同步暂停，仅统计这台 Mac"
+            return "已开启：Token 活动不受影响；同步暂停，Token 成本暂时仅统计本机。"
         }
         return isDelayed
-            ? "暂用本机与上次成功同步的数据"
-            : "合并所选文件夹内的设备账本"
+            ? "已开启：Token 活动不受影响；Token 成本暂用本机与上次同步数据。"
+            : "已开启：Token 活动不受影响；Token 成本汇总多台 Mac。"
     }
 }
 
