@@ -87,18 +87,66 @@ actor TokenCostReader {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = .autoupdatingCurrent
         let subscriptionPeriod = try? subscriptionPeriod(now: now)
-        let uniqueRecords = Array(Set(records)).sorted {
+        let uniqueRecords = Self.mergedRecords(records).sorted {
             if $0.timestamp != $1.timestamp { return $0.timestamp < $1.timestamp }
             if $0.model != $1.model { return $0.model < $1.model }
             return $0.totalTokens < $1.totalTokens
         }
+        var costRecords = uniqueRecords
+        var dataScope: TokenCostDataScope = .local
+        var syncMessage: String?
+        if let configuration = CostSyncPreferences.configuration() {
+            let service = CostLedgerSyncService()
+            do {
+                let result = try service.sync(
+                    localRecords: uniqueRecords,
+                    configuration: configuration
+                )
+                costRecords = Self.mergedRecords(uniqueRecords + result.records)
+                if result.skippedFileCount > 0 {
+                    dataScope = .partial(deviceCount: max(1, result.deviceCount))
+                    syncMessage = "有 \(result.skippedFileCount) 个设备账本未纳入成本"
+                } else if result.deviceCount > 1 {
+                    dataScope = .multiDevice(deviceCount: result.deviceCount)
+                } else {
+                    dataScope = .singleDevice
+                }
+            } catch {
+                if let syncError = error as? CostLedgerSyncService.SyncError,
+                   syncError == .accountMismatch || syncError == .accountUnavailable {
+                    costRecords = uniqueRecords
+                    dataScope = .syncBlocked
+                } else if let cached = service.loadCache(namespace: configuration.namespace) {
+                    costRecords = Self.mergedRecords(uniqueRecords + cached.records)
+                    dataScope = .syncDelayed
+                } else {
+                    dataScope = .syncDelayed
+                }
+                syncMessage = error.localizedDescription
+            }
+        }
         return TokenCostCalculator.snapshot(
-            records: uniqueRecords,
+            records: costRecords,
             now: now,
             calendar: calendar,
             subscriptionPeriod: subscriptionPeriod,
-            skippedSessionFileCount: skippedSessionFileCount
+            skippedSessionFileCount: skippedSessionFileCount,
+            dataScope: dataScope,
+            syncMessage: syncMessage
         )
+    }
+
+    private static func mergedRecords(_ records: [TokenUsageRecord]) -> [TokenUsageRecord] {
+        var identified: [String: TokenUsageRecord] = [:]
+        var unidentified = Set<TokenUsageRecord>()
+        for record in records {
+            if let eventID = record.eventID {
+                identified[eventID] = record
+            } else {
+                unidentified.insert(record)
+            }
+        }
+        return Array(identified.values) + Array(unidentified)
     }
 
     private func sessionFiles() throws -> SessionFileListing {
@@ -177,6 +225,8 @@ enum TokenCostSessionParser {
         var previousTotals: RawUsage?
         var replayGate: ChildReplayGate?
         var sawSessionMeta = false
+        var sessionID = fallbackSessionID(data)
+        var occurrenceBySignature: [String: Int] = [:]
         var result: [TokenUsageRecord] = []
 
         for line in data.split(separator: 0x0A) {
@@ -189,6 +239,7 @@ enum TokenCostSessionParser {
             }
             if type == "session_meta", !sawSessionMeta {
                 sawSessionMeta = true
+                sessionID = stableSessionID(in: payload) ?? sessionID
                 if isChildSession(payload) {
                     if let timestamp = object["timestamp"] as? String,
                        let date = dateFormatter.date(from: timestamp)
@@ -237,7 +288,22 @@ enum TokenCostSessionParser {
             if let totals { previousTotals = totals }
             guard usage.hasTokens else { continue }
             guard let resolvedModel = modelName(in: payload) ?? info.flatMap(modelName(in:)) ?? model else { continue }
+            let signature = [
+                timestamp,
+                resolvedModel,
+                String(usage.input),
+                String(usage.cached),
+                String(usage.cacheWrite),
+                String(usage.output),
+                String(usage.total),
+                serviceTier.rawValue
+            ].joined(separator: "|")
+            let occurrence = occurrenceBySignature[signature, default: 0]
+            occurrenceBySignature[signature] = occurrence + 1
             result.append(TokenUsageRecord(
+                eventID: CostLedgerSyncService.digest(
+                    "\(sessionID)|\(signature)|\(occurrence)"
+                ),
                 timestamp: date,
                 model: resolvedModel,
                 inputTokens: usage.input,
@@ -328,6 +394,24 @@ enum TokenCostSessionParser {
             || nonNull(payload["parent_thread_id"])
             || payload["thread_source"] as? String == "subagent"
             || nonNull((payload["source"] as? [String: Any])?["subagent"])
+    }
+
+    private static func stableSessionID(in payload: [String: Any]) -> String? {
+        for value in [payload["id"], payload["session_id"]] {
+            if let id = (value as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !id.isEmpty {
+                return id
+            }
+        }
+        return nil
+    }
+
+    private static func fallbackSessionID(_ data: Data) -> String {
+        let firstLine = data.split(separator: 0x0A).first.map {
+            String(decoding: $0, as: UTF8.self)
+        }
+            ?? "empty-session"
+        return CostLedgerSyncService.digest(firstLine)
     }
 
     private static func nonNull(_ value: Any?) -> Bool {

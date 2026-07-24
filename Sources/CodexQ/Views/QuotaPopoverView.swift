@@ -117,7 +117,12 @@ struct QuotaPopoverView: View {
                 InsetSeparator()
                 EmbeddedSettingsView(
                     settings: settings,
-                    settingsDidChange: contentDidChange
+                    costDataScope: store.tokenCost?.dataScope ?? .local,
+                    costSyncMessage: store.tokenCost?.syncMessage,
+                    settingsDidChange: contentDidChange,
+                    costSyncDidChange: {
+                        Task { await store.refreshFromButton() }
+                    }
                 )
             }
 
@@ -351,7 +356,10 @@ private struct DisabledContinuousQuotaBar: View {
 
 private struct EmbeddedSettingsView: View {
     @ObservedObject var settings: AppSettings
+    let costDataScope: TokenCostDataScope
+    let costSyncMessage: String?
     let settingsDidChange: () -> Void
+    let costSyncDidChange: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -366,6 +374,28 @@ private struct EmbeddedSettingsView: View {
                 }
             }
 
+            Toggle("iCloud 成本同步", isOn: costSyncBinding)
+
+            if settings.icloudCostSyncEnabled {
+                HStack(spacing: 6) {
+                    Text(settings.icloudCostSyncFolderName ?? "未选择文件夹")
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                    Spacer(minLength: 4)
+                    Button("更换文件夹…") {
+                        chooseCostSyncFolder()
+                    }
+                    .buttonStyle(.borderless)
+                }
+            }
+
+            CostSyncImpactCard(
+                isEnabled: settings.icloudCostSyncEnabled,
+                dataScope: costDataScope,
+                message: settings.icloudCostSyncEnabled
+                    ? costSyncMessage ?? settings.icloudCostSyncSetupError
+                    : settings.icloudCostSyncSetupError
+            )
         }
         .font(.caption)
         .toggleStyle(.checkbox)
@@ -385,6 +415,95 @@ private struct EmbeddedSettingsView: View {
         .onChange(of: settings.notifyAt20) { settingsDidChange() }
         .onChange(of: settings.notifyAt10) { settingsDidChange() }
         .onChange(of: settings.notifyAt5) { settingsDidChange() }
+    }
+
+    private var costSyncBinding: Binding<Bool> {
+        Binding(
+            get: { settings.icloudCostSyncEnabled },
+            set: { isEnabled in
+                if isEnabled {
+                    chooseCostSyncFolder()
+                } else {
+                    settings.disableICloudCostSync()
+                    settingsDidChange()
+                    costSyncDidChange()
+                }
+            }
+        )
+    }
+
+    private func chooseCostSyncFolder() {
+        guard let folderURL = ICloudDriveFolderPicker.chooseFolder() else { return }
+        Task {
+            do {
+                try await settings.enableICloudCostSync(folderURL: folderURL)
+                settingsDidChange()
+                costSyncDidChange()
+            } catch {
+                settingsDidChange()
+            }
+        }
+    }
+}
+
+private struct CostSyncImpactCard: View {
+    let isEnabled: Bool
+    let dataScope: TokenCostDataScope
+    let message: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            impactRow(
+                title: "Token 活动",
+                detail: isEnabled && isDelayed
+                    ? "账号数据，仍可正常刷新"
+                    : "账号数据，不受此设置影响"
+            )
+            impactRow(title: "Token 成本", detail: costDetail)
+            Text("只同步模型、时间和 Token 数，不同步会话内容或登录信息。")
+                .font(.system(size: 9))
+                .foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
+            if let message {
+                Text(message)
+                    .font(.system(size: 9))
+                    .foregroundStyle(isDelayed ? .orange : .secondary)
+                    .lineLimit(2)
+            }
+        }
+        .padding(7)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 7))
+        .overlay {
+            RoundedRectangle(cornerRadius: 7)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+        }
+    }
+
+    private func impactRow(title: String, detail: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Text(title)
+                .fontWeight(.semibold)
+            Text(detail)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var isDelayed: Bool {
+        switch dataScope {
+        case .syncDelayed, .syncBlocked: return true
+        case .local, .singleDevice, .multiDevice, .partial: return false
+        }
+    }
+
+    private var costDetail: String {
+        guard isEnabled else { return "仅统计这台 Mac" }
+        if case .syncBlocked = dataScope {
+            return "同步暂停，仅统计这台 Mac"
+        }
+        return isDelayed
+            ? "暂用本机与上次成功同步的数据"
+            : "合并所选文件夹内的设备账本"
     }
 }
 

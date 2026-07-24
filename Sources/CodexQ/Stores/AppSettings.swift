@@ -14,6 +14,9 @@ final class AppSettings: ObservableObject {
     @Published var notifyAt20: Bool { didSet { defaults.set(notifyAt20, forKey: Keys.notifyAt20) } }
     @Published var notifyAt10: Bool { didSet { defaults.set(notifyAt10, forKey: Keys.notifyAt10) } }
     @Published var notifyAt5: Bool { didSet { defaults.set(notifyAt5, forKey: Keys.notifyAt5) } }
+    @Published private(set) var icloudCostSyncEnabled: Bool
+    @Published private(set) var icloudCostSyncFolderPath: String?
+    @Published private(set) var icloudCostSyncSetupError: String?
     var warningThresholds: [Int] {
         [(20, notifyAt20), (10, notifyAt10), (5, notifyAt5)]
             .compactMap { $0.1 ? $0.0 : nil }
@@ -36,6 +39,42 @@ final class AppSettings: ObservableObject {
         notifyAt20 = defaults.object(forKey: Keys.notifyAt20) as? Bool ?? true
         notifyAt10 = defaults.object(forKey: Keys.notifyAt10) as? Bool ?? true
         notifyAt5 = defaults.object(forKey: Keys.notifyAt5) as? Bool ?? true
+        icloudCostSyncEnabled = defaults.bool(forKey: CostSyncPreferences.enabledKey)
+        icloudCostSyncFolderPath = defaults.string(forKey: CostSyncPreferences.folderPathKey)
+        icloudCostSyncSetupError = nil
+    }
+
+    var icloudCostSyncFolderName: String? {
+        icloudCostSyncFolderPath.map {
+            URL(fileURLWithPath: $0, isDirectory: true).lastPathComponent
+        }
+    }
+
+    func enableICloudCostSync(folderURL: URL) async throws {
+        do {
+            let namespace = try await Task.detached {
+                try CostLedgerSyncService().prepare(folderURL: folderURL)
+            }.value
+            if defaults.string(forKey: CostSyncPreferences.deviceIDKey) == nil {
+                defaults.set(UUID().uuidString, forKey: CostSyncPreferences.deviceIDKey)
+            }
+            let path = folderURL.standardizedFileURL.path
+            defaults.set(path, forKey: CostSyncPreferences.folderPathKey)
+            defaults.set(namespace, forKey: CostSyncPreferences.namespaceKey)
+            defaults.set(true, forKey: CostSyncPreferences.enabledKey)
+            icloudCostSyncFolderPath = path
+            icloudCostSyncEnabled = true
+            icloudCostSyncSetupError = nil
+        } catch {
+            icloudCostSyncSetupError = error.localizedDescription
+            throw error
+        }
+    }
+
+    func disableICloudCostSync() {
+        defaults.set(false, forKey: CostSyncPreferences.enabledKey)
+        icloudCostSyncEnabled = false
+        icloudCostSyncSetupError = nil
     }
 
     private static func migrateLegacySettingsIfNeeded(to defaults: UserDefaults) {

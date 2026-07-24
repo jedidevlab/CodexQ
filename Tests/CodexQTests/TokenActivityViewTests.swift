@@ -605,6 +605,21 @@ struct TokenActivityViewTests {
         #expect(settingsSource.contains("HStack(spacing: 4)"))
     }
 
+    @Test("iCloud 成本同步设置明确区分账号活动与设备成本")
+    func costSyncSettingsExplainDataImpact() throws {
+        let source = try String(
+            contentsOfFile: "Sources/CodexQ/Views/QuotaPopoverView.swift",
+            encoding: .utf8
+        )
+
+        #expect(source.contains("Toggle(\"iCloud 成本同步\""))
+        #expect(source.contains("\"账号数据，不受此设置影响\""))
+        #expect(source.contains("\"仅统计这台 Mac\""))
+        #expect(source.contains("\"合并所选文件夹内的设备账本\""))
+        #expect(source.contains("只同步模型、时间和 Token 数"))
+        #expect(source.contains("ICloudDriveFolderPicker.chooseFolder()"))
+    }
+
     @Test("鼠标停留与展开状态会上报并在关闭后复位")
     func popoverReportsInteractionsAndResetsExpansionOnClose() throws {
         let source = try String(

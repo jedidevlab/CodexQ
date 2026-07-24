@@ -9,7 +9,7 @@
   <a href="https://github.com/jedidevlab/CodexQ/releases/latest">下载最新版</a>
 </p>
 
-CodexQ 是一款原生 macOS 菜单栏工具。它把 ChatGPT（原 Codex）5 小时与周限额、套餐类型、剩余额度、预计耗尽时间、每日 Token 活动和本机 Token 成本集中在一个浮动面板中显示。
+CodexQ 是一款原生 macOS 菜单栏工具。它把 ChatGPT（原 Codex）5 小时与周限额、套餐类型、剩余额度、预计耗尽时间、每日 Token 活动和 Token 成本集中在一个浮动面板中显示。
 
 ## 一眼掌握使用节奏
 
@@ -17,7 +17,7 @@ CodexQ 是一款原生 macOS 菜单栏工具。它把 ChatGPT（原 Codex）5 �
 - **套餐识别**：直接显示 app-server 返回的套餐类型，并使用紧凑的原生标题样式。
 - **耗尽预测**：根据当前使用节奏判断额度是否够用，并显示预计耗尽时间。
 - **Token 活动**：查看按弹窗宽度自动扩展的每日热力图、最近完整日与累计 Token 用量。
-- **Token 成本**：按本机会话中有官方 API 定价的模型估算昨日、本订阅周期与累计成本；所有纳入计算的模型都会展开显示。
+- **Token 成本**：默认按本机会话估算昨日、本订阅周期与累计成本；也可以通过用户选择的 iCloud Drive 文件夹合并多台 Mac 的脱敏成本账本。
 - **可靠刷新**：额度与 Token 活动共用一次 app-server 会话；短暂刷新失败时保留上次成功数据并明确提示。
 - **及时提醒**：支持自动刷新、登录时启动，以及 20% / 10% / 5% 额度预警。
 - **原生体验**：使用 SwiftUI 与 AppKit 构建，常驻菜单栏，不打断当前工作。
@@ -43,6 +43,15 @@ CodexQ 是一款原生 macOS 菜单栏工具。它把 ChatGPT（原 Codex）5 �
 - macOS 14 或更新版本
 - 已安装 ChatGPT app，支持 `/Applications` 或 `~/Applications`（同时兼容旧版 Codex app）
 - 本地构建需要 Swift 6 工具链
+
+## iCloud 成本同步
+
+在弹窗底部打开设置，勾选 `iCloud 成本同步`，再选择 iCloud Drive 中的专用文件夹。其他 Mac 使用同一 Codex 账号并选择同一文件夹后，Token 成本会合并各设备账本。
+
+- Token 活动来自账号数据，不受该开关影响。
+- 关闭同步时，Token 成本只统计当前 Mac。
+- 开启同步时，只写入模型、时间和 Token 数，不复制原始会话或登录信息。
+- 账本经过字段脱敏，但 CodexQ 不会额外加密文件；不要选择公开共享文件夹。
 
 ## 本地运行
 

@@ -15,7 +15,7 @@ struct TokenCostSection: View {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text("Token 成本")
                     .font(.headline)
-                Text("本机数据")
+                Text(scopeLabel)
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
                 Spacer(minLength: 6)
@@ -52,7 +52,8 @@ struct TokenCostSection: View {
                 if let detail = activeSummary {
                     TokenCostDetailCard(
                         summary: detail,
-                        subscriptionPeriod: snapshot.subscriptionPeriod
+                        subscriptionPeriod: snapshot.subscriptionPeriod,
+                        dataScope: snapshot.dataScope
                     )
                 }
                 if snapshot.skippedSessionFileCount > 0 {
@@ -60,6 +61,12 @@ struct TokenCostSection: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .help("这些本机 session 文件无法读取或不是普通 JSONL 文件，总金额可能偏低。")
+                }
+                if let syncMessage = snapshot.syncMessage {
+                    Text(syncMessage)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
                 }
             }
             if let errorMessage {
@@ -187,6 +194,18 @@ struct TokenCostSection: View {
         }
     }
 
+    private var scopeLabel: String {
+        guard let scope = snapshot?.dataScope else { return "本机数据" }
+        switch scope {
+        case .local: return "本机数据"
+        case .singleDevice: return "仅此设备"
+        case .multiDevice: return "多设备"
+        case .syncDelayed: return "多设备 · 同步延迟"
+        case .syncBlocked: return "本机数据 · 同步暂停"
+        case .partial: return "多设备 · 部分数据"
+        }
+    }
+
     private func title(for kind: TokenCostPeriodSummary.Kind) -> String {
         switch kind {
         case .today: return "今日"
@@ -213,6 +232,7 @@ struct TokenCostSection: View {
 private struct TokenCostDetailCard: View {
     let summary: TokenCostPeriodSummary
     let subscriptionPeriod: DateInterval?
+    let dataScope: TokenCostDataScope
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -301,7 +321,12 @@ private struct TokenCostDetailCard: View {
     }
 
     private var footerText: String {
-        "本机数据，按官方 API 价估算，非实际账单"
+        switch dataScope {
+        case .local, .syncBlocked:
+            return "本机数据，按官方 API 价估算，非实际账单"
+        case .singleDevice, .multiDevice, .syncDelayed, .partial:
+            return "多设备脱敏账本，按官方 API 价估算，非实际账单"
+        }
     }
 
     private var displayedAmount: String {

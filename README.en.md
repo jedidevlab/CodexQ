@@ -9,7 +9,7 @@
   <a href="https://github.com/jedidevlab/CodexQ/releases/latest">Download latest</a>
 </p>
 
-CodexQ is a native macOS menu bar utility. It brings ChatGPT (formerly Codex) five-hour and weekly quota, plan type, remaining capacity, projected run-out time, Token activity, and local Token cost estimates into one floating panel.
+CodexQ is a native macOS menu bar utility. It brings ChatGPT (formerly Codex) five-hour and weekly quota, plan type, remaining capacity, projected run-out time, Token activity, and Token cost estimates into one floating panel.
 
 ## Your usage pace at a glance
 
@@ -17,7 +17,7 @@ CodexQ is a native macOS menu bar utility. It brings ChatGPT (formerly Codex) fi
 - **Plan identification:** show the plan type returned by app-server in a compact native header.
 - **Run-out projection:** see whether your current pace is sustainable and when the quota may run out.
 - **Token activity:** review three months of daily activity plus the latest completed day and lifetime Token usage.
-- **Token cost:** estimate yesterday, the current subscription period, and lifetime cost from locally recorded models with official API pricing; every included model is shown in the detail view.
+- **Token cost:** estimate yesterday, the current subscription period, and lifetime cost from local sessions, with optional multi-Mac merging through a user-selected iCloud Drive folder.
 - **Reliable refresh:** quota and Token activity share one app-server session; temporary refresh failures retain the last successful data with a clear status.
 - **Timely alerts:** enable automatic refresh, launch at login, and quota warnings at 20%, 10%, or 5%.
 - **Native experience:** built with SwiftUI and AppKit to stay available without interrupting your work.
@@ -43,6 +43,15 @@ If macOS blocks the first launch, try opening the app once, then go to System Se
 - macOS 14 or later
 - ChatGPT app installed in `/Applications` or `~/Applications` (the legacy Codex app is also supported)
 - Swift 6 toolchain for local builds
+
+## iCloud Cost Sync
+
+Open settings from the bottom of the popover, enable `iCloud Cost Sync`, and select a dedicated folder in iCloud Drive. Other Macs using the same Codex account can select the same folder to merge their cost ledgers.
+
+- Token activity is account data and is unaffected by this setting.
+- With sync off, Token cost includes only the current Mac.
+- With sync on, CodexQ writes only model names, timestamps, and Token counts; it does not copy raw sessions or login information.
+- Ledger fields are sanitized, but CodexQ does not add file encryption. Do not choose a publicly shared folder.
 
 ## Build and Run
 

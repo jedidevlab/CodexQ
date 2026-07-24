@@ -1,11 +1,12 @@
 import Foundation
 
-enum TokenServiceTier: Hashable, Sendable {
+enum TokenServiceTier: String, Codable, Hashable, Sendable {
     case standard
     case priority
 }
 
 struct TokenUsageRecord: Equatable, Hashable, Sendable {
+    let eventID: String?
     let timestamp: Date
     let model: String
     let inputTokens: Int64
@@ -16,6 +17,7 @@ struct TokenUsageRecord: Equatable, Hashable, Sendable {
     let serviceTier: TokenServiceTier
 
     init(
+        eventID: String? = nil,
         timestamp: Date,
         model: String,
         inputTokens: Int64,
@@ -25,6 +27,7 @@ struct TokenUsageRecord: Equatable, Hashable, Sendable {
         totalTokens: Int64,
         serviceTier: TokenServiceTier = .standard
     ) {
+        self.eventID = eventID
         self.timestamp = timestamp
         self.model = model
         self.inputTokens = inputTokens
@@ -36,6 +39,15 @@ struct TokenUsageRecord: Equatable, Hashable, Sendable {
     }
 }
 
+enum TokenCostDataScope: Equatable, Sendable {
+    case local
+    case singleDevice
+    case multiDevice(deviceCount: Int)
+    case syncDelayed
+    case syncBlocked
+    case partial(deviceCount: Int)
+}
+
 struct TokenCostSnapshot: Equatable, Sendable {
     let today: TokenCostPeriodSummary
     let yesterday: TokenCostPeriodSummary
@@ -43,6 +55,8 @@ struct TokenCostSnapshot: Equatable, Sendable {
     let lifetime: TokenCostPeriodSummary
     let subscriptionPeriod: DateInterval?
     let skippedSessionFileCount: Int
+    let dataScope: TokenCostDataScope
+    let syncMessage: String?
 
     init(
         today: TokenCostPeriodSummary,
@@ -50,7 +64,9 @@ struct TokenCostSnapshot: Equatable, Sendable {
         subscription: TokenCostPeriodSummary?,
         lifetime: TokenCostPeriodSummary,
         subscriptionPeriod: DateInterval?,
-        skippedSessionFileCount: Int = 0
+        skippedSessionFileCount: Int = 0,
+        dataScope: TokenCostDataScope = .local,
+        syncMessage: String? = nil
     ) {
         self.today = today
         self.yesterday = yesterday
@@ -58,6 +74,8 @@ struct TokenCostSnapshot: Equatable, Sendable {
         self.lifetime = lifetime
         self.subscriptionPeriod = subscriptionPeriod
         self.skippedSessionFileCount = skippedSessionFileCount
+        self.dataScope = dataScope
+        self.syncMessage = syncMessage
     }
 }
 
@@ -272,7 +290,9 @@ enum TokenCostCalculator {
         now: Date,
         calendar: Calendar,
         subscriptionPeriod: DateInterval?,
-        skippedSessionFileCount: Int = 0
+        skippedSessionFileCount: Int = 0,
+        dataScope: TokenCostDataScope = .local,
+        syncMessage: String? = nil
     ) -> TokenCostSnapshot {
         let todayStart = calendar.startOfDay(for: now)
         let tomorrow = calendar.date(byAdding: .day, value: 1, to: todayStart) ?? now
@@ -303,7 +323,9 @@ enum TokenCostCalculator {
                 records: records
             ),
             subscriptionPeriod: subscriptionPeriod,
-            skippedSessionFileCount: skippedSessionFileCount
+            skippedSessionFileCount: skippedSessionFileCount,
+            dataScope: dataScope,
+            syncMessage: syncMessage
         )
     }
 
