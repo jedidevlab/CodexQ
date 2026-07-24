@@ -74,6 +74,87 @@ struct CostLedgerSyncTests {
         }
     }
 
+    @Test("本设备账本混入无效记录后会重建，避免多设备成本永久缺失")
+    func repairsInvalidEntryInCurrentDeviceLedger() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let folder = root.appendingPathComponent("sync", isDirectory: true)
+        let home = root.appendingPathComponent("home", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try writeAuth(accountID: "same-account", home: home)
+        let service = CostLedgerSyncService(
+            homeDirectory: home,
+            cacheURL: root.appendingPathComponent("cache.json")
+        )
+        let namespace = try service.prepare(folderURL: folder)
+        let configuration = CostSyncConfiguration(
+            folderURL: folder,
+            deviceID: "current-device",
+            namespace: namespace
+        )
+        _ = try service.sync(
+            localRecords: [record(id: "valid-event", tokens: 100)],
+            configuration: configuration
+        )
+
+        let ledgerURL = try #require(deviceLedgerURLs(in: folder).first)
+        var ledger = try #require(
+            JSONSerialization.jsonObject(with: Data(contentsOf: ledgerURL)) as? [String: Any]
+        )
+        var entries = try #require(ledger["records"] as? [[String: Any]])
+        var invalid = try #require(entries.first)
+        invalid["eventID"] = "invalid-event"
+        invalid["inputTokens"] = -1
+        entries.append(invalid)
+        ledger["records"] = entries
+        try JSONSerialization.data(withJSONObject: ledger, options: [.sortedKeys])
+            .write(to: ledgerURL, options: .atomic)
+
+        let repaired = try service.sync(
+            localRecords: [record(id: "valid-event", tokens: 100)],
+            configuration: configuration
+        )
+
+        #expect(repaired.records.map(\.eventID) == ["valid-event"])
+        #expect(repaired.skippedFileCount == 0)
+        let repairedText = try String(contentsOf: ledgerURL, encoding: .utf8)
+        #expect(!repairedText.contains("invalid-event"))
+    }
+
+    @Test("账本内容没有变化时不替换文件，避免历史月份反复上传")
+    func leavesUnchangedLedgerFileUntouched() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let folder = root.appendingPathComponent("sync", isDirectory: true)
+        let home = root.appendingPathComponent("home", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try writeAuth(accountID: "same-account", home: home)
+        let service = CostLedgerSyncService(
+            homeDirectory: home,
+            cacheURL: root.appendingPathComponent("cache.json")
+        )
+        let namespace = try service.prepare(folderURL: folder)
+        let configuration = CostSyncConfiguration(
+            folderURL: folder,
+            deviceID: "current-device",
+            namespace: namespace
+        )
+        let records = [record(id: "stable-event", tokens: 100)]
+        _ = try service.sync(localRecords: records, configuration: configuration)
+        let ledgerURL = try #require(deviceLedgerURLs(in: folder).first)
+        let before = try #require(
+            FileManager.default.attributesOfItem(atPath: ledgerURL.path)[.modificationDate] as? Date
+        )
+        Thread.sleep(forTimeInterval: 0.05)
+
+        _ = try service.sync(localRecords: records, configuration: configuration)
+
+        let after = try #require(
+            FileManager.default.attributesOfItem(atPath: ledgerURL.path)[.modificationDate] as? Date
+        )
+        #expect(after == before)
+    }
+
     @Test("复制会话生成相同事件标识且同会话重复事件仍各自保留")
     func parserCreatesStableIDsWithoutCollapsingRealRepeats() throws {
         let root = FileManager.default.temporaryDirectory
@@ -137,5 +218,19 @@ struct CostLedgerSyncTests {
             result += try String(contentsOf: url, encoding: .utf8)
         }
         return result
+    }
+
+    private func deviceLedgerURLs(in folder: URL) -> [URL] {
+        let devices = folder.appendingPathComponent("devices", isDirectory: true)
+        guard let enumerator = FileManager.default.enumerator(
+            at: devices,
+            includingPropertiesForKeys: [.isRegularFileKey]
+        ) else {
+            return []
+        }
+        return enumerator.compactMap { item in
+            guard let url = item as? URL, url.pathExtension == "json" else { return nil }
+            return url
+        }
     }
 }

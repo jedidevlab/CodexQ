@@ -270,7 +270,7 @@ struct CostLedgerSyncService {
             .appendingPathComponent(device, isDirectory: true)
         try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
 
-        let entries = records.compactMap(LedgerEntry.init)
+        let entries = records.compactMap(LedgerEntry.init).filter(\.isValid)
         let grouped = Dictionary(grouping: entries) { month(for: $0.timestamp) }
         for (month, newEntries) in grouped {
             let url = directory.appendingPathComponent("\(month).json")
@@ -278,8 +278,9 @@ struct CostLedgerSyncService {
             if fileManager.fileExists(atPath: url.path),
                let existing = try? decoder.decode(LedgerFile.self, from: boundedData(at: url)),
                existing.schemaVersion == Self.schemaVersion,
-               existing.device == device {
-                for entry in existing.records {
+               existing.device == device,
+               existing.month == month {
+                for entry in existing.records where entry.isValid {
                     byID[entry.eventID] = entry
                 }
             }
@@ -295,7 +296,7 @@ struct CostLedgerSyncService {
                     return $0.timestamp < $1.timestamp
                 }
             )
-            try write(ledger, to: url)
+            try writeIfChanged(ledger, to: url)
         }
     }
 
@@ -389,6 +390,15 @@ struct CostLedgerSyncService {
     private func write<T: Encodable>(_ value: T, to url: URL) throws {
         let data = try encoder.encode(value)
         guard data.count <= Self.maximumLedgerSize else { throw SyncError.invalidLedger }
+        try data.write(to: url, options: .atomic)
+    }
+
+    private func writeIfChanged<T: Encodable>(_ value: T, to url: URL) throws {
+        let data = try encoder.encode(value)
+        guard data.count <= Self.maximumLedgerSize else { throw SyncError.invalidLedger }
+        if let existing = try? boundedData(at: url), existing == data {
+            return
+        }
         try data.write(to: url, options: .atomic)
     }
 

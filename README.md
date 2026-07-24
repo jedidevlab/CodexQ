@@ -44,9 +44,9 @@ CodexQ 是一款原生 macOS 菜单栏工具。它把 ChatGPT（原 Codex）5 �
 - 已安装 ChatGPT app，支持 `/Applications` 或 `~/Applications`（同时兼容旧版 Codex app）
 - 本地构建需要 Swift 6 工具链
 
-## iCloud 成本同步
+## iCloud 同步
 
-在弹窗底部打开设置，勾选 `iCloud 成本同步`，再选择 iCloud Drive 中的专用文件夹。其他 Mac 使用同一 Codex 账号并选择同一文件夹后，Token 成本会合并各设备账本。
+在弹窗底部打开设置，勾选 `iCloud 同步`，再选择 iCloud Drive 中的专用文件夹。其他 Mac 使用同一 Codex 账号并选择同一文件夹后，Token 成本会合并各设备账本。
 
 - Token 活动来自账号数据，不受该开关影响。
 - 关闭同步时，Token 成本只统计当前 Mac。
