@@ -89,7 +89,7 @@ struct QuotaBarLayoutTests {
         let viewSource = source[viewStart.lowerBound..<viewEnd.lowerBound]
 
         #expect(viewSource.contains(
-            "var body: some View {\n        VStack(alignment: .leading, spacing: 10) {"
+            "var body: some View {\n        VStack(alignment: .leading, spacing: 8) {"
         ))
     }
 }

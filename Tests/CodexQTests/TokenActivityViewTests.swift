@@ -483,20 +483,21 @@ struct TokenActivityViewTests {
         #expect(!source.contains("Button(\"退出\")"))
     }
 
-    @Test("底部整排元素与分隔线保持十点间距并保留按钮点击尺寸")
-    func footerRowUsesTenPointSeparatorSpacing() throws {
+    @Test("底部栏与限额重置栏使用同一处分隔线间距")
+    func footerRowUsesResetCreditSeparatorSpacing() throws {
         let source = try String(
             contentsOfFile: "Sources/CodexQ/Views/QuotaPopoverView.swift",
             encoding: .utf8
         )
         let footerSource = try sourceSection(
             source,
-            from: "VStack(spacing: 10) {\n                InsetSeparator()",
+            from: "if isSettingsExpanded {",
             to: ".padding(.bottom, 10)"
         )
 
         #expect(footerSource.contains(".frame(width: 24, height: 24)"))
-        #expect(footerSource.contains("VStack(spacing: 10)"))
+        #expect(source.contains("VStack(alignment: .leading, spacing: 8)"))
+        #expect(!footerSource.contains("VStack(spacing: 10)"))
         #expect(source.contains(".padding(.bottom, 10)"))
         #expect(source.contains(".padding(.top, QuotaPopoverLayout.horizontalPadding)"))
     }

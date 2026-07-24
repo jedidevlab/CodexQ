@@ -42,7 +42,7 @@ struct QuotaPopoverView: View {
     private let formatter = ResetTimeFormatter()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             if let snapshot = store.snapshot {
                 if let planName = PlanTypeFormatter.displayName(for: snapshot.planType) {
                     VStack(spacing: 5) {
@@ -126,62 +126,60 @@ struct QuotaPopoverView: View {
                 )
             }
 
-            VStack(spacing: 10) {
-                InsetSeparator()
+            InsetSeparator()
 
-                HStack(spacing: 8) {
-                    if let error = store.errorMessage, store.snapshot != nil {
-                        Text(failureStatus(error: error))
-                            .font(.caption)
-                            .foregroundStyle(.red)
-                            .lineLimit(1)
-                            .help(error)
-                    } else if let updatedAt = store.lastUpdatedAt {
-                        Text(RelativeUpdateFormatter.string(
-                            since: updatedAt,
-                            now: relativeTimeNow
-                        ))
+            HStack(spacing: 8) {
+                if let error = store.errorMessage, store.snapshot != nil {
+                    Text(failureStatus(error: error))
                         .font(.caption)
-                        .foregroundStyle(Color.primary.opacity(0.72))
-                        .monospacedDigit()
-                    }
-                    Spacer()
-                    Button {
-                        isSettingsExpanded.toggle()
-                    } label: {
-                        FooterIconButtonLabel(
-                            systemName: isSettingsExpanded ? "gearshape.fill" : "gearshape"
-                        )
-                    }
-                    .buttonStyle(.borderless)
-                    .help("设置")
-                    .accessibilityLabel("设置")
-
-                    Button {
-                        Task { await store.refreshFromButton() }
-                    } label: {
-                        if store.isRefreshButtonBusy {
-                            ProgressView()
-                                .controlSize(.small)
-                                .frame(width: 24, height: 24)
-                        } else {
-                            FooterIconButtonLabel(systemName: "arrow.clockwise")
-                        }
-                    }
-                    .buttonStyle(.borderless)
-                    .disabled(isAnyRefreshing)
-                    .help("立即刷新")
-                    .accessibilityLabel("立即刷新")
-
-                    Button {
-                        NSApplication.shared.terminate(nil)
-                    } label: {
-                        FooterIconButtonLabel(systemName: "power")
-                    }
-                    .buttonStyle(.borderless)
-                    .help("退出")
-                    .accessibilityLabel("退出")
+                        .foregroundStyle(.red)
+                        .lineLimit(1)
+                        .help(error)
+                } else if let updatedAt = store.lastUpdatedAt {
+                    Text(RelativeUpdateFormatter.string(
+                        since: updatedAt,
+                        now: relativeTimeNow
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(Color.primary.opacity(0.72))
+                    .monospacedDigit()
                 }
+                Spacer()
+                Button {
+                    isSettingsExpanded.toggle()
+                } label: {
+                    FooterIconButtonLabel(
+                        systemName: isSettingsExpanded ? "gearshape.fill" : "gearshape"
+                    )
+                }
+                .buttonStyle(.borderless)
+                .help("设置")
+                .accessibilityLabel("设置")
+
+                Button {
+                    Task { await store.refreshFromButton() }
+                } label: {
+                    if store.isRefreshButtonBusy {
+                        ProgressView()
+                            .controlSize(.small)
+                            .frame(width: 24, height: 24)
+                    } else {
+                        FooterIconButtonLabel(systemName: "arrow.clockwise")
+                    }
+                }
+                .buttonStyle(.borderless)
+                .disabled(isAnyRefreshing)
+                .help("立即刷新")
+                .accessibilityLabel("立即刷新")
+
+                Button {
+                    NSApplication.shared.terminate(nil)
+                } label: {
+                    FooterIconButtonLabel(systemName: "power")
+                }
+                .buttonStyle(.borderless)
+                .help("退出")
+                .accessibilityLabel("退出")
             }
         }
         .padding(.horizontal, QuotaPopoverLayout.horizontalPadding)
