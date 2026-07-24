@@ -325,7 +325,7 @@ private struct TokenCostDetailCard: View {
         case .local, .syncBlocked:
             return "本机数据，按官方 API 价估算，非实际账单"
         case .singleDevice:
-            return "仅本地数据，按官方 API 价估算，非实际账单"
+            return "仅此设备数据，按官方 API 价估算，非实际账单"
         case .multiDevice, .syncDelayed, .partial:
             return "多设备数据，按官方 API 价估算，非实际账单"
         }
