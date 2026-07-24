@@ -257,8 +257,8 @@ private struct TokenCostDetailCard: View {
             }
 
             Text(footerText)
-                .font(.system(size: 9))
-                .foregroundStyle(.tertiary)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(9)
