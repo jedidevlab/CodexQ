@@ -36,25 +36,41 @@ actor TokenCostReader {
     private let authURL: URL
     private let fileManager: FileManager
     private let costLedgerSyncService: CostLedgerSyncService
+    private let costSyncConfiguration: @Sendable () -> CostSyncConfiguration?
     private var cache: [URL: CachedFile] = [:]
 
     init(
         homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser,
-        fileManager: FileManager = .default
+        fileManager: FileManager = .default,
+        costLedgerCacheURL: URL? = nil,
+        costSyncConfiguration: @escaping @Sendable () -> CostSyncConfiguration? = {
+            CostSyncPreferences.configuration()
+        }
     ) {
         sessionsDirectory = homeDirectory.appendingPathComponent(".codex/sessions", isDirectory: true)
         authURL = homeDirectory.appendingPathComponent(".codex/auth.json")
         self.fileManager = fileManager
+        self.costSyncConfiguration = costSyncConfiguration
         costLedgerSyncService = CostLedgerSyncService(
             homeDirectory: homeDirectory,
-            fileManager: fileManager
+            fileManager: fileManager,
+            cacheURL: costLedgerCacheURL
         )
     }
 
     func read(now: Date = Date()) throws -> TokenCostSnapshot {
-        let listing = try sessionFiles()
+        let configuration = costSyncConfiguration()
+        let listing: SessionFileListing
+        do {
+            listing = try sessionFiles()
+        } catch ReaderError.sessionsUnavailable {
+            guard configuration != nil else { throw ReaderError.sessionsUnavailable }
+            listing = SessionFileListing(files: [], skippedCount: 0)
+        }
         let files = listing.files
-        guard !files.isEmpty else { throw ReaderError.sessionsUnavailable }
+        guard !files.isEmpty || configuration != nil else {
+            throw ReaderError.sessionsUnavailable
+        }
 
         var records: [TokenUsageRecord] = []
         var skippedSessionFileCount = listing.skippedCount
@@ -100,7 +116,7 @@ actor TokenCostReader {
         var costRecords = uniqueRecords
         var dataScope: TokenCostDataScope = .local
         var syncMessage: String?
-        if let configuration = CostSyncPreferences.configuration() {
+        if let configuration {
             let service = costLedgerSyncService
             do {
                 let result = try service.sync(

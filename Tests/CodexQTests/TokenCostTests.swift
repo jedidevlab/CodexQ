@@ -420,6 +420,68 @@ struct TokenCostTests {
         #expect(snapshot.skippedSessionFileCount == 1)
     }
 
+    @Test("启用多设备同步后无本机会话仍读取远端账本")
+    func readerLoadsRemoteLedgerWithoutLocalSessions() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let folder = root.appendingPathComponent("sync", isDirectory: true)
+        let remoteHome = root.appendingPathComponent("remote-home", isDirectory: true)
+        let localHome = root.appendingPathComponent("local-home", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        for home in [remoteHome, localHome] {
+            let codexDirectory = home.appendingPathComponent(".codex", isDirectory: true)
+            try FileManager.default.createDirectory(
+                at: codexDirectory,
+                withIntermediateDirectories: true
+            )
+            try #"{"tokens":{"account_id":"same-account"}}"#.write(
+                to: codexDirectory.appendingPathComponent("auth.json"),
+                atomically: true,
+                encoding: .utf8
+            )
+        }
+
+        let remoteService = CostLedgerSyncService(
+            homeDirectory: remoteHome,
+            cacheURL: root.appendingPathComponent("remote-cache.json")
+        )
+        let namespace = try remoteService.prepare(folderURL: folder)
+        _ = try remoteService.sync(
+            localRecords: [
+                TokenUsageRecord(
+                    eventID: "remote-event",
+                    timestamp: try date("2026-07-23T18:00:00Z"),
+                    model: "gpt-5.6-sol",
+                    inputTokens: 100,
+                    cachedInputTokens: 0,
+                    cacheWriteInputTokens: 0,
+                    outputTokens: 10,
+                    totalTokens: 110
+                )
+            ],
+            configuration: CostSyncConfiguration(
+                folderURL: folder,
+                deviceID: "remote-device",
+                namespace: namespace
+            )
+        )
+        let configuration = CostSyncConfiguration(
+            folderURL: folder,
+            deviceID: "local-device",
+            namespace: namespace
+        )
+
+        let snapshot = try await TokenCostReader(
+            homeDirectory: localHome,
+            costLedgerCacheURL: root.appendingPathComponent("local-cache.json"),
+            costSyncConfiguration: { configuration }
+        ).read(now: try date("2026-07-23T20:00:00Z"))
+
+        #expect(snapshot.today.totalTokens == 110)
+        #expect(snapshot.lifetime.totalTokens == 110)
+        #expect(snapshot.dataScope == .singleDevice)
+    }
+
     @Test("成本界面悬浮只高亮并由点击稳定展开面板内模型明细")
     func costSectionKeepsRequestedCompactInteraction() throws {
         let source = try String(
