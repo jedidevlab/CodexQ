@@ -497,15 +497,7 @@ struct TokenCostTests {
         #expect(!source.contains("累计成本"))
         #expect(source.contains("Text(\"今日\")"))
         #expect(source.contains("Text(scopeLabel)"))
-        let detailCardStart = try #require(source.range(of: "private struct TokenCostDetailCard"))
-        let detailCardEnd = try #require(source.range(
-            of: "private var displayedAmount",
-            range: detailCardStart.lowerBound..<source.endIndex
-        ))
-        let detailCardSource = String(source[detailCardStart.lowerBound..<detailCardEnd.lowerBound])
-        #expect(detailCardSource.contains(".font(.caption2)"))
-        #expect(detailCardSource.contains(".foregroundStyle(.secondary)"))
-        #expect(!detailCardSource.contains(".foregroundStyle(.tertiary)"))
+        #expect(source.contains(".foregroundStyle(.tertiary)"))
         #expect(!source.contains("Text(\"API 估算\")"))
         #expect(source.contains("hoveredKind"))
         #expect(source.contains("pinnedKind"))
