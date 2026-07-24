@@ -2,6 +2,23 @@ import Foundation
 import Testing
 @testable import CodexQ
 
+private final class LockedStrings: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storage: [String] = []
+
+    func append(_ value: String) {
+        lock.lock()
+        storage.append(value)
+        lock.unlock()
+    }
+
+    var values: [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return storage
+    }
+}
+
 struct CostLedgerSyncTests {
     @Test("两台设备只合并脱敏事件并按稳定标识去重")
     func mergesSanitizedDeviceLedgersByStableEventID() throws {
@@ -72,6 +89,123 @@ struct CostLedgerSyncTests {
         #expect(throws: CostLedgerSyncService.SyncError.accountMismatch) {
             _ = try CostLedgerSyncService(homeDirectory: secondHome).prepare(folderURL: folder)
         }
+    }
+
+    @Test("多台设备同时初始化空文件夹时采用同一个账本命名空间")
+    func concurrentPreparationUsesPersistedManifest() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let folder = root.appendingPathComponent("sync", isDirectory: true)
+        let home = root.appendingPathComponent("home", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try writeAuth(accountID: "same-account", home: home)
+        let namespaces = LockedStrings()
+
+        DispatchQueue.concurrentPerform(iterations: 16) { device in
+            do {
+                let service = CostLedgerSyncService(
+                    homeDirectory: home,
+                    cacheURL: root.appendingPathComponent("cache-\(device).json")
+                )
+                namespaces.append(try service.prepare(folderURL: folder))
+            } catch {
+                namespaces.append("error:\(error)")
+            }
+        }
+
+        #expect(namespaces.values.count == 16)
+        #expect(Set(namespaces.values).count == 1)
+    }
+
+    @Test("同账号清单发生竞争后同步采用文件夹中的权威命名空间")
+    func syncAdoptsAuthoritativeNamespace() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let folder = root.appendingPathComponent("sync", isDirectory: true)
+        let home = root.appendingPathComponent("home", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try writeAuth(accountID: "same-account", home: home)
+        let service = CostLedgerSyncService(
+            homeDirectory: home,
+            cacheURL: root.appendingPathComponent("cache.json")
+        )
+        let namespace = try service.prepare(folderURL: folder)
+
+        let result = try service.sync(
+            localRecords: [record(id: "valid-event", tokens: 100)],
+            configuration: CostSyncConfiguration(
+                folderURL: folder,
+                deviceID: "current-device",
+                namespace: "stale-namespace"
+            )
+        )
+
+        #expect(result.namespace == namespace)
+        #expect(result.records.count == 1)
+    }
+
+    @Test("聚合缓存超过容量时不保留旧缓存并明确报告")
+    func reportsAggregateCacheFailureWithoutKeepingStaleData() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let folder = root.appendingPathComponent("sync", isDirectory: true)
+        let home = root.appendingPathComponent("home", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try writeAuth(accountID: "same-account", home: home)
+        let service = CostLedgerSyncService(
+            homeDirectory: home,
+            cacheURL: root.appendingPathComponent("cache.json"),
+            cacheSizeLimit: 1
+        )
+        let namespace = try service.prepare(folderURL: folder)
+
+        let result = try service.sync(
+            localRecords: [record(id: "valid-event", tokens: 100)],
+            configuration: CostSyncConfiguration(
+                folderURL: folder,
+                deviceID: "current-device",
+                namespace: namespace
+            )
+        )
+
+        #expect(result.records.count == 1)
+        #expect(result.cacheWarning != nil)
+        #expect(service.loadCache(namespace: namespace) == nil)
+    }
+
+    @Test("已取消的成本同步在扫描账本前立即停止")
+    func cancelledSyncStopsBeforeScanningLedgers() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let folder = root.appendingPathComponent("sync", isDirectory: true)
+        let home = root.appendingPathComponent("home", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try writeAuth(accountID: "same-account", home: home)
+        let service = CostLedgerSyncService(
+            homeDirectory: home,
+            cacheURL: root.appendingPathComponent("cache.json")
+        )
+        let namespace = try service.prepare(folderURL: folder)
+        let task = Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            do {
+                _ = try service.sync(
+                    localRecords: [record(id: "valid-event", tokens: 100)],
+                    configuration: CostSyncConfiguration(
+                        folderURL: folder,
+                        deviceID: "current-device",
+                        namespace: namespace
+                    )
+                )
+                return false
+            } catch is CancellationError {
+                return true
+            } catch {
+                return false
+            }
+        }
+
+        #expect(await task.value)
     }
 
     @Test("本设备账本混入无效记录后会重建，避免多设备成本永久缺失")

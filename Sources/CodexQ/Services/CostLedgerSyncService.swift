@@ -40,6 +40,7 @@ struct CostLedgerSyncResult: Sendable {
     let deviceCount: Int
     let skippedFileCount: Int
     let namespace: String
+    let cacheWarning: String?
 }
 
 struct CostLedgerCachedResult: Sendable {
@@ -47,7 +48,7 @@ struct CostLedgerCachedResult: Sendable {
     let deviceCount: Int
 }
 
-struct CostLedgerSyncService {
+final class CostLedgerSyncService {
     enum SyncError: Equatable, LocalizedError {
         case folderUnavailable
         case accountUnavailable
@@ -159,17 +160,28 @@ struct CostLedgerSyncService {
 
     static let schemaVersion = 1
     static let maximumLedgerSize = 16 * 1_024 * 1_024
+    static let maximumCacheSize = 256 * 1_024 * 1_024
+
+    private struct CachedLedger {
+        let size: Int
+        let modificationDate: Date
+        let ledger: LedgerFile
+    }
 
     private let fileManager: FileManager
     private let authURL: URL
     private let cacheURL: URL
+    private let cacheSizeLimit: Int
+    private var ledgerCache: [URL: CachedLedger] = [:]
 
     init(
         homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser,
         fileManager: FileManager = .default,
-        cacheURL: URL? = nil
+        cacheURL: URL? = nil,
+        cacheSizeLimit: Int = CostLedgerSyncService.maximumCacheSize
     ) {
         self.fileManager = fileManager
+        self.cacheSizeLimit = cacheSizeLimit
         authURL = homeDirectory.appendingPathComponent(".codex/auth.json")
         self.cacheURL = cacheURL ?? FileManager.default
             .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -196,10 +208,8 @@ struct CostLedgerSyncService {
         localRecords: [TokenUsageRecord],
         configuration: CostSyncConfiguration
     ) throws -> CostLedgerSyncResult {
+        try Task.checkCancellation()
         let manifest = try validatedManifest(in: configuration.folderURL)
-        guard manifest.namespace == configuration.namespace else {
-            throw SyncError.invalidLedger
-        }
         let device = Self.digest(configuration.deviceID)
         try writeLocalLedgers(
             records: localRecords,
@@ -210,16 +220,29 @@ struct CostLedgerSyncService {
             folderURL: configuration.folderURL,
             namespace: manifest.namespace
         )
-        try? saveCache(result)
-        return result
+        let cacheWarning: String?
+        do {
+            try saveCache(result)
+            cacheWarning = nil
+        } catch {
+            try? fileManager.removeItem(at: cacheURL)
+            cacheWarning = "多设备缓存未更新，离线时将只显示本机成本"
+        }
+        return CostLedgerSyncResult(
+            records: result.records,
+            deviceCount: result.deviceCount,
+            skippedFileCount: result.skippedFileCount,
+            namespace: result.namespace,
+            cacheWarning: cacheWarning
+        )
     }
 
     func loadCache(namespace: String) -> CostLedgerCachedResult? {
-        guard let data = try? Data(contentsOf: cacheURL),
-              data.count <= Self.maximumLedgerSize,
+        guard let data = try? boundedData(at: cacheURL, sizeLimit: cacheSizeLimit),
               let cache = try? decoder.decode(CacheFile.self, from: data),
               cache.schemaVersion == Self.schemaVersion,
-              cache.namespace == namespace else {
+              cache.namespace == namespace,
+              cache.records.allSatisfy(\.isValid) else {
             return nil
         }
         return CostLedgerCachedResult(
@@ -256,8 +279,12 @@ struct CostLedgerSyncService {
             accountFingerprint: Self.fingerprint(accountID: accountID, salt: salt),
             createdAt: Date()
         )
-        try write(manifest, to: url)
-        return manifest
+        do {
+            try write(manifest, to: url, options: .withoutOverwriting)
+        } catch {
+            guard fileManager.fileExists(atPath: url.path) else { throw error }
+        }
+        return try validatedManifest(in: folderURL)
     }
 
     private func writeLocalLedgers(
@@ -307,29 +334,53 @@ struct CostLedgerSyncService {
         let devicesURL = folderURL.appendingPathComponent("devices", isDirectory: true)
         guard let enumerator = fileManager.enumerator(
             at: devicesURL,
-            includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey],
+            includingPropertiesForKeys: [
+                .isRegularFileKey,
+                .fileSizeKey,
+                .contentModificationDateKey
+            ],
             options: [.skipsHiddenFiles]
         ) else {
             return CostLedgerSyncResult(
                 records: [],
                 deviceCount: 0,
                 skippedFileCount: 0,
-                namespace: namespace
+                namespace: namespace,
+                cacheWarning: nil
             )
         }
 
         var byID: [String: LedgerEntry] = [:]
         var devices = Set<String>()
         var skipped = 0
+        var liveFiles = Set<URL>()
         for case let url as URL in enumerator where url.pathExtension == "json" {
             do {
-                let values = try url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
+                try Task.checkCancellation()
+                liveFiles.insert(url)
+                let values = try url.resourceValues(
+                    forKeys: [.isRegularFileKey, .fileSizeKey, .contentModificationDateKey]
+                )
                 guard values.isRegularFile == true,
                       (values.fileSize ?? 0) <= Self.maximumLedgerSize else {
                     skipped += 1
                     continue
                 }
-                let ledger = try decoder.decode(LedgerFile.self, from: boundedData(at: url))
+                let size = values.fileSize ?? 0
+                let modificationDate = values.contentModificationDate ?? .distantPast
+                let ledger: LedgerFile
+                if let cached = ledgerCache[url],
+                   cached.size == size,
+                   cached.modificationDate == modificationDate {
+                    ledger = cached.ledger
+                } else {
+                    ledger = try decoder.decode(LedgerFile.self, from: boundedData(at: url))
+                    ledgerCache[url] = CachedLedger(
+                        size: size,
+                        modificationDate: modificationDate,
+                        ledger: ledger
+                    )
+                }
                 guard ledger.schemaVersion == Self.schemaVersion,
                       !ledger.device.isEmpty,
                       !ledger.month.isEmpty,
@@ -341,16 +392,21 @@ struct CostLedgerSyncService {
                 for entry in ledger.records where !entry.eventID.isEmpty {
                     byID[entry.eventID] = entry
                 }
+            } catch is CancellationError {
+                throw CancellationError()
             } catch {
+                ledgerCache.removeValue(forKey: url)
                 skipped += 1
             }
         }
+        ledgerCache = ledgerCache.filter { liveFiles.contains($0.key) }
         _ = namespace
         return CostLedgerSyncResult(
             records: byID.values.map(\.record),
             deviceCount: devices.count,
             skippedFileCount: skipped,
-            namespace: namespace
+            namespace: namespace,
+            cacheWarning: nil
         )
     }
 
@@ -365,7 +421,7 @@ struct CostLedgerSyncService {
             deviceCount: result.deviceCount,
             records: result.records.compactMap(LedgerEntry.init)
         )
-        try write(cache, to: cacheURL)
+        try writeIfChanged(cache, to: cacheURL, sizeLimit: cacheSizeLimit)
     }
 
     private func accountID() throws -> String {
@@ -379,24 +435,36 @@ struct CostLedgerSyncService {
         return accountID
     }
 
-    private func boundedData(at url: URL) throws -> Data {
+    private func boundedData(
+        at url: URL,
+        sizeLimit: Int = CostLedgerSyncService.maximumLedgerSize
+    ) throws -> Data {
         let values = try url.resourceValues(forKeys: [.fileSizeKey])
-        guard (values.fileSize ?? 0) <= Self.maximumLedgerSize else {
+        guard (values.fileSize ?? 0) <= sizeLimit else {
             throw SyncError.invalidLedger
         }
         return try Data(contentsOf: url, options: .mappedIfSafe)
     }
 
-    private func write<T: Encodable>(_ value: T, to url: URL) throws {
+    private func write<T: Encodable>(
+        _ value: T,
+        to url: URL,
+        sizeLimit: Int = CostLedgerSyncService.maximumLedgerSize,
+        options: Data.WritingOptions = .atomic
+    ) throws {
         let data = try encoder.encode(value)
-        guard data.count <= Self.maximumLedgerSize else { throw SyncError.invalidLedger }
-        try data.write(to: url, options: .atomic)
+        guard data.count <= sizeLimit else { throw SyncError.invalidLedger }
+        try data.write(to: url, options: options)
     }
 
-    private func writeIfChanged<T: Encodable>(_ value: T, to url: URL) throws {
+    private func writeIfChanged<T: Encodable>(
+        _ value: T,
+        to url: URL,
+        sizeLimit: Int = CostLedgerSyncService.maximumLedgerSize
+    ) throws {
         let data = try encoder.encode(value)
-        guard data.count <= Self.maximumLedgerSize else { throw SyncError.invalidLedger }
-        if let existing = try? boundedData(at: url), existing == data {
+        guard data.count <= sizeLimit else { throw SyncError.invalidLedger }
+        if let existing = try? boundedData(at: url, sizeLimit: sizeLimit), existing == data {
             return
         }
         try data.write(to: url, options: .atomic)

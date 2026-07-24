@@ -35,6 +35,7 @@ actor TokenCostReader {
     private let sessionsDirectory: URL
     private let authURL: URL
     private let fileManager: FileManager
+    private let costLedgerSyncService: CostLedgerSyncService
     private var cache: [URL: CachedFile] = [:]
 
     init(
@@ -44,6 +45,10 @@ actor TokenCostReader {
         sessionsDirectory = homeDirectory.appendingPathComponent(".codex/sessions", isDirectory: true)
         authURL = homeDirectory.appendingPathComponent(".codex/auth.json")
         self.fileManager = fileManager
+        costLedgerSyncService = CostLedgerSyncService(
+            homeDirectory: homeDirectory,
+            fileManager: fileManager
+        )
     }
 
     func read(now: Date = Date()) throws -> TokenCostSnapshot {
@@ -96,21 +101,34 @@ actor TokenCostReader {
         var dataScope: TokenCostDataScope = .local
         var syncMessage: String?
         if let configuration = CostSyncPreferences.configuration() {
-            let service = CostLedgerSyncService()
+            let service = costLedgerSyncService
             do {
                 let result = try service.sync(
                     localRecords: uniqueRecords,
                     configuration: configuration
                 )
+                if result.namespace != configuration.namespace {
+                    UserDefaults.standard.set(
+                        result.namespace,
+                        forKey: CostSyncPreferences.namespaceKey
+                    )
+                }
                 costRecords = Self.mergedRecords(uniqueRecords + result.records)
+                var syncMessages: [String] = []
                 if result.skippedFileCount > 0 {
                     dataScope = .partial(deviceCount: max(1, result.deviceCount))
-                    syncMessage = "有 \(result.skippedFileCount) 个设备账本未纳入成本"
+                    syncMessages.append("有 \(result.skippedFileCount) 个设备账本未纳入成本")
                 } else if result.deviceCount > 1 {
                     dataScope = .multiDevice(deviceCount: result.deviceCount)
                 } else {
                     dataScope = .singleDevice
                 }
+                if let cacheWarning = result.cacheWarning {
+                    syncMessages.append(cacheWarning)
+                }
+                syncMessage = syncMessages.isEmpty
+                    ? nil
+                    : syncMessages.joined(separator: "；")
             } catch {
                 if let syncError = error as? CostLedgerSyncService.SyncError,
                    syncError == .accountMismatch || syncError == .accountUnavailable {
