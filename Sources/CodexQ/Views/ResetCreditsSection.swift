@@ -57,7 +57,11 @@ struct ResetCreditsSection: View {
                                     .fixedSize(horizontal: true, vertical: false)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.vertical, 6)
+                            .padding(.top, 6)
+                            .padding(
+                                .bottom,
+                                row.id == presentation.rows.last?.id ? 2 : 6
+                            )
 
                             if row.id != presentation.rows.last?.id {
                                 InsetSeparator()

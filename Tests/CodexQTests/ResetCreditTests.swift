@@ -297,7 +297,8 @@ struct ResetCreditUISafetyTests {
         #expect(source.contains(".layoutPriority(1)"))
         #expect(source.contains("Spacer(minLength: 8)"))
         #expect(source.contains(".fixedSize(horizontal: true, vertical: false)"))
-        #expect(source.contains(".padding(.vertical, 6)"))
+        #expect(source.contains(".padding(.top, 6)"))
+        #expect(source.contains("row.id == presentation.rows.last?.id ? 2 : 6"))
     }
 
     @Test("重置记录下方与分割线保持紧凑间距")
@@ -307,10 +308,10 @@ struct ResetCreditUISafetyTests {
             encoding: .utf8
         )
 
-        #expect(source.contains(".padding(.vertical, 6)"))
+        #expect(source.contains(".padding(.top, 6)"))
+        #expect(source.contains("row.id == presentation.rows.last?.id ? 2 : 6"))
         #expect(!source.contains(".padding(.vertical, 1)"))
         #expect(!source.contains(".padding(.top, 5)"))
-        #expect(!source.contains(".padding(.bottom, 2)"))
     }
 
     @Test("重置展开状态由弹窗持有以便关闭时复位")
