@@ -56,12 +56,6 @@ struct TokenActivitySection: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            if let errorMessage {
-                Text("Token 活动刷新失败，显示上次数据")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .help(errorMessage)
-            }
         } else if let errorMessage {
             Text("Token 活动暂不可用")
                 .font(.caption)

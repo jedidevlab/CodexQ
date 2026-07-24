@@ -67,6 +67,7 @@ final class AppSettings: ObservableObject {
             icloudCostSyncFolderPath = path
             icloudCostSyncEnabled = true
             icloudCostSyncSetupError = nil
+            NotificationCenter.default.post(name: .codexQCostSyncPreferencesDidChange, object: nil)
         } catch {
             icloudCostSyncSetupError = error.localizedDescription
             throw error
@@ -77,6 +78,7 @@ final class AppSettings: ObservableObject {
         defaults.set(false, forKey: CostSyncPreferences.enabledKey)
         icloudCostSyncEnabled = false
         icloudCostSyncSetupError = nil
+        NotificationCenter.default.post(name: .codexQCostSyncPreferencesDidChange, object: nil)
     }
 
     func updateNotificationPermissionWarning(authorizationGranted: Bool) {

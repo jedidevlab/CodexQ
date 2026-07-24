@@ -11,7 +11,9 @@ final class StatusBarController: NSObject {
         backing: .buffered,
         defer: false
     )
-    private let store = QuotaStore()
+    private let store = QuotaStore(
+        costSyncChangeEvents: { CostSyncFolderChangeStream.shared.events() }
+    )
     private var hostingController: NSHostingController<AnyView>?
     private var cancellables = Set<AnyCancellable>()
     private var autoCloseTask: Task<Void, Never>?
@@ -60,8 +62,8 @@ final class StatusBarController: NSObject {
         }
 
         if let button = statusItem.button {
-            button.action = #selector(togglePopover)
             button.target = self
+            button.action = #selector(togglePopover)
             button.imagePosition = .imageLeading
             button.image = StatusIconRenderer.image(
                 source: image,
@@ -263,21 +265,28 @@ final class StatusBarController: NSObject {
     }
 
     private func updateStatusItem() {
+        guard let button = statusItem.button else { return }
         let remainingPercent = store.snapshot?.statusRemainingPercent
         let error = store.errorMessage
         let now = Date()
+        let title = StatusTitleFormatter.string(
+            remainingPercent: remainingPercent,
+            lastUpdatedAt: store.lastUpdatedAt,
+            error: error,
+            now: now
+        )
+        let toolTip = StatusTitleFormatter.toolTip(
+            remainingPercent: remainingPercent,
+            lastUpdatedAt: store.lastUpdatedAt,
+            error: error,
+            now: now
+        )
 
-        statusItem.button?.title = StatusTitleFormatter.string(
-            remainingPercent: remainingPercent,
-            lastUpdatedAt: store.lastUpdatedAt,
-            error: error,
-            now: now
-        )
-        statusItem.button?.toolTip = StatusTitleFormatter.toolTip(
-            remainingPercent: remainingPercent,
-            lastUpdatedAt: store.lastUpdatedAt,
-            error: error,
-            now: now
-        )
+        if button.title != title {
+            button.title = title
+        }
+        if button.toolTip != toolTip {
+            button.toolTip = toolTip
+        }
     }
 }

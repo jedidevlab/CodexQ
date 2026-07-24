@@ -155,6 +155,44 @@ struct TokenActivityViewTests {
         costGate.open()
     }
 
+    @Test("活动与成本并发完成后发布账号补算结果")
+    @MainActor
+    func reconcilesPublishedCostWithAccountActivity() async {
+        let quota = QuotaSnapshot(
+            fiveHour: .init(usedPercent: 25, resetsAt: nil, durationMinutes: 300),
+            weekly: .init(usedPercent: 40, resetsAt: nil, durationMinutes: 10_080)
+        )
+        let activity = TokenActivitySnapshot(
+            peakDailyTokens: 150,
+            lifetimeTokens: 150,
+            days: []
+        )
+        let recordedCost = tokenCostSnapshot(tokens: 100, cost: 2)
+        let store = QuotaStore(
+            readRateLimits: { quota },
+            readTokenActivity: { activity },
+            readTokenCost: { recordedCost },
+            loadCachedSnapshot: { nil },
+            saveCachedSnapshot: { _ in },
+            notifyQuotaCrossings: { _, _ in }
+        )
+        let finished = AsyncStream<Void>.makeStream()
+        var finishedIterator = finished.stream.makeAsyncIterator()
+        let cancellable = store.$isTokenActivityRefreshing
+            .dropFirst()
+            .filter { !$0 }
+            .sink { _ in finished.continuation.yield() }
+
+        #expect(await store.refresh())
+        _ = await finishedIterator.next()
+
+        #expect(store.tokenCost?.lifetime.recordedTokens == 100)
+        #expect(store.tokenCost?.lifetime.totalTokens == 150)
+        #expect(store.tokenCost?.lifetime.recordedEstimatedCostUSD == 2)
+        #expect(store.tokenCost?.lifetime.supplement?.estimatedCostUSD == 1)
+        withExtendedLifetime(cancellable) {}
+    }
+
     @Test("Token 活动失败不回滚额度缓存和通知")
     @MainActor
     func activityFailurePreservesQuotaSideEffects() async {
@@ -190,6 +228,42 @@ struct TokenActivityViewTests {
         #expect(cacheSaveCount == 1)
         #expect(notificationCallCount == 1)
         withExtendedLifetime(cancellable) {}
+    }
+
+    @Test("合并请求失败时仍单独刷新额度和 Token 活动")
+    @MainActor
+    func dashboardActivityFailureFallsBackToQuotaRefresh() async {
+        let quota = QuotaSnapshot(
+            fiveHour: .init(usedPercent: 25, resetsAt: nil, durationMinutes: 300),
+            weekly: .init(usedPercent: 40, resetsAt: nil, durationMinutes: 10_080)
+        )
+        let activity = TokenActivitySnapshot(
+            peakDailyTokens: 150,
+            lifetimeTokens: 150,
+            days: [.init(startDate: "2026-07-24", tokens: 150)]
+        )
+        let fallbackCalls = ActivityCounter()
+        let store = QuotaStore(
+            readDashboardSnapshots: { throw ActivityFixtureError.unavailable },
+            readRateLimits: {
+                _ = await fallbackCalls.increment()
+                return quota
+            },
+            readTokenActivity: { activity },
+            readTokenCost: { emptyTokenCostSnapshot() },
+            loadCachedSnapshot: { nil },
+            saveCachedSnapshot: { _ in },
+            notifyQuotaCrossings: { _, _ in }
+        )
+
+        let succeeded = await store.refresh()
+
+        #expect(succeeded)
+        #expect(store.snapshot == quota)
+        #expect(store.errorMessage == nil)
+        #expect(store.tokenActivity == activity)
+        #expect(store.tokenActivityErrorMessage == nil)
+        #expect(await fallbackCalls.value == 1)
     }
 
     @Test("临时失败保留上次成功的 Token 活动和成本")
@@ -236,6 +310,95 @@ struct TokenActivityViewTests {
         #expect(store.tokenActivityErrorMessage != nil)
         #expect(store.tokenCostErrorMessage != nil)
         withExtendedLifetime(cancellable) {}
+    }
+
+    @Test("同步文件变化只刷新 Token 成本")
+    @MainActor
+    func costSyncFileChangeRefreshesOnlyTokenCost() async {
+        let changes = AsyncStream<Void>.makeStream()
+        let costPublished = AsyncStream<TokenCostSnapshot>.makeStream()
+        var costIterator = costPublished.stream.makeAsyncIterator()
+        let quotaCalls = ActivityCounter()
+        let activityCalls = ActivityCounter()
+        let costCalls = ActivityCounter()
+        let quota = QuotaSnapshot(
+            fiveHour: .init(usedPercent: 25, resetsAt: nil, durationMinutes: 300),
+            weekly: .init(usedPercent: 40, resetsAt: nil, durationMinutes: 10_080)
+        )
+        let expectedCost = tokenCostSnapshot(tokens: 200, cost: 4)
+        let store = QuotaStore(
+            readRateLimits: {
+                _ = await quotaCalls.increment()
+                return quota
+            },
+            readTokenActivity: {
+                _ = await activityCalls.increment()
+                return .init(peakDailyTokens: 0, days: [])
+            },
+            readTokenCost: {
+                _ = await costCalls.increment()
+                return expectedCost
+            },
+            costSyncChangeEvents: { changes.stream },
+            costSyncChangeDebounce: .milliseconds(1),
+            loadCachedSnapshot: { nil },
+            saveCachedSnapshot: { _ in },
+            notifyQuotaCrossings: { _, _ in }
+        )
+        let cancellable = store.$tokenCost
+            .compactMap { $0 }
+            .sink { costPublished.continuation.yield($0) }
+
+        changes.continuation.yield()
+        let published = await costIterator.next()
+        store.stop()
+
+        #expect(published == expectedCost)
+        #expect(await costCalls.value == 1)
+        #expect(await quotaCalls.value == 0)
+        #expect(await activityCalls.value == 0)
+        withExtendedLifetime(cancellable) {}
+    }
+
+    @Test("成本刷新期间收到同步变化会在完成后补刷")
+    @MainActor
+    func costSyncFileChangeDuringRefreshQueuesAnotherRefresh() async {
+        let changes = AsyncStream<Void>.makeStream()
+        let firstCostStarted = AsyncStream<Void>.makeStream()
+        var firstCostStartedIterator = firstCostStarted.stream.makeAsyncIterator()
+        let firstCostGate = ActivityGate()
+        let costCalls = ActivityCounter()
+        let initialCost = tokenCostSnapshot(tokens: 100, cost: 2)
+        let updatedCost = tokenCostSnapshot(tokens: 200, cost: 4)
+        let store = QuotaStore(
+            readTokenCost: {
+                let call = await costCalls.increment()
+                if call == 1 {
+                    firstCostStarted.continuation.yield()
+                    await firstCostGate.wait()
+                    return initialCost
+                }
+                return updatedCost
+            },
+            costSyncChangeEvents: { changes.stream },
+            costSyncChangeDebounce: .milliseconds(1),
+            loadCachedSnapshot: { nil },
+            saveCachedSnapshot: { _ in },
+            notifyQuotaCrossings: { _, _ in }
+        )
+
+        changes.continuation.yield()
+        _ = await firstCostStartedIterator.next()
+        changes.continuation.yield()
+        try? await Task.sleep(for: .milliseconds(20))
+        firstCostGate.open()
+        for _ in 0..<100 where await costCalls.value < 2 {
+            try? await Task.sleep(for: .milliseconds(1))
+        }
+        store.stop()
+
+        #expect(await costCalls.value == 2)
+        #expect(store.tokenCost == updatedCost)
     }
 
     @Test("重置明细瞬时缺失时保留同次数下尚未到期的最近明细")
@@ -390,7 +553,6 @@ struct TokenActivityViewTests {
             contentsOfFile: "Sources/CodexQ/Views/QuotaPopoverView.swift",
             encoding: .utf8
         )
-
         #expect(source.contains("PlanTypeFormatter.displayName(for: snapshot.planType)"))
         #expect(source.contains("PlanHeader(planName: planName)"))
         #expect(source.contains("private struct PlanHeader"))
@@ -624,25 +786,36 @@ struct TokenActivityViewTests {
         #expect(settingsSource.contains("HStack(spacing: 4)"))
     }
 
-    @Test("iCloud 同步设置简明说明影响并将文件夹按钮紧邻开关")
+    @Test("iCloud 同步设置明确区分活动与成本，并始终提供文件夹选择")
     func costSyncSettingsExplainDataImpact() throws {
         let source = try String(
             contentsOfFile: "Sources/CodexQ/Views/QuotaPopoverView.swift",
             encoding: .utf8
         )
-        let toggleRange = try #require(source.range(of: "Toggle(\"iCloud 同步\""))
-        let buttonRange = try #require(source.range(of: "Button(\"更换文件夹…\")"))
-        let syncRowBetweenControls = source[toggleRange.upperBound..<buttonRange.lowerBound]
+        let impactRowSource = try sourceSection(
+            source,
+            from: "private func syncImpactRow",
+            to: "private struct QuotaRow"
+        )
 
-        #expect(!syncRowBetweenControls.contains("Spacer"))
+        #expect(source.contains("Toggle(\"启用 iCloud 多设备成本同步\""))
+        #expect(source.contains("ScrollingFolderPathText(path: settings.icloudCostSyncFolderPath)"))
+        #expect(source.contains("Button(\"选择文件夹\")"))
+        #expect(source.contains("path ?? \"尚未选择文件夹\""))
+        #expect(source.contains(".repeatForever(autoreverses: true)"))
+        #expect(source.contains("\"chart.bar.fill\""))
+        #expect(source.contains("\"Token 活动不受影响\""))
+        #expect(source.contains("\"始终读取当前账号的 app-server 数据。\""))
+        #expect(source.contains("\"dollarsign.circle\""))
+        #expect(source.contains("\"Token 成本\""))
+        #expect(source.contains("\"关闭仅统计本机；开启合并统计多设备。\""))
         #expect(source.contains(".buttonStyle(.bordered)"))
         #expect(source.contains(".controlSize(.small)"))
-        #expect(!source.contains("icloudCostSyncFolderName"))
-        #expect(source.contains("\"未开启：活动不变；成本仅统计本机。\""))
-        #expect(source.contains("\"Token 活动不影响；成本汇总多台 Mac。\""))
-        #expect(source.contains("Text(\"仅同步模型、时间和 Token 数，不含会话及登录信息。\")"))
-        #expect(source.contains(".minimumScaleFactor(0.85)"))
         #expect(source.contains("ICloudDriveFolderPicker.chooseFolder()"))
+        #expect(!source.contains("costSyncDidChange"))
+        #expect(impactRowSource.contains(
+            "VStack(alignment: .leading, spacing: 2) {\n            HStack(alignment: .top, spacing: 8) {"
+        ))
     }
 
     @Test("鼠标停留与展开状态会上报并在关闭后复位")
@@ -756,6 +929,7 @@ struct TokenActivityViewTests {
         #expect(popoverSource.contains("isRefreshing: store.isTokenActivityRefreshing"))
         #expect(activitySource.contains("hasRecordedTokens"))
         #expect(gridIndex.lowerBound < emptyIndex.lowerBound)
+        #expect(!activitySource.contains("Token 活动刷新失败，显示上次数据"))
     }
 
     @Test("设计与计划采用按弹窗宽度扩展的合并热力图")
@@ -822,6 +996,25 @@ private func emptyTokenCostSnapshot() -> TokenCostSnapshot {
         yesterday: TokenCostPeriodSummary(kind: .yesterday, models: []),
         subscription: nil,
         lifetime: TokenCostPeriodSummary(kind: .lifetime, models: []),
+        subscriptionPeriod: nil
+    )
+}
+
+private func tokenCostSnapshot(tokens: Int64, cost: Double) -> TokenCostSnapshot {
+    let model = TokenCostModelSummary(
+        model: "gpt-test",
+        inputTokens: tokens,
+        cachedInputTokens: 0,
+        cacheWriteInputTokens: 0,
+        outputTokens: 0,
+        totalTokens: tokens,
+        estimatedCostUSD: cost
+    )
+    return TokenCostSnapshot(
+        today: TokenCostPeriodSummary(kind: .today, models: [model]),
+        yesterday: TokenCostPeriodSummary(kind: .yesterday, models: []),
+        subscription: nil,
+        lifetime: TokenCostPeriodSummary(kind: .lifetime, models: [model]),
         subscriptionPeriod: nil
     )
 }

@@ -234,6 +234,8 @@ private struct TokenCostDetailCard: View {
     let subscriptionPeriod: DateInterval?
     let dataScope: TokenCostDataScope
 
+    @State private var isSupplementExplanationPresented = false
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
@@ -256,6 +258,8 @@ private struct TokenCostDetailCard: View {
                 }
             }
 
+            costBreakdown
+
             Text(footerText)
                 .font(.system(size: 9))
                 .foregroundStyle(.tertiary)
@@ -271,8 +275,8 @@ private struct TokenCostDetailCard: View {
     }
 
     private func modelRow(_ model: TokenCostModelSummary) -> some View {
-        let fraction = summary.totalTokens > 0
-            ? Double(model.totalTokens) / Double(summary.totalTokens)
+        let fraction = summary.recordedTokens > 0
+            ? Double(model.totalTokens) / Double(summary.recordedTokens)
             : 0
         return VStack(alignment: .leading, spacing: 3) {
             HStack(alignment: .firstTextBaseline) {
@@ -306,6 +310,67 @@ private struct TokenCostDetailCard: View {
                 + "缓存 \(TokenCountFormatter.compactNumber(model.cachedInputTokens)) · "
                 + "输出 \(TokenCountFormatter.compactNumber(model.outputTokens))"
         )
+    }
+
+    private var costBreakdown: some View {
+        VStack(spacing: 4) {
+            Divider()
+                .opacity(0.55)
+            costRow(
+                label: "设备记录",
+                tokens: summary.recordedTokens,
+                amount: summary.recordedEstimatedCostUSD
+            )
+            if let supplement = summary.supplement {
+                costRow(
+                    label: "官方差额",
+                    tokens: supplement.tokens,
+                    amount: supplement.estimatedCostUSD,
+                    showsSupplementInfo: true
+                )
+            }
+        }
+    }
+
+    private func costRow(
+        label: String,
+        tokens: Int64,
+        amount: Double,
+        showsSupplementInfo: Bool = false
+    ) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Text(label)
+            Text(TokenCountFormatter.string(tokens))
+                .foregroundStyle(.secondary)
+            if showsSupplementInfo {
+                Button {
+                    isSupplementExplanationPresented.toggle()
+                } label: {
+                    Image(systemName: "info.circle")
+                        .font(.caption2)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .help("解释官方差额")
+                .accessibilityLabel("解释官方差额")
+                .popover(isPresented: $isSupplementExplanationPresented, arrowEdge: .bottom) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("官方差额说明")
+                            .font(.caption.weight(.semibold))
+                        Text("官方 Token 数据高于设备记录时，对没有明细的差额按设备记录平均单价估算。")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(10)
+                    .frame(width: 210, alignment: .leading)
+                }
+            }
+            Spacer()
+            Text(TokenCostFormatter.amount(amount))
+                .monospacedDigit()
+        }
+        .font(.caption2)
     }
 
     private var detailTitle: String {

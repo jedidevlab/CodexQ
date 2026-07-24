@@ -1,4 +1,11 @@
 import AppKit
+import CoreGraphics
+
+enum ScreenSessionState {
+    static func isLocked(_ session: [String: Any]?) -> Bool {
+        session?["CGSSessionScreenIsLocked"] as? Bool ?? false
+    }
+}
 
 @main
 enum CodexQApp {
@@ -16,12 +23,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusController: StatusBarController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self,
+            selector: #selector(sessionDidBecomeActive(_:)),
+            name: NSWorkspace.sessionDidBecomeActiveNotification,
+            object: nil
+        )
         DispatchQueue.main.async { [weak self] in
-            self?.statusController = StatusBarController()
+            self?.startStatusControllerIfNeeded()
         }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        NSWorkspace.shared.notificationCenter.removeObserver(self)
         statusController?.stop()
+    }
+
+    @objc private func sessionDidBecomeActive(_ notification: Notification) {
+        startStatusControllerIfNeeded()
+    }
+
+    private func startStatusControllerIfNeeded() {
+        guard statusController == nil,
+              !ScreenSessionState.isLocked(
+                CGSessionCopyCurrentDictionary() as? [String: Any]
+              ) else {
+            return
+        }
+        statusController = StatusBarController()
+        NSWorkspace.shared.notificationCenter.removeObserver(self)
     }
 }

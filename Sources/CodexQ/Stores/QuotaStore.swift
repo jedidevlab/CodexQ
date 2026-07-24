@@ -25,9 +25,14 @@ final class QuotaStore: ObservableObject {
     private let readTokenCost: @Sendable () async throws -> TokenCostSnapshot
     private let saveCachedSnapshot: (CachedQuotaSnapshot) -> Void
     private let notifyQuotaCrossings: (QuotaSnapshot?, QuotaSnapshot) async -> Void
+    private let costSyncChangeDebounce: Duration
     private var refreshTask: Task<Void, Never>?
     private var tokenActivityTask: Task<Void, Never>?
+    private var costSyncChangeTask: Task<Void, Never>?
+    private var costSyncDebounceTask: Task<Void, Never>?
     private var tokenActivityGeneration = 0
+    private var pendingCostSyncRefresh = false
+    private var recordedTokenCost: TokenCostSnapshot?
 
     init(
         readDashboardSnapshots: (@Sendable () async throws -> AppServerSnapshots)? = nil,
@@ -36,6 +41,8 @@ final class QuotaStore: ObservableObject {
         readTokenCost: @escaping @Sendable () async throws -> TokenCostSnapshot = {
             try await readCurrentTokenCost()
         },
+        costSyncChangeEvents: (@Sendable () -> AsyncStream<Void>)? = nil,
+        costSyncChangeDebounce: Duration = .seconds(2),
         loadCachedSnapshot: () -> CachedQuotaSnapshot? = SnapshotCache.load,
         saveCachedSnapshot: @escaping (CachedQuotaSnapshot) -> Void = SnapshotCache.save,
         notifyQuotaCrossings: ((QuotaSnapshot?, QuotaSnapshot) async -> Void)? = nil
@@ -57,6 +64,7 @@ final class QuotaStore: ObservableObject {
             try await AppServerClient().readTokenActivity()
         }
         self.readTokenCost = readTokenCost
+        self.costSyncChangeDebounce = costSyncChangeDebounce
         self.saveCachedSnapshot = saveCachedSnapshot
         self.notifyQuotaCrossings = notifyQuotaCrossings ?? { previous, current in
             let settings = AppSettings.shared
@@ -74,6 +82,14 @@ final class QuotaStore: ObservableObject {
         if let cached = loadCachedSnapshot() {
             snapshot = cached.snapshot
             lastUpdatedAt = cached.updatedAt
+        }
+        if let costSyncChangeEvents {
+            costSyncChangeTask = Task { [weak self] in
+                for await _ in costSyncChangeEvents() {
+                    guard let self, !Task.isCancelled else { return }
+                    self.scheduleTokenCostRefreshFromSyncChange()
+                }
+            }
         }
     }
 
@@ -102,6 +118,11 @@ final class QuotaStore: ObservableObject {
         tokenActivityGeneration += 1
         tokenActivityTask?.cancel()
         tokenActivityTask = nil
+        costSyncChangeTask?.cancel()
+        costSyncChangeTask = nil
+        costSyncDebounceTask?.cancel()
+        costSyncDebounceTask = nil
+        pendingCostSyncRefresh = false
         isTokenActivityRefreshing = false
     }
 
@@ -137,10 +158,39 @@ final class QuotaStore: ObservableObject {
         do {
             let newSnapshot: QuotaSnapshot
             if let readDashboardSnapshots {
-                let dashboard = try await readDashboardSnapshots()
-                newSnapshot = dashboard.quota
-                tokenActivity = dashboard.tokenActivity
-                tokenActivityErrorMessage = nil
+                do {
+                    let dashboard = try await readDashboardSnapshots()
+                    newSnapshot = dashboard.quota
+                    tokenActivity = dashboard.tokenActivity
+                    tokenActivityErrorMessage = nil
+                    publishTokenCost()
+                } catch is CancellationError {
+                    throw CancellationError()
+                } catch {
+                    tokenActivityErrorMessage = error.localizedDescription
+                    async let fallbackActivity: TokenRefreshResult = {
+                        do {
+                            return .activity(try await readTokenActivity(), nil)
+                        } catch is CancellationError {
+                            return .activity(nil, nil)
+                        } catch {
+                            return .activity(nil, error.localizedDescription)
+                        }
+                    }()
+                    newSnapshot = try await readRateLimits()
+                    switch await fallbackActivity {
+                    case let .activity(activity, errorMessage):
+                        if let activity {
+                            tokenActivity = activity
+                            tokenActivityErrorMessage = nil
+                            publishTokenCost()
+                        } else if let errorMessage {
+                            tokenActivityErrorMessage = errorMessage
+                        }
+                    case .cost:
+                        break
+                    }
+                }
             } else {
                 newSnapshot = try await readRateLimits()
             }
@@ -210,10 +260,7 @@ final class QuotaStore: ObservableObject {
 
         tokenActivityTask = Task { [weak self, readTokenActivity, readTokenCost] in
             defer {
-                if let self, self.tokenActivityGeneration == generation {
-                    self.isTokenActivityRefreshing = false
-                    self.tokenActivityTask = nil
-                }
+                self?.finishTokenRefresh(generation: generation)
             }
             await withTaskGroup(of: TokenRefreshResult.self) { group in
                 group.addTask {
@@ -245,12 +292,14 @@ final class QuotaStore: ObservableObject {
                         if let activity {
                             self.tokenActivity = activity
                             self.tokenActivityErrorMessage = nil
+                            self.publishTokenCost()
                         } else if let errorMessage {
                             self.tokenActivityErrorMessage = errorMessage
                         }
                     case let .cost(cost, errorMessage):
                         if let cost {
-                            self.tokenCost = cost
+                            self.recordedTokenCost = cost
+                            self.publishTokenCost()
                             self.tokenCostErrorMessage = nil
                         } else if let errorMessage {
                             self.tokenCostErrorMessage = errorMessage
@@ -269,17 +318,15 @@ final class QuotaStore: ObservableObject {
 
         tokenActivityTask = Task { [weak self, readTokenCost] in
             defer {
-                if let self, self.tokenActivityGeneration == generation {
-                    self.isTokenActivityRefreshing = false
-                    self.tokenActivityTask = nil
-                }
+                self?.finishTokenRefresh(generation: generation)
             }
             do {
                 let cost = try await readTokenCost()
                 guard let self,
                       self.tokenActivityGeneration == generation,
                       !Task.isCancelled else { return }
-                self.tokenCost = cost
+                self.recordedTokenCost = cost
+                self.publishTokenCost()
                 self.tokenCostErrorMessage = nil
             } catch is CancellationError {
                 return
@@ -290,6 +337,45 @@ final class QuotaStore: ObservableObject {
                 self.tokenCostErrorMessage = error.localizedDescription
             }
         }
+    }
+
+    private func scheduleTokenCostRefreshFromSyncChange() {
+        costSyncDebounceTask?.cancel()
+        costSyncDebounceTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                try await Task.sleep(for: costSyncChangeDebounce)
+            } catch {
+                return
+            }
+            guard !Task.isCancelled else { return }
+            guard self.tokenActivityTask == nil else {
+                self.pendingCostSyncRefresh = true
+                return
+            }
+            self.startTokenCostRefreshIfNeeded()
+        }
+    }
+
+    private func finishTokenRefresh(generation: Int) {
+        guard tokenActivityGeneration == generation else { return }
+        isTokenActivityRefreshing = false
+        tokenActivityTask = nil
+        guard pendingCostSyncRefresh else { return }
+        pendingCostSyncRefresh = false
+        startTokenCostRefreshIfNeeded()
+    }
+
+    private func publishTokenCost() {
+        guard let recordedTokenCost else { return }
+        guard let tokenActivity else {
+            tokenCost = recordedTokenCost
+            return
+        }
+        tokenCost = TokenCostReconciler.reconcile(
+            recordedTokenCost,
+            with: tokenActivity
+        )
     }
 }
 

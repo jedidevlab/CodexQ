@@ -17,7 +17,7 @@ CodexQ is a native macOS menu bar utility. It brings ChatGPT (formerly Codex) fi
 - **Plan identification:** show the plan type returned by app-server in a compact native header.
 - **Run-out projection:** see whether your current pace is sustainable and when the quota may run out.
 - **Token activity:** review three months of daily activity plus the latest completed day and lifetime Token usage.
-- **Token cost:** estimate yesterday, the current subscription period, and lifetime cost from local sessions, with optional multi-Mac merging through a user-selected iCloud Drive folder.
+- **Token cost:** estimate yesterday, the current subscription period, and lifetime cost from local sessions, with optional multi-Mac merging through device records in a user-selected iCloud Drive folder.
 - **Reliable refresh:** quota and Token activity share one app-server session; temporary refresh failures retain the last successful data with a clear status.
 - **Timely alerts:** enable automatic refresh, launch at login, and quota warnings at 20%, 10%, or 5%.
 - **Native experience:** built with SwiftUI and AppKit to stay available without interrupting your work.
@@ -28,8 +28,8 @@ Download the archive for your Mac from [GitHub Releases](https://github.com/jedi
 
 | Mac | Archive |
 | --- | --- |
-| Apple Silicon | `CodexQ-1.0.17-arm64.zip` |
-| Intel | `CodexQ-1.0.17-x86_64.zip` |
+| Apple Silicon | `CodexQ-1.0.18-arm64.zip` |
+| Intel | `CodexQ-1.0.18-x86_64.zip` |
 
 Unzip the archive, then move `CodexQ.app` to Applications.
 
@@ -46,12 +46,14 @@ If macOS blocks the first launch, try opening the app once, then go to System Se
 
 ## iCloud Cost Sync
 
-Open settings from the bottom of the popover, enable `iCloud Cost Sync`, and select a dedicated folder in iCloud Drive. Other Macs using the same Codex account can select the same folder to merge their cost ledgers.
+Open settings from the bottom of the popover, enable `iCloud Cost Sync`, and select a dedicated folder in iCloud Drive. Other Macs using the same Codex account can select the same folder to merge their device records.
 
 - Token activity is account data and is unaffected by this setting.
 - With sync off, Token cost includes only the current Mac.
-- With sync on, CodexQ writes only model names, timestamps, and Token counts; it does not copy raw sessions or login information.
-- Ledger fields are sanitized, but CodexQ does not add file encryption. Do not choose a publicly shared folder.
+- With sync on, each Mac writes its own sanitized device records with only model names, timestamps, and Token counts; CodexQ does not copy raw sessions or login information.
+- Multi-device merging deduplicates stable event identifiers, so the same session event is counted once even if it appears in more than one file.
+- If official Token totals are higher than device records, CodexQ shows the missing portion separately as the official difference and estimates it from the average device-record rate.
+- Sanitized sync files are not additionally encrypted by CodexQ. Do not choose a publicly shared folder.
 
 ## Build and Run
 
@@ -79,15 +81,15 @@ swift test
 Build an ad-hoc signed archive:
 
 ```bash
-./script/package_release.sh 1.0.17 arm64
-./script/package_release.sh 1.0.17 x86_64
+./script/package_release.sh 1.0.18 arm64
+./script/package_release.sh 1.0.18 x86_64
 ```
 
 The archive is written to:
 
 ```text
-dist/CodexQ-1.0.17-arm64.zip
-dist/CodexQ-1.0.17-x86_64.zip
+dist/CodexQ-1.0.18-arm64.zip
+dist/CodexQ-1.0.18-x86_64.zip
 ```
 
 The helper script builds a local `.app` bundle in `dist/CodexQ.app` for development use. Generated build artifacts are excluded from Git.

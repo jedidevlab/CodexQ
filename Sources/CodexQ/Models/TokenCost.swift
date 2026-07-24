@@ -89,12 +89,35 @@ struct TokenCostPeriodSummary: Equatable, Sendable, Identifiable {
 
     let kind: Kind
     let models: [TokenCostModelSummary]
+    let accountTokens: Int64?
+    let supplement: TokenCostSupplement?
 
     var id: Kind { kind }
-    var totalTokens: Int64 { models.reduce(0) { $0 + $1.totalTokens } }
-    var estimatedCostUSD: Double {
+    var recordedTokens: Int64 { models.reduce(0) { $0 + $1.totalTokens } }
+    var totalTokens: Int64 { accountTokens ?? recordedTokens }
+    var recordedEstimatedCostUSD: Double {
         models.reduce(0) { $0 + $1.estimatedCostUSD }
     }
+    var estimatedCostUSD: Double {
+        recordedEstimatedCostUSD + (supplement?.estimatedCostUSD ?? 0)
+    }
+
+    init(
+        kind: Kind,
+        models: [TokenCostModelSummary],
+        accountTokens: Int64? = nil,
+        supplement: TokenCostSupplement? = nil
+    ) {
+        self.kind = kind
+        self.models = models
+        self.accountTokens = accountTokens
+        self.supplement = supplement
+    }
+}
+
+struct TokenCostSupplement: Equatable, Sendable {
+    let tokens: Int64
+    let estimatedCostUSD: Double
 }
 
 struct TokenCostModelSummary: Equatable, Sendable, Identifiable {
@@ -374,6 +397,114 @@ enum TokenCostCalculator {
     }
 }
 
+enum TokenCostReconciler {
+    static func reconcile(
+        _ recorded: TokenCostSnapshot,
+        with activity: TokenActivitySnapshot,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> TokenCostSnapshot {
+        let tokensByDay = activity.days.reduce(into: [Date: Int64]()) { result, day in
+            guard let date = date(day.startDate, calendar: calendar) else { return }
+            result[calendar.startOfDay(for: date), default: 0] += day.tokens
+        }
+        let today = calendar.startOfDay(for: now)
+        let yesterday = calendar.date(byAdding: .day, value: -1, to: today)
+        let fallbackRate = unitCost(of: recorded.lifetime)
+
+        return TokenCostSnapshot(
+            today: reconcile(
+                recorded.today,
+                accountTokens: tokensByDay[today],
+                fallbackRate: fallbackRate
+            ),
+            yesterday: reconcile(
+                recorded.yesterday,
+                accountTokens: yesterday.flatMap { tokensByDay[$0] },
+                fallbackRate: fallbackRate
+            ),
+            subscription: recorded.subscription.map { summary in
+                reconcile(
+                    summary,
+                    accountTokens: recorded.subscriptionPeriod.flatMap {
+                        accountTokens(in: $0, tokensByDay: tokensByDay, calendar: calendar)
+                    },
+                    fallbackRate: fallbackRate
+                )
+            },
+            lifetime: reconcile(
+                recorded.lifetime,
+                accountTokens: activity.lifetimeTokens,
+                fallbackRate: fallbackRate
+            ),
+            subscriptionPeriod: recorded.subscriptionPeriod,
+            skippedSessionFileCount: recorded.skippedSessionFileCount,
+            dataScope: recorded.dataScope,
+            syncMessage: recorded.syncMessage
+        )
+    }
+
+    private static func reconcile(
+        _ recorded: TokenCostPeriodSummary,
+        accountTokens: Int64?,
+        fallbackRate: Double?
+    ) -> TokenCostPeriodSummary {
+        guard let accountTokens else { return recorded }
+        let missingTokens = max(0, accountTokens - recorded.recordedTokens)
+        let rate = unitCost(of: recorded) ?? fallbackRate ?? 0
+        let supplement = missingTokens > 0
+            ? TokenCostSupplement(
+                tokens: missingTokens,
+                estimatedCostUSD: Double(missingTokens) * rate
+            )
+            : nil
+        return TokenCostPeriodSummary(
+            kind: recorded.kind,
+            models: recorded.models,
+            accountTokens: accountTokens,
+            supplement: supplement
+        )
+    }
+
+    private static func unitCost(of summary: TokenCostPeriodSummary) -> Double? {
+        guard summary.recordedTokens > 0 else { return nil }
+        return summary.recordedEstimatedCostUSD / Double(summary.recordedTokens)
+    }
+
+    private static func accountTokens(
+        in period: DateInterval,
+        tokensByDay: [Date: Int64],
+        calendar: Calendar
+    ) -> Int64? {
+        let start = calendar.startOfDay(for: period.start)
+        let end = calendar.startOfDay(for: period.end)
+        let values: [Int64] = tokensByDay.compactMap { entry in
+            guard entry.key >= start, entry.key < end else { return nil }
+            return entry.value
+        }
+        guard !values.isEmpty else { return nil }
+        return values.reduce(0, +)
+    }
+
+    private static func date(_ value: String, calendar: Calendar) -> Date? {
+        let parts = value.split(separator: "-", omittingEmptySubsequences: false)
+        guard parts.count == 3,
+              let year = Int(parts[0]),
+              let month = Int(parts[1]),
+              let day = Int(parts[2]),
+              let date = calendar.date(
+                from: DateComponents(year: year, month: month, day: day)
+              ) else {
+            return nil
+        }
+        let resolved = calendar.dateComponents([.year, .month, .day], from: date)
+        guard resolved.year == year, resolved.month == month, resolved.day == day else {
+            return nil
+        }
+        return date
+    }
+}
+
 enum SubscriptionPeriodResolver {
     static func currentPeriod(
         activeStart: Date,
@@ -405,7 +536,7 @@ enum SubscriptionPeriodResolver {
 
 enum TokenCostFormatter {
     static func amount(_ summary: TokenCostPeriodSummary) -> String {
-        guard !summary.models.isEmpty else { return "$0.00" }
+        guard !summary.models.isEmpty || summary.supplement != nil else { return "$0.00" }
         return dollarAmount(summary.estimatedCostUSD)
     }
 

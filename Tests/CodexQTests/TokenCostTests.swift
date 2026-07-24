@@ -271,6 +271,148 @@ struct TokenCostTests {
         #expect(snapshot.lifetime.totalTokens == 1_000)
     }
 
+    @Test("账号累计 Token 以净差额补算并与账本成本分开")
+    func reconcilesAccountTotalsWithoutChangingRecordedCost() throws {
+        let now = try date("2026-07-23T12:00:00Z")
+        let recorded = TokenCostCalculator.snapshot(
+            records: [
+                record(model: "gpt-5.6-sol", at: now, tokens: 1_000_000)
+            ],
+            now: now,
+            calendar: utcCalendar,
+            subscriptionPeriod: nil
+        )
+        let activity = TokenActivitySnapshot(
+            peakDailyTokens: 1_500_000,
+            lifetimeTokens: 1_500_000,
+            days: [
+                TokenActivityDay(startDate: "2026-07-23", tokens: 1_500_000)
+            ]
+        )
+
+        let reconciled = TokenCostReconciler.reconcile(
+            recorded,
+            with: activity,
+            now: now,
+            calendar: utcCalendar
+        )
+
+        #expect(reconciled.lifetime.recordedTokens == 1_000_000)
+        #expect(reconciled.lifetime.totalTokens == 1_500_000)
+        #expect(
+            reconciled.lifetime.recordedEstimatedCostUSD
+                == recorded.lifetime.recordedEstimatedCostUSD
+        )
+        #expect(reconciled.lifetime.supplement?.tokens == 500_000)
+        #expect(
+            reconciled.lifetime.supplement?.estimatedCostUSD
+                == recorded.lifetime.recordedEstimatedCostUSD / 2
+        )
+        #expect(
+            reconciled.lifetime.estimatedCostUSD
+                == recorded.lifetime.recordedEstimatedCostUSD * 1.5
+        )
+        #expect(reconciled.today.totalTokens == 1_500_000)
+    }
+
+    @Test("账号 Token 不高于账本时不生成负数补算")
+    func doesNotCreateNegativeSupplement() throws {
+        let now = try date("2026-07-23T12:00:00Z")
+        let recorded = TokenCostCalculator.snapshot(
+            records: [
+                record(model: "gpt-5.6-sol", at: now, tokens: 1_000_000)
+            ],
+            now: now,
+            calendar: utcCalendar,
+            subscriptionPeriod: nil
+        )
+        let activity = TokenActivitySnapshot(
+            peakDailyTokens: 900_000,
+            lifetimeTokens: 900_000,
+            days: [
+                TokenActivityDay(startDate: "2026-07-23", tokens: 900_000)
+            ]
+        )
+
+        let reconciled = TokenCostReconciler.reconcile(
+            recorded,
+            with: activity,
+            now: now,
+            calendar: utcCalendar
+        )
+
+        #expect(reconciled.lifetime.recordedTokens == 1_000_000)
+        #expect(reconciled.lifetime.totalTokens == 900_000)
+        #expect(reconciled.lifetime.supplement == nil)
+        #expect(
+            reconciled.lifetime.estimatedCostUSD
+                == recorded.lifetime.recordedEstimatedCostUSD
+        )
+    }
+
+    @Test("非法活动日期不能归一化后参与成本补算")
+    func invalidActivityDateDoesNotAffectReconciliation() throws {
+        let now = try date("2026-03-02T12:00:00Z")
+        let recorded = TokenCostCalculator.snapshot(
+            records: [
+                record(model: "gpt-5.6-sol", at: now, tokens: 100)
+            ],
+            now: now,
+            calendar: utcCalendar,
+            subscriptionPeriod: nil
+        )
+        let activity = TokenActivitySnapshot(
+            peakDailyTokens: 200,
+            days: [
+                TokenActivityDay(startDate: "2026-02-30", tokens: 200)
+            ]
+        )
+
+        let reconciled = TokenCostReconciler.reconcile(
+            recorded,
+            with: activity,
+            now: now,
+            calendar: utcCalendar
+        )
+
+        #expect(reconciled.today.accountTokens == nil)
+        #expect(reconciled.today.totalTokens == 100)
+        #expect(reconciled.today.supplement == nil)
+    }
+
+    @Test("缺少活动日桶时保留账本中的订阅周期 Token")
+    func missingDailyBucketsPreserveRecordedSubscriptionTokens() throws {
+        let now = try date("2026-07-23T12:00:00Z")
+        let period = DateInterval(
+            start: try date("2026-07-06T02:29:39Z"),
+            end: try date("2026-08-06T02:29:39Z")
+        )
+        let recorded = TokenCostCalculator.snapshot(
+            records: [
+                record(model: "gpt-5.6-sol", at: now, tokens: 100)
+            ],
+            now: now,
+            calendar: utcCalendar,
+            subscriptionPeriod: period
+        )
+        let activity = TokenActivitySnapshot(
+            peakDailyTokens: 0,
+            lifetimeTokens: 100,
+            days: []
+        )
+
+        let reconciled = TokenCostReconciler.reconcile(
+            recorded,
+            with: activity,
+            now: now,
+            calendar: utcCalendar
+        )
+
+        #expect(reconciled.subscription?.accountTokens == nil)
+        #expect(reconciled.subscription?.totalTokens == 100)
+        #expect(reconciled.subscription?.supplement == nil)
+    }
+
     @Test("过期的月度认证区间按原续费锚点推进到当前周期")
     func advancesStaleMonthlySubscriptionPeriod() throws {
         let period = SubscriptionPeriodResolver.currentPeriod(
@@ -509,7 +651,6 @@ struct TokenCostTests {
         #expect(!source.contains("hoverExitTask"))
         #expect(!source.contains(".transition("))
         #expect(source.contains("TokenCostDetailCard"))
-        #expect(!source.contains(".popover("))
         #expect(source.contains("ForEach(summary.models) { model in"))
         #expect(!source.contains("summary.models.prefix(6)"))
         #expect(!source.contains("另有 \\(summary.models.count - 6) 个模型"))
@@ -523,10 +664,13 @@ struct TokenCostTests {
         #expect(!source.contains("同步账本 · 1 台"))
         #expect(!source.contains("iCloud 脱敏账本，按官方 API 价估算"))
         #expect(!source.contains("多设备脱敏账本，按官方 API 价估算"))
-        #expect(!source.contains("accountLifetimeTokens"))
-        #expect(!source.contains("accountTotalTokens"))
-        #expect(!source.contains("未归因用量"))
-        #expect(!source.contains("TokenCostAttribution"))
+        #expect(source.contains("summary.recordedEstimatedCostUSD"))
+        #expect(source.contains("summary.supplement"))
+        #expect(source.contains("设备记录"))
+        #expect(source.contains("官方差额"))
+        #expect(source.contains("Image(systemName: \"info.circle\")"))
+        #expect(source.contains(".popover(isPresented: $isSupplementExplanationPresented"))
+        #expect(source.contains("官方 Token 数据高于设备记录时"))
     }
 
     @Test("金额固定使用美元符号且不显示地区前缀")

@@ -16,6 +16,52 @@ struct StatusIconRendererTests {
         #expect(!updateSource.contains("statusItem.button?.image ="))
     }
 
+    @Test("菜单栏标题不重复写入相同值")
+    func statusItemTitleOnlyChangesWhenNeeded() throws {
+        let source = try String(
+            contentsOfFile: "Sources/CodexQ/App/StatusBarController.swift",
+            encoding: .utf8
+        )
+
+        #expect(source.contains("if button.title != title"))
+        #expect(source.contains("button.title = title"))
+    }
+
+    @Test("菜单栏按钮先设置 target 再设置 action")
+    func statusItemConfiguresTargetBeforeAction() throws {
+        let source = try String(
+            contentsOfFile: "Sources/CodexQ/App/StatusBarController.swift",
+            encoding: .utf8
+        )
+        let targetIndex = try #require(source.range(of: "button.target = self"))
+        let actionIndex = try #require(source.range(of: "button.action = #selector"))
+
+        #expect(targetIndex.lowerBound < actionIndex.lowerBound)
+    }
+
+    @Test("锁屏时延后创建菜单栏状态项")
+    func statusItemCreationWaitsForActiveSession() throws {
+        let source = try String(
+            contentsOfFile: "Sources/CodexQ/App/CodexQApp.swift",
+            encoding: .utf8
+        )
+
+        #expect(source.contains("NSWorkspace.sessionDidBecomeActiveNotification"))
+        #expect(source.contains("ScreenSessionState.isLocked"))
+        #expect(source.contains("startStatusControllerIfNeeded()"))
+    }
+
+    @Test("会话字典能识别锁屏状态")
+    func screenSessionStateDetectsLock() {
+        #expect(ScreenSessionState.isLocked([
+            "CGSSessionScreenIsLocked": true
+        ]))
+        #expect(!ScreenSessionState.isLocked([
+            "CGSSessionScreenIsLocked": false
+        ]))
+        #expect(!ScreenSessionState.isLocked(nil))
+    }
+
     @Test("菜单栏图标不随额度裁切")
     @MainActor
     func iconIsNotClippedByRemainingPercent() throws {
