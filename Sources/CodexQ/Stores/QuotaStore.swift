@@ -62,12 +62,9 @@ final class QuotaStore: ObservableObject {
             let settings = AppSettings.shared
             guard settings.notificationsEnabled else { return }
             let service = QuotaNotificationService()
-            let granted = await service.requestAuthorization()
-            settings.notificationsEnabled = NotificationAuthorizationPolicy.effectiveEnabled(
-                requestedEnabled: settings.notificationsEnabled,
-                authorizationGranted: granted
-            )
-            guard settings.notificationsEnabled else { return }
+            let granted = await service.requestAuthorizationIfNeeded()
+            settings.updateNotificationPermissionWarning(authorizationGranted: granted)
+            guard NotificationAuthorizationPolicy.canSendNotifications(authorizationGranted: granted) else { return }
             await service.notifyCrossings(
                 previous: previous,
                 current: current,

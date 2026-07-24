@@ -2,11 +2,8 @@ import Foundation
 import UserNotifications
 
 enum NotificationAuthorizationPolicy {
-    static func effectiveEnabled(
-        requestedEnabled: Bool,
-        authorizationGranted: Bool
-    ) -> Bool {
-        requestedEnabled && authorizationGranted
+    static func canSendNotifications(authorizationGranted: Bool) -> Bool {
+        authorizationGranted
     }
 }
 
@@ -34,6 +31,27 @@ actor QuotaNotificationService {
                 .requestAuthorization(options: [.alert, .sound])
         } catch {
             return false
+        }
+    }
+
+    func requestAuthorizationIfNeeded() async -> Bool {
+        switch await authorizationStatus() {
+        case .authorized, .provisional, .ephemeral:
+            return true
+        case .notDetermined:
+            return await requestAuthorization()
+        case .denied:
+            return false
+        @unknown default:
+            return false
+        }
+    }
+
+    private func authorizationStatus() async -> UNAuthorizationStatus {
+        await withCheckedContinuation { continuation in
+            UNUserNotificationCenter.current().getNotificationSettings { settings in
+                continuation.resume(returning: settings.authorizationStatus)
+            }
         }
     }
 

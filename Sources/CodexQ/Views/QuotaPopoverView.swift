@@ -374,6 +374,12 @@ private struct EmbeddedSettingsView: View {
                 }
             }
 
+            if settings.notificationsEnabled,
+               let warning = settings.notificationPermissionWarning {
+                Text(warning)
+                    .foregroundStyle(.secondary)
+            }
+
             Toggle("iCloud 成本同步", isOn: costSyncBinding)
 
             if settings.icloudCostSyncEnabled {
@@ -403,13 +409,13 @@ private struct EmbeddedSettingsView: View {
         .onChange(of: settings.launchAtLogin) { settingsDidChange() }
         .onChange(of: settings.notificationsEnabled) { _, requestedEnabled in
             settingsDidChange()
-            guard requestedEnabled else { return }
+            guard requestedEnabled else {
+                settings.updateNotificationPermissionWarning(authorizationGranted: true)
+                return
+            }
             Task {
-                let granted = await QuotaNotificationService().requestAuthorization()
-                settings.notificationsEnabled = NotificationAuthorizationPolicy.effectiveEnabled(
-                    requestedEnabled: settings.notificationsEnabled,
-                    authorizationGranted: granted
-                )
+                let granted = await QuotaNotificationService().requestAuthorizationIfNeeded()
+                settings.updateNotificationPermissionWarning(authorizationGranted: granted)
             }
         }
         .onChange(of: settings.notifyAt20) { settingsDidChange() }

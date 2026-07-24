@@ -14,6 +14,7 @@ final class AppSettings: ObservableObject {
     @Published var notifyAt20: Bool { didSet { defaults.set(notifyAt20, forKey: Keys.notifyAt20) } }
     @Published var notifyAt10: Bool { didSet { defaults.set(notifyAt10, forKey: Keys.notifyAt10) } }
     @Published var notifyAt5: Bool { didSet { defaults.set(notifyAt5, forKey: Keys.notifyAt5) } }
+    @Published private(set) var notificationPermissionWarning: String?
     @Published private(set) var icloudCostSyncEnabled: Bool
     @Published private(set) var icloudCostSyncFolderPath: String?
     @Published private(set) var icloudCostSyncSetupError: String?
@@ -39,6 +40,7 @@ final class AppSettings: ObservableObject {
         notifyAt20 = defaults.object(forKey: Keys.notifyAt20) as? Bool ?? true
         notifyAt10 = defaults.object(forKey: Keys.notifyAt10) as? Bool ?? true
         notifyAt5 = defaults.object(forKey: Keys.notifyAt5) as? Bool ?? true
+        notificationPermissionWarning = nil
         icloudCostSyncEnabled = defaults.bool(forKey: CostSyncPreferences.enabledKey)
         icloudCostSyncFolderPath = defaults.string(forKey: CostSyncPreferences.folderPathKey)
         icloudCostSyncSetupError = nil
@@ -75,6 +77,12 @@ final class AppSettings: ObservableObject {
         defaults.set(false, forKey: CostSyncPreferences.enabledKey)
         icloudCostSyncEnabled = false
         icloudCostSyncSetupError = nil
+    }
+
+    func updateNotificationPermissionWarning(authorizationGranted: Bool) {
+        notificationPermissionWarning = authorizationGranted
+            ? nil
+            : "系统通知未允许，请在“系统设置 > 通知”中允许 CodexQ 通知。"
     }
 
     private static func migrateLegacySettingsIfNeeded(to defaults: UserDefaults) {

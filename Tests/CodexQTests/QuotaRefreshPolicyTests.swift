@@ -3,36 +3,22 @@ import Testing
 @testable import CodexQ
 
 struct QuotaNotificationTests {
-    @Test("通知权限被拒绝时关闭应用内通知开关")
-    func deniedAuthorizationDisablesNotifications() {
-        #expect(!NotificationAuthorizationPolicy.effectiveEnabled(
-            requestedEnabled: true,
-            authorizationGranted: false
-        ))
-        #expect(NotificationAuthorizationPolicy.effectiveEnabled(
-            requestedEnabled: true,
-            authorizationGranted: true
-        ))
-        #expect(!NotificationAuthorizationPolicy.effectiveEnabled(
-            requestedEnabled: false,
-            authorizationGranted: true
-        ))
+    @Test("系统通知未授权时不发送提醒")
+    func deniedAuthorizationPreventsDelivery() {
+        #expect(!NotificationAuthorizationPolicy.canSendNotifications(authorizationGranted: false))
+        #expect(NotificationAuthorizationPolicy.canSendNotifications(authorizationGranted: true))
     }
 
-    @Test("授权完成时以当前开关状态为准")
-    func authorizationCompletionUsesCurrentToggleState() throws {
+    @Test("系统拒绝通知后保留用户的额度预警选择")
+    func deniedAuthorizationDoesNotTurnOffPreference() throws {
         let source = try String(
             contentsOfFile: "Sources/CodexQ/Views/QuotaPopoverView.swift",
             encoding: .utf8
         )
 
-        #expect(source.contains(
-            "requestedEnabled: settings.notificationsEnabled,\n" +
-            "                    authorizationGranted: granted"
-        ))
+        #expect(source.contains("settings.updateNotificationPermissionWarning(authorizationGranted: granted)"))
         #expect(!source.contains(
-            "requestedEnabled: requestedEnabled,\n" +
-            "                    authorizationGranted: granted"
+            "settings.notificationsEnabled = NotificationAuthorizationPolicy"
         ))
     }
 
