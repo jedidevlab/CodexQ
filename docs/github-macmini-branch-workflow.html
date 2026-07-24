@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CodexQ 双 Mac 通过 GitHub 继续开发测试流程</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f7f7f5;
+      --text: #1f2328;
+      --muted: #61666d;
+      --line: #d8dadd;
+      --panel: #ffffff;
+      --code-bg: #111827;
+      --code-text: #eef2ff;
+      --accent: #0b63ce;
+      --note-bg: #eef6ff;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #111315;
+        --text: #e6edf3;
+        --muted: #a1a8b3;
+        --line: #30363d;
+        --panel: #161b22;
+        --code-bg: #05070a;
+        --code-text: #e6edf3;
+        --accent: #6cb6ff;
+        --note-bg: #132237;
+      }
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 15px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    main {
+      max-width: 920px;
+      margin: 0 auto;
+      padding: 36px 20px 56px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 28px;
+      line-height: 1.25;
+      letter-spacing: 0;
+    }
+
+    h2 {
+      margin: 32px 0 10px;
+      padding-top: 18px;
+      border-top: 1px solid var(--line);
+      font-size: 20px;
+      letter-spacing: 0;
+    }
+
+    h3 {
+      margin: 22px 0 8px;
+      font-size: 16px;
+      letter-spacing: 0;
+    }
+
+    p {
+      margin: 8px 0 12px;
+    }
+
+    .lead {
+      color: var(--muted);
+      font-size: 16px;
+    }
+
+    .note {
+      margin: 16px 0;
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--note-bg);
+    }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.94em;
+    }
+
+    pre {
+      overflow-x: auto;
+      margin: 12px 0 18px;
+      padding: 14px 16px;
+      border-radius: 8px;
+      background: var(--code-bg);
+      color: var(--code-text);
+      line-height: 1.55;
+    }
+
+    pre code {
+      color: inherit;
+      font-size: 13px;
+    }
+
+    ul {
+      padding-left: 22px;
+    }
+
+    li {
+      margin: 6px 0;
+    }
+
+    .command-note {
+      color: var(--muted);
+      margin-top: -8px;
+    }
+
+    .checklist {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px 16px;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>CodexQ 双 Mac 通过 GitHub 继续开发测试流程</h1>
+    <p class="lead">目标：把当前 Mac 上的开发分支推到 GitHub，然后在 Mac mini 上拉下来继续开发、测试、提交，再同步回当前 Mac。</p>
+
+    <div class="note">
+      <strong>当前项目状态</strong>
+      <p>仓库地址：<code>https://github.com/jedidevlab/CodexQ.git</code></p>
+      <p>开发分支：<code>codex/icloud-cost-ledger-plan</code></p>
+      <p>当前最新提交：<code>e737638 Clarify single-device cost scope</code></p>
+      <p>重点：推送这个开发分支不会自动更新 <code>main</code>。只有最后显式合并并推送 <code>main</code>，GitHub 默认分支才会变化。</p>
+    </div>
+
+    <h2>0. 先看懂常用命令和参数</h2>
+    <p>下面这些词会反复出现。你可以先粗看一遍，后面遇到不懂的参数再回来查。</p>
+
+    <div class="checklist">
+      <ul>
+        <li><code>git</code>：代码版本管理工具，用来记录改动、切换分支、同步 GitHub。</li>
+        <li><code>origin</code>：远端仓库的默认名字。这里指 <code>https://github.com/jedidevlab/CodexQ.git</code>。</li>
+        <li><code>main</code>：主分支，通常代表正式稳定代码。</li>
+        <li><code>codex/icloud-cost-ledger-plan</code>：当前开发分支，用来继续 iCloud 成本账本相关开发。</li>
+        <li><code>cd</code>：进入某个目录。例如 <code>cd /Users/jun/Desktop/CodexQ</code> 就是进入项目文件夹。</li>
+        <li><code>git status</code>：查看当前在哪个分支、有没有未提交文件。</li>
+        <li><code>git fetch</code>：只从 GitHub 拉取最新记录，不直接改你当前文件。</li>
+        <li><code>git pull</code>：从 GitHub 拉取最新记录，并更新你当前分支的文件。</li>
+        <li><code>git push</code>：把本机提交推送到 GitHub。</li>
+        <li><code>git switch</code>：切换分支。</li>
+        <li><code>git clone</code>：第一次把 GitHub 仓库完整下载到本机。</li>
+        <li><code>git add</code>：把准备提交的文件加入暂存区。</li>
+        <li><code>git commit</code>：把暂存区里的改动保存成一次提交。</li>
+        <li><code>-u</code>：完整写法是 <code>--set-upstream</code>。作用是绑定本地分支和远端分支，之后可以直接用 <code>git push</code> 或 <code>git pull</code>。</li>
+        <li><code>--track</code>：从远端分支创建本地分支，并自动建立跟踪关系。</li>
+        <li><code>--ff-only</code>：只允许“快进”更新。如果本地和远端已经分叉，它会停止，不会自动生成合并提交。对新手更安全。</li>
+        <li><code>--no-ff</code>：合并时即使可以快进，也强制生成一条合并提交。适合把完整功能分支合进 <code>main</code> 时保留清晰记录。</li>
+        <li><code>-c</code>：在 <code>git switch -c 分支名</code> 里表示创建新分支并切过去。</li>
+        <li><code>-m</code>：在 <code>git commit -m "说明"</code> 或 <code>git merge -m "说明"</code> 里表示直接写提交说明。</li>
+        <li><code>--heads</code>：在 <code>git ls-remote --heads</code> 里表示只查询远端分支，不查询 tag。</li>
+        <li><code>-1</code>：在 <code>git log -1</code> 里表示只看最近 1 条提交。</li>
+      </ul>
+    </div>
+
+    <h2>1. 在当前 Mac 推送开发分支</h2>
+    <p>先进入项目目录，确认当前工作区干净，再把分支推到 GitHub。</p>
+
+    <pre><code># 进入当前 Mac 上的 CodexQ 项目目录
+cd /Users/jun/Desktop/CodexQ
+
+# 查看当前是否有未提交的改动
+# 如果输出为空或显示 working tree clean，说明可以推送
+git status
+
+# 把当前开发分支推到 GitHub
+# -u 的意思是把本地分支和远端分支绑定起来
+# 以后在这个分支上可以直接用 git push，不用每次写 origin 和分支名
+# origin 是 GitHub 远端仓库的名字
+git push -u origin codex/icloud-cost-ledger-plan</code></pre>
+
+    <p class="command-note">这一步完成后，GitHub 上会出现 <code>codex/icloud-cost-ledger-plan</code> 分支，Mac mini 才能拉到它。</p>
+
+    <h3>确认远端分支已经存在</h3>
+    <pre><code># 查询 GitHub 上是否已经有这条分支
+# --heads 表示只看远端分支，不看 tag
+git ls-remote --heads origin codex/icloud-cost-ledger-plan
+
+# 如果看到类似下面的输出，说明推送成功
+# e737638... refs/heads/codex/icloud-cost-ledger-plan</code></pre>
+
+    <h2>2. 在 Mac mini 上拉取分支</h2>
+    <p>这里分两种情况：Mac mini 上还没有项目，或者已经有项目。</p>
+
+    <h3>情况 A：Mac mini 上还没有 CodexQ 仓库</h3>
+    <pre><code># 进入你想放项目的目录
+# 这里以桌面为例
+cd ~/Desktop
+
+# 从 GitHub 克隆 CodexQ 仓库
+# clone 的意思是把远端仓库完整下载到本机
+git clone https://github.com/jedidevlab/CodexQ.git
+
+# 进入刚下载好的项目目录
+cd CodexQ
+
+# 切换到远端开发分支，并在本机创建同名跟踪分支
+# --track 的意思是让本地分支跟踪 origin/codex/icloud-cost-ledger-plan
+# 跟踪后，git pull 和 git push 会默认对应这条远端分支
+git switch --track origin/codex/icloud-cost-ledger-plan</code></pre>
+
+    <h3>情况 B：Mac mini 上已经有 CodexQ 仓库</h3>
+    <pre><code># 进入 Mac mini 上已有的 CodexQ 项目目录
+# 把这里替换成你自己的真实路径
+cd /你的/CodexQ/路径
+
+# 从 GitHub 拉取最新的分支列表和提交信息
+# fetch 只更新本地记录，不会直接改你的代码文件
+git fetch origin
+
+# 如果本地已经有这条分支，就直接切过去
+# 如果本地还没有，就用 --track 从远端创建
+git switch codex/icloud-cost-ledger-plan || git switch --track origin/codex/icloud-cost-ledger-plan
+
+# 拉取远端最新提交
+# --ff-only 表示只允许快进更新，避免自动生成你看不懂的合并提交
+# 如果它报错，说明本地和远端都有新提交，需要先处理冲突
+git pull --ff-only</code></pre>
+
+    <h2>3. 确认 Mac mini 拉到的是正确分支</h2>
+    <pre><code># 查看当前所在分支
+git branch --show-current
+
+# 查看当前分支最新一条提交
+# -1 表示只显示最近一条
+git log -1 --oneline
+
+# 预期结果大致是：
+# codex/icloud-cost-ledger-plan
+# e737638 Clarify single-device cost scope</code></pre>
+
+    <h2>4. 在 Mac mini 上测试和运行</h2>
+    <p>先确认 Swift 可用，然后跑项目测试和 app 验证脚本。</p>
+
+    <pre><code># 查看 Swift 版本，确认 Mac mini 有 Swift 工具链
+swift --version
+
+# 运行全部测试
+# 这会验证项目里已有的自动化测试
+swift test
+
+# 构建并验证 CodexQ.app
+# 这个脚本会生成 dist/CodexQ.app，并做启动/签名等基础检查
+./script/build_and_run.sh --verify</code></pre>
+
+    <h2>5. 在 Mac mini 上继续开发并提交</h2>
+    <p>每次开始改代码前，先同步最新代码；改完后测试、提交、推送。</p>
+
+    <pre><code># 开始改代码前，先拉远端最新提交
+# 这样可以减少两台 Mac 改出冲突的概率
+# --ff-only 表示只接受简单直线更新
+git pull --ff-only
+
+# 查看你改了哪些文件
+git status
+
+# 改完后先跑测试
+swift test
+
+# 再跑 app 构建验证
+./script/build_and_run.sh --verify
+
+# 添加要提交的文件
+# 如果你清楚只改了某几个文件，建议写具体文件名
+git add Sources/CodexQ/Views/TokenCostSection.swift Tests/CodexQTests/TokenCostTests.swift
+
+# 创建提交
+# 提交说明用一句话描述这次改动
+# -m 后面跟的是这次提交的说明文字
+git commit -m "Update iCloud cost wording"
+
+# 推送到 GitHub 的同名开发分支
+git push</code></pre>
+
+    <h2>6. 回到当前 Mac 继续接力</h2>
+    <p>Mac mini 推送后，当前 Mac 需要把 GitHub 上的新提交拉回来。</p>
+
+    <pre><code># 回到当前 Mac 的项目目录
+cd /Users/jun/Desktop/CodexQ
+
+# 切到同一个开发分支
+git switch codex/icloud-cost-ledger-plan
+
+# 拉取 Mac mini 推上去的新提交
+# --ff-only 表示只做安全的快进更新
+git pull --ff-only</code></pre>
+
+    <h2>7. 避免两台机器互相冲突</h2>
+    <div class="checklist">
+      <ul>
+        <li>开始改代码前，先执行 <code>git pull --ff-only</code>。</li>
+        <li>改完并测试通过后，马上执行 <code>git push</code>。</li>
+        <li>尽量不要两台 Mac 同时改同一个文件。</li>
+        <li>如果必须同时测试不同方向，Mac mini 可以开临时分支。</li>
+      </ul>
+    </div>
+
+    <h3>Mac mini 临时分支示例</h3>
+    <pre><code># 从当前开发分支新建一个 mini 专用测试分支
+# -c 表示 create，也就是创建新分支
+git switch -c codex/icloud-cost-ledger-mini-test
+
+# 推送这个临时分支到 GitHub
+# -u 表示绑定本地临时分支和远端临时分支
+git push -u origin codex/icloud-cost-ledger-mini-test
+
+# 测试完成后，切回主开发分支
+git switch codex/icloud-cost-ledger-plan
+
+# 确保主开发分支是最新的
+# --ff-only 表示只接受简单直线更新
+git pull --ff-only
+
+# 把 mini 测试分支合并回来
+# --no-ff 表示保留一次明确的合并提交
+git merge --no-ff codex/icloud-cost-ledger-mini-test
+
+# 推送合并结果
+git push</code></pre>
+
+    <h2>8. 最后合并到 main</h2>
+    <p>等 iCloud 成本账本这条开发分支测试完成，再合并到 <code>main</code>。</p>
+
+    <pre><code># 切到 main 分支
+git switch main
+
+# 拉取 GitHub 上最新的 main
+# origin main 表示从 GitHub 的 main 分支拉取
+# --ff-only 表示不自动制造合并提交
+git pull --ff-only origin main
+
+# 把开发分支合并进 main
+# --no-ff 会保留一次清晰的合并提交，方便以后看历史
+# -m 后面是这次合并提交的说明
+git merge --no-ff codex/icloud-cost-ledger-plan -m "Merge iCloud cost ledger work"
+
+# 合并后再次跑测试
+swift test
+
+# 再跑 app 验证
+./script/build_and_run.sh --verify
+
+# 把 main 推到 GitHub
+# 只有这一步之后，GitHub 默认分支 main 才真正更新
+git push origin main</code></pre>
+
+    <h2>常见问题</h2>
+    <h3>看到 conflict 是什么？</h3>
+    <p>意思是两台机器改到了同一段代码，Git 不知道该保留哪一边。代码小白遇到这个，不建议硬改，先停止并把完整终端输出发给 Codex 处理。</p>
+
+    <h3><code>git push</code> 提示登录怎么办？</h3>
+    <p>说明 Mac mini 还没有配置 GitHub 登录。优先使用 GitHub CLI：</p>
+
+    <pre><code># 检查有没有安装 GitHub CLI
+gh --version
+
+# 登录 GitHub
+gh auth login
+
+# 登录后确认状态
+gh auth status</code></pre>
+
+    <h3>我怎么知道现在代码是不是干净？</h3>
+    <pre><code># 查看工作区状态
+git status
+
+# 如果看到 working tree clean
+# 表示当前没有未提交改动</code></pre>
+  </main>
+</body>
+</html>
