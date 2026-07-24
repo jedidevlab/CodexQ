@@ -198,7 +198,7 @@ struct TokenCostSection: View {
         guard let scope = snapshot?.dataScope else { return "本机数据" }
         switch scope {
         case .local: return "本机数据"
-        case .singleDevice: return "仅此设备"
+        case .singleDevice: return "同步账本 · 1 台"
         case .multiDevice: return "多设备"
         case .syncDelayed: return "多设备 · 同步延迟"
         case .syncBlocked: return "本机数据 · 同步暂停"
@@ -324,7 +324,9 @@ private struct TokenCostDetailCard: View {
         switch dataScope {
         case .local, .syncBlocked:
             return "本机数据，按官方 API 价估算，非实际账单"
-        case .singleDevice, .multiDevice, .syncDelayed, .partial:
+        case .singleDevice:
+            return "iCloud 脱敏账本，按官方 API 价估算，非实际账单"
+        case .multiDevice, .syncDelayed, .partial:
             return "多设备脱敏账本，按官方 API 价估算，非实际账单"
         }
     }
