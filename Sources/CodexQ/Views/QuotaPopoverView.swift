@@ -386,7 +386,6 @@ private struct EmbeddedSettingsView: View {
 
             HStack(spacing: 6) {
                 Toggle("iCloud 同步", isOn: costSyncBinding)
-                Spacer(minLength: 4)
                 if settings.icloudCostSyncEnabled {
                     Button("更换文件夹…") {
                         chooseCostSyncFolder()
@@ -462,14 +461,11 @@ private struct CostSyncImpactCard: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(impactSummary)
                 .lineLimit(1)
-            Text("仅同步模型、时间和 Token 数。")
+            Text("仅同步模型、时间和 Token 数，不含会话及登录信息。")
                 .font(.system(size: 9))
                 .foregroundStyle(.tertiary)
                 .lineLimit(1)
-            Text("不含会话内容和登录信息。")
-                .font(.system(size: 9))
-                .foregroundStyle(.tertiary)
-                .lineLimit(1)
+                .minimumScaleFactor(0.85)
             if let message {
                 Text(message)
                     .font(.system(size: 9))
@@ -502,7 +498,7 @@ private struct CostSyncImpactCard: View {
         }
         return isDelayed
             ? "同步延迟：活动不变；成本显示最近数据。"
-            : "已开启：活动不变；成本汇总多台 Mac。"
+            : "Token 活动不影响；成本汇总多台 Mac。"
     }
 }
 

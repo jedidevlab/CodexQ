@@ -622,7 +622,7 @@ struct TokenActivityViewTests {
         #expect(settingsSource.contains("HStack(spacing: 4)"))
     }
 
-    @Test("iCloud 同步设置简明说明开关影响并将文件夹操作右对齐")
+    @Test("iCloud 同步设置简明说明影响并将文件夹按钮紧邻开关")
     func costSyncSettingsExplainDataImpact() throws {
         let source = try String(
             contentsOfFile: "Sources/CodexQ/Views/QuotaPopoverView.swift",
@@ -632,14 +632,14 @@ struct TokenActivityViewTests {
         let buttonRange = try #require(source.range(of: "Button(\"更换文件夹…\")"))
         let syncRowBetweenControls = source[toggleRange.upperBound..<buttonRange.lowerBound]
 
-        #expect(syncRowBetweenControls.contains("Spacer(minLength: 4)"))
+        #expect(!syncRowBetweenControls.contains("Spacer"))
         #expect(source.contains(".buttonStyle(.bordered)"))
         #expect(source.contains(".controlSize(.small)"))
         #expect(!source.contains("icloudCostSyncFolderName"))
         #expect(source.contains("\"未开启：活动不变；成本仅统计本机。\""))
-        #expect(source.contains("\"已开启：活动不变；成本汇总多台 Mac。\""))
-        #expect(source.contains("Text(\"仅同步模型、时间和 Token 数。\")"))
-        #expect(source.contains("Text(\"不含会话内容和登录信息。\")"))
+        #expect(source.contains("\"Token 活动不影响；成本汇总多台 Mac。\""))
+        #expect(source.contains("Text(\"仅同步模型、时间和 Token 数，不含会话及登录信息。\")"))
+        #expect(source.contains(".minimumScaleFactor(0.85)"))
         #expect(source.contains("ICloudDriveFolderPicker.chooseFolder()"))
     }
 
