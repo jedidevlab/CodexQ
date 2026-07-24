@@ -126,7 +126,7 @@ struct QuotaPopoverView: View {
                 )
             }
 
-            VStack(spacing: 4) {
+            VStack(spacing: 10) {
                 InsetSeparator()
 
                 HStack(spacing: 8) {
