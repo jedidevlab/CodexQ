@@ -126,63 +126,67 @@ struct QuotaPopoverView: View {
                 )
             }
 
-            InsetSeparator()
+            VStack(spacing: 4) {
+                InsetSeparator()
 
-            HStack(spacing: 8) {
-                if let error = store.errorMessage, store.snapshot != nil {
-                    Text(failureStatus(error: error))
+                HStack(spacing: 8) {
+                    if let error = store.errorMessage, store.snapshot != nil {
+                        Text(failureStatus(error: error))
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                            .lineLimit(1)
+                            .help(error)
+                    } else if let updatedAt = store.lastUpdatedAt {
+                        Text(RelativeUpdateFormatter.string(
+                            since: updatedAt,
+                            now: relativeTimeNow
+                        ))
                         .font(.caption)
-                        .foregroundStyle(.red)
-                        .lineLimit(1)
-                        .help(error)
-                } else if let updatedAt = store.lastUpdatedAt {
-                    Text(RelativeUpdateFormatter.string(
-                        since: updatedAt,
-                        now: relativeTimeNow
-                    ))
-                    .font(.caption)
-                    .foregroundStyle(Color.primary.opacity(0.72))
-                    .monospacedDigit()
-                }
-                Spacer()
-                Button {
-                    isSettingsExpanded.toggle()
-                } label: {
-                    FooterIconButtonLabel(
-                        systemName: isSettingsExpanded ? "gearshape.fill" : "gearshape"
-                    )
-                }
-                .buttonStyle(.borderless)
-                .help("设置")
-                .accessibilityLabel("设置")
-
-                Button {
-                    Task { await store.refreshFromButton() }
-                } label: {
-                    if store.isRefreshButtonBusy {
-                        ProgressView()
-                            .controlSize(.small)
-                            .frame(width: 24, height: 24)
-                    } else {
-                        FooterIconButtonLabel(systemName: "arrow.clockwise")
+                        .foregroundStyle(Color.primary.opacity(0.72))
+                        .monospacedDigit()
                     }
-                }
-                .buttonStyle(.borderless)
-                .disabled(isAnyRefreshing)
-                .help("立即刷新")
-                .accessibilityLabel("立即刷新")
+                    Spacer()
+                    Button {
+                        isSettingsExpanded.toggle()
+                    } label: {
+                        FooterIconButtonLabel(
+                            systemName: isSettingsExpanded ? "gearshape.fill" : "gearshape"
+                        )
+                    }
+                    .buttonStyle(.borderless)
+                    .help("设置")
+                    .accessibilityLabel("设置")
 
-                Button {
-                    NSApplication.shared.terminate(nil)
-                } label: {
-                    FooterIconButtonLabel(systemName: "power")
+                    Button {
+                        Task { await store.refreshFromButton() }
+                    } label: {
+                        if store.isRefreshButtonBusy {
+                            ProgressView()
+                                .controlSize(.small)
+                                .frame(width: 24, height: 24)
+                        } else {
+                            FooterIconButtonLabel(systemName: "arrow.clockwise")
+                        }
+                    }
+                    .buttonStyle(.borderless)
+                    .disabled(isAnyRefreshing)
+                    .help("立即刷新")
+                    .accessibilityLabel("立即刷新")
+
+                    Button {
+                        NSApplication.shared.terminate(nil)
+                    } label: {
+                        FooterIconButtonLabel(systemName: "power")
+                    }
+                    .buttonStyle(.borderless)
+                    .help("退出")
+                    .accessibilityLabel("退出")
                 }
-                .buttonStyle(.borderless)
-                .help("退出")
-                .accessibilityLabel("退出")
             }
         }
-        .padding(QuotaPopoverLayout.horizontalPadding)
+        .padding(.horizontal, QuotaPopoverLayout.horizontalPadding)
+        .padding(.top, QuotaPopoverLayout.horizontalPadding)
+        .padding(.bottom, 10)
         .frame(width: QuotaPopoverLayout.width)
         .onHover { isHovering in
             interactionDidChange(.pointer, isHovering)

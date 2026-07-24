@@ -483,6 +483,23 @@ struct TokenActivityViewTests {
         #expect(!source.contains("Button(\"退出\")"))
     }
 
+    @Test("底部操作栏减少上下留白但保留按钮点击尺寸")
+    func footerUsesCompactVerticalSpacing() throws {
+        let source = try String(
+            contentsOfFile: "Sources/CodexQ/Views/QuotaPopoverView.swift",
+            encoding: .utf8
+        )
+        let footerSource = try sourceSection(
+            source,
+            from: "VStack(spacing: 4) {\n                InsetSeparator()",
+            to: ".padding(.bottom, 10)"
+        )
+
+        #expect(footerSource.contains(".frame(width: 24, height: 24)"))
+        #expect(source.contains(".padding(.bottom, 10)"))
+        #expect(source.contains(".padding(.top, QuotaPopoverLayout.horizontalPadding)"))
+    }
+
     @Test("5 小时与周限额按标题 Pace、进度条、额度重置三层排列")
     func paceWarningUsesOpenUsageQuotaRowLayout() throws {
         let source = try String(
