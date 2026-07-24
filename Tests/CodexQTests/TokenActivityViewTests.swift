@@ -633,10 +633,13 @@ struct TokenActivityViewTests {
         let syncRowBetweenControls = source[toggleRange.upperBound..<buttonRange.lowerBound]
 
         #expect(syncRowBetweenControls.contains("Spacer(minLength: 4)"))
+        #expect(source.contains(".buttonStyle(.bordered)"))
+        #expect(source.contains(".controlSize(.small)"))
         #expect(!source.contains("icloudCostSyncFolderName"))
-        #expect(source.contains("\"未开启：Token 活动不受影响；Token 成本仅统计本机。\""))
-        #expect(source.contains("\"已开启：Token 活动不受影响；Token 成本汇总多台 Mac。\""))
-        #expect(source.contains("仅同步模型、时间和 Token 数"))
+        #expect(source.contains("\"未开启：活动不变；成本仅统计本机。\""))
+        #expect(source.contains("\"已开启：活动不变；成本汇总多台 Mac。\""))
+        #expect(source.contains("Text(\"仅同步模型、时间和 Token 数。\")"))
+        #expect(source.contains("Text(\"不含会话内容和登录信息。\")"))
         #expect(source.contains("ICloudDriveFolderPicker.chooseFolder()"))
     }
 

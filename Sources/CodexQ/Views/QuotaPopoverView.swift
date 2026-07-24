@@ -391,7 +391,8 @@ private struct EmbeddedSettingsView: View {
                     Button("更换文件夹…") {
                         chooseCostSyncFolder()
                     }
-                    .buttonStyle(.borderless)
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
                 }
             }
 
@@ -460,11 +461,15 @@ private struct CostSyncImpactCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(impactSummary)
-                .fixedSize(horizontal: false, vertical: true)
-            Text("仅同步模型、时间和 Token 数；不含会话内容和登录信息。")
+                .lineLimit(1)
+            Text("仅同步模型、时间和 Token 数。")
                 .font(.system(size: 9))
                 .foregroundStyle(.tertiary)
-                .fixedSize(horizontal: false, vertical: true)
+                .lineLimit(1)
+            Text("不含会话内容和登录信息。")
+                .font(.system(size: 9))
+                .foregroundStyle(.tertiary)
+                .lineLimit(1)
             if let message {
                 Text(message)
                     .font(.system(size: 9))
@@ -490,14 +495,14 @@ private struct CostSyncImpactCard: View {
 
     private var impactSummary: String {
         guard isEnabled else {
-            return "未开启：Token 活动不受影响；Token 成本仅统计本机。"
+            return "未开启：活动不变；成本仅统计本机。"
         }
         if case .syncBlocked = dataScope {
-            return "已开启：Token 活动不受影响；同步暂停，Token 成本暂时仅统计本机。"
+            return "同步暂停：活动不变；成本仅统计本机。"
         }
         return isDelayed
-            ? "已开启：Token 活动不受影响；Token 成本暂用本机与上次同步数据。"
-            : "已开启：Token 活动不受影响；Token 成本汇总多台 Mac。"
+            ? "同步延迟：活动不变；成本显示最近数据。"
+            : "已开启：活动不变；成本汇总多台 Mac。"
     }
 }
 
