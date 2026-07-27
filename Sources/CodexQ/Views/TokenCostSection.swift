@@ -271,12 +271,11 @@ private struct TokenCostDetailCard: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(9)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 9))
+        .background(Color.primary.opacity(0.055), in: RoundedRectangle(cornerRadius: 9))
         .overlay {
             RoundedRectangle(cornerRadius: 9)
-                .strokeBorder(Color.primary.opacity(0.12), lineWidth: 1)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
         }
-        .shadow(color: .black.opacity(0.12), radius: 8, y: 3)
     }
 
     private func modelRow(_ model: TokenCostModelSummary) -> some View {
