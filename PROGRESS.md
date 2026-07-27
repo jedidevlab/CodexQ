@@ -34,3 +34,8 @@
 - `swift build -c release --disable-sandbox`：成功；可执行文件 2,371,760 bytes，低于 2,459,285 bytes（原基线 +5%）上限。
 - 再次全量测试中的基准：5,630 条去重记录、$455.234458；冷读 21,344.597875ms、温读 127.034902ms，均在独立冻结快照内通过全量解析成本一致性断言。
 - 已提交：`d280e34 perf: parse token session files concurrently`（本地 `perf/lightweight`，未推送）。
+
+## 后续缺陷修复
+
+- 审查发现基准原先只断言成本，无法独立证明读取器的去重记录数相等。`TokenCostSnapshot` 现保存 `sourceRecordCount`；读取器传入本地去重记录数，reconcile 保持该值，真实基准同时断言记录数与成本。
+- 验证：`swift test --disable-sandbox --filter TokenCostTests` 23 passed；`swift test --disable-sandbox --filter TokenCostBenchmarkTests` 全绿，5,670 条记录、$457.311073，冷读中位数 30,371.855088ms、温读 158.545927ms。

@@ -57,6 +57,7 @@ struct TokenCostSnapshot: Equatable, Sendable {
     let skippedSessionFileCount: Int
     let dataScope: TokenCostDataScope
     let syncMessage: String?
+    let sourceRecordCount: Int
 
     init(
         today: TokenCostPeriodSummary,
@@ -66,7 +67,8 @@ struct TokenCostSnapshot: Equatable, Sendable {
         subscriptionPeriod: DateInterval?,
         skippedSessionFileCount: Int = 0,
         dataScope: TokenCostDataScope = .local,
-        syncMessage: String? = nil
+        syncMessage: String? = nil,
+        sourceRecordCount: Int = 0
     ) {
         self.today = today
         self.yesterday = yesterday
@@ -76,6 +78,7 @@ struct TokenCostSnapshot: Equatable, Sendable {
         self.skippedSessionFileCount = skippedSessionFileCount
         self.dataScope = dataScope
         self.syncMessage = syncMessage
+        self.sourceRecordCount = sourceRecordCount
     }
 }
 
@@ -315,7 +318,8 @@ enum TokenCostCalculator {
         subscriptionPeriod: DateInterval?,
         skippedSessionFileCount: Int = 0,
         dataScope: TokenCostDataScope = .local,
-        syncMessage: String? = nil
+        syncMessage: String? = nil,
+        sourceRecordCount: Int? = nil
     ) -> TokenCostSnapshot {
         let todayStart = calendar.startOfDay(for: now)
         let tomorrow = calendar.date(byAdding: .day, value: 1, to: todayStart) ?? now
@@ -348,7 +352,8 @@ enum TokenCostCalculator {
             subscriptionPeriod: subscriptionPeriod,
             skippedSessionFileCount: skippedSessionFileCount,
             dataScope: dataScope,
-            syncMessage: syncMessage
+            syncMessage: syncMessage,
+            sourceRecordCount: sourceRecordCount ?? records.count
         )
     }
 
@@ -440,7 +445,8 @@ enum TokenCostReconciler {
             subscriptionPeriod: recorded.subscriptionPeriod,
             skippedSessionFileCount: recorded.skippedSessionFileCount,
             dataScope: recorded.dataScope,
-            syncMessage: recorded.syncMessage
+            syncMessage: recorded.syncMessage,
+            sourceRecordCount: recorded.sourceRecordCount
         )
     }
 

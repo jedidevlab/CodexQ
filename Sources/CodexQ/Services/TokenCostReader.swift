@@ -193,7 +193,8 @@ actor TokenCostReader {
             subscriptionPeriod: subscriptionPeriod,
             skippedSessionFileCount: skippedSessionFileCount,
             dataScope: dataScope,
-            syncMessage: syncMessage
+            syncMessage: syncMessage,
+            sourceRecordCount: uniqueRecords.count
         )
     }
 

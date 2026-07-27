@@ -76,7 +76,7 @@ struct TokenCostBenchmarkTests {
         _ snapshot: TokenCostSnapshot,
         reference: (recordCount: Int, costUSD: Double)
     ) {
-        #expect(reference.recordCount > 0)
+        #expect(snapshot.sourceRecordCount == reference.recordCount)
         #expect(abs(snapshot.lifetime.recordedEstimatedCostUSD - reference.costUSD) < 0.000_001)
     }
 
