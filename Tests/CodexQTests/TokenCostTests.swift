@@ -671,6 +671,7 @@ struct TokenCostTests {
         #expect(source.contains("Image(systemName: \"info.circle\")"))
         #expect(source.contains(".popover(isPresented: $isSupplementExplanationPresented"))
         #expect(source.contains("官方 Token 数据高于设备记录时"))
+        #expect(source.contains("TokenCountFormatter.compactNumber(summary.totalTokens, fractionLength: 1)"))
     }
 
     @Test("金额固定使用美元符号且不显示地区前缀")

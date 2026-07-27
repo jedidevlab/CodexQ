@@ -197,6 +197,7 @@ struct TokenActivityTests {
     @Test("每日方块使用统一 Token 数量和活动等级规则")
     func sharedFormattingAndActivityLevels() {
         #expect(!TokenCountFormatter.compactNumber(1_200).contains("tokens"))
+        #expect(TokenCountFormatter.compactNumber(770_000, fractionLength: 1).contains(".0"))
         #expect(TokenCountFormatter.string(1_200).hasSuffix(" tokens"))
         #expect(TokenActivityLevel.level(tokens: 0, peakTokens: 2_000) == 0)
         #expect(TokenActivityLevel.level(tokens: 2_000, peakTokens: 2_000) == 4)

@@ -495,8 +495,10 @@ private struct ScrollingFolderPathText: View {
         .frame(height: 16)
         .clipped()
         .onPreferenceChange(FolderPathTextWidthKey.self) { newWidth in
-            textWidth = newWidth
-            updateScroll()
+            Task { @MainActor in
+                textWidth = newWidth
+                updateScroll()
+            }
         }
         .id(displayText)
     }

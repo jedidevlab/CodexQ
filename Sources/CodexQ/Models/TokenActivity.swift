@@ -152,8 +152,12 @@ enum TokenActivityPresentation {
 }
 
 enum TokenCountFormatter {
-    static func compactNumber(_ tokens: Int64) -> String {
-        tokens.formatted(.number.notation(.compactName))
+    static func compactNumber(_ tokens: Int64, fractionLength: Int? = nil) -> String {
+        var format = FloatingPointFormatStyle<Double>.number.notation(.compactName)
+        if let fractionLength {
+            format = format.precision(.fractionLength(fractionLength))
+        }
+        return Double(tokens).formatted(format)
     }
 
     static func string(_ tokens: Int64) -> String {

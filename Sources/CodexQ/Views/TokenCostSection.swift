@@ -127,7 +127,7 @@ struct TokenCostSection: View {
                         .monospacedDigit()
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
-                    Text(TokenCountFormatter.compactNumber(summary.totalTokens))
+                    Text(TokenCountFormatter.compactNumber(summary.totalTokens, fractionLength: 1))
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)

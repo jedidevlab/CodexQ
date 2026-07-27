@@ -109,7 +109,7 @@ private struct TokenActivityInlineSummary: View {
         HStack(spacing: 3) {
             Text(label)
                 .foregroundStyle(Color.primary.opacity(0.72))
-            Text(tokens.map(TokenCountFormatter.compactNumber) ?? "暂无数据")
+            Text(tokens.map { TokenCountFormatter.compactNumber($0, fractionLength: 1) } ?? "暂无数据")
                 .fontWeight(.semibold)
                 .monospacedDigit()
         }

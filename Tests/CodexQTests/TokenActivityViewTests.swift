@@ -879,7 +879,7 @@ struct TokenActivityViewTests {
         #expect(source.contains("TokenActivityPresentation.latestRecordedDay("))
         #expect(source.contains("TokenActivityDateLabel.string("))
         #expect(!source.contains("今日 Token"))
-        #expect(source.contains("TokenCountFormatter.compactNumber"))
+        #expect(source.contains("TokenCountFormatter.compactNumber($0, fractionLength: 1)"))
         #expect(source.contains("TokenActivityInlineSummary("))
         #expect(!source.contains("TokenActivitySummaryRow"))
         #expect(!source.contains(".background(.quaternary"))
