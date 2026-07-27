@@ -149,18 +149,13 @@ final class StatusBarController: NSObject {
         if panel.isVisible {
             panel.orderOut(nil)
         } else {
-            let anchorRect = button.window?.convertToScreen(
-                button.convert(StatusPopoverAnchor.rect(for: button), to: nil)
-            )
-            guard let anchorRect,
-                  let screen = NSScreen.screens.first(where: { $0.frame.intersects(anchorRect) })
-                    ?? button.window?.screen else {
+            guard let position = currentPanelPosition(for: button) else {
                 return
             }
             store.setPopoverPresented(true)
-            currentAnchorRect = anchorRect
-            currentVisibleFrame = screen.visibleFrame
-            fitPanel(anchorRect: anchorRect, visibleFrame: screen.visibleFrame)
+            currentAnchorRect = position.anchorRect
+            currentVisibleFrame = position.visibleFrame
+            fitPanel(anchorRect: position.anchorRect, visibleFrame: position.visibleFrame)
             panel.orderFrontRegardless()
             panel.makeKey()
             updateAutoClose()
@@ -236,12 +231,27 @@ final class StatusBarController: NSObject {
             guard let self,
                   !Task.isCancelled,
                   self.panel.isVisible,
-                  let anchorRect = self.currentAnchorRect,
-                  let visibleFrame = self.currentVisibleFrame else {
+                  let button = self.statusItem.button,
+                  let position = self.currentPanelPosition(for: button) else {
                 return
             }
-            self.fitPanel(anchorRect: anchorRect, visibleFrame: visibleFrame)
+            self.currentAnchorRect = position.anchorRect
+            self.currentVisibleFrame = position.visibleFrame
+            self.fitPanel(anchorRect: position.anchorRect, visibleFrame: position.visibleFrame)
         }
+    }
+
+    private func currentPanelPosition(for button: NSStatusBarButton) -> (
+        anchorRect: NSRect,
+        visibleFrame: NSRect
+    )? {
+        guard let anchorRect = button.window?.convertToScreen(
+            button.convert(StatusPopoverAnchor.rect(for: button), to: nil)
+        ), let screen = NSScreen.screens.first(where: { $0.frame.intersects(anchorRect) })
+            ?? button.window?.screen else {
+            return nil
+        }
+        return (anchorRect, screen.visibleFrame)
     }
 
     private func fitPanel(anchorRect: NSRect, visibleFrame: NSRect) {
