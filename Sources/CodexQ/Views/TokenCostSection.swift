@@ -18,7 +18,9 @@ struct TokenCostSection: View {
                 Text(scopeLabel)
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
-                Spacer(minLength: 6)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                Spacer(minLength: 0)
                 if let today = snapshot?.today {
                     periodButton(summary: today, compact: true)
                 }
@@ -107,8 +109,11 @@ struct TokenCostSection: View {
                     Text(TokenCostFormatter.amount(summary))
                         .fontWeight(.semibold)
                         .monospacedDigit()
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
                 }
                 .font(.caption2)
+                .layoutPriority(1)
                 .padding(.horizontal, 7)
                 .padding(.vertical, 4)
                 .background(cardBackground(for: summary.kind), in: Capsule())
@@ -123,7 +128,7 @@ struct TokenCostSection: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
                     Text(TokenCostFormatter.amount(summary))
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
                         .monospacedDigit()
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
