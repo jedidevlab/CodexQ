@@ -231,13 +231,11 @@ final class StatusBarController: NSObject {
             guard let self,
                   !Task.isCancelled,
                   self.panel.isVisible,
-                  let button = self.statusItem.button,
-                  let position = self.currentPanelPosition(for: button) else {
+                  let anchorRect = self.currentAnchorRect,
+                  let visibleFrame = self.currentVisibleFrame else {
                 return
             }
-            self.currentAnchorRect = position.anchorRect
-            self.currentVisibleFrame = position.visibleFrame
-            self.fitPanel(anchorRect: position.anchorRect, visibleFrame: position.visibleFrame)
+            self.fitPanel(anchorRect: anchorRect, visibleFrame: visibleFrame)
         }
     }
 
