@@ -844,10 +844,10 @@ struct TokenActivityViewTests {
             source.range(of: "private func panelDidClose()", range: toggleStart.upperBound..<source.endIndex)
         )
         let toggleSource = source[toggleStart.lowerBound..<toggleEnd.lowerBound]
-        let screenGuard = try #require(toggleSource.range(of: "guard let anchorRect"))
+        let positionGuard = try #require(toggleSource.range(of: "guard let position = currentPanelPosition(for: button)"))
         let presentedState = try #require(toggleSource.range(of: "store.setPopoverPresented(true)"))
 
-        #expect(screenGuard.lowerBound < presentedState.lowerBound)
+        #expect(positionGuard.lowerBound < presentedState.lowerBound)
     }
 
     @Test("每日路径调用共享方块、单位和等级")
