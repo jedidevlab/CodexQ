@@ -33,3 +33,4 @@
 - `swift test --disable-sandbox`：177 tests passed，0 skipped（新增的真实数据基准测试使总数从冻结的 176 增至 177；原有测试未修改）。
 - `swift build -c release --disable-sandbox`：成功；可执行文件 2,371,760 bytes，低于 2,459,285 bytes（原基线 +5%）上限。
 - 再次全量测试中的基准：5,630 条去重记录、$455.234458；冷读 21,344.597875ms、温读 127.034902ms，均在独立冻结快照内通过全量解析成本一致性断言。
+- 已提交：`d280e34 perf: parse token session files concurrently`（本地 `perf/lightweight`，未推送）。
