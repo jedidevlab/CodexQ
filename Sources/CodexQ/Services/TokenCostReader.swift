@@ -21,10 +21,15 @@ actor TokenCostReader {
         }
     }
 
-    private struct CachedFile {
+    private struct CachedFile: Sendable {
         let size: UInt64
         let modificationDate: Date
         let records: [TokenUsageRecord]
+    }
+
+    private struct ParsedFile: Sendable {
+        let url: URL
+        let cache: CachedFile?
     }
 
     private struct SessionFileListing {
@@ -58,7 +63,7 @@ actor TokenCostReader {
         )
     }
 
-    func read(now: Date = Date()) throws -> TokenCostSnapshot {
+    func read(now: Date = Date()) async throws -> TokenCostSnapshot {
         let configuration = costSyncConfiguration()
         let listing: SessionFileListing
         do {
@@ -75,6 +80,7 @@ actor TokenCostReader {
         var records: [TokenUsageRecord] = []
         var skippedSessionFileCount = listing.skippedCount
         var liveFiles = Set<URL>()
+        var filesToParse: [(URL, UInt64, Date)] = []
         for url in files {
             try Task.checkCancellation()
             liveFiles.insert(url)
@@ -89,19 +95,40 @@ actor TokenCostReader {
                     records.append(contentsOf: cached.records)
                     continue
                 }
-                let parsed = try TokenCostSessionParser.records(in: url)
-                cache[url] = CachedFile(
-                    size: size,
-                    modificationDate: modificationDate,
-                    records: parsed
-                )
-                records.append(contentsOf: parsed)
+                filesToParse.append((url, size, modificationDate))
             } catch is CancellationError {
                 throw CancellationError()
             } catch {
                 cache.removeValue(forKey: url)
                 skippedSessionFileCount += 1
             }
+        }
+        let parsedFiles = await withTaskGroup(of: ParsedFile.self) { group in
+            for (url, size, modificationDate) in filesToParse {
+                group.addTask {
+                    guard !Task.isCancelled,
+                          let records = try? TokenCostSessionParser.records(in: url) else {
+                        return ParsedFile(url: url, cache: nil)
+                    }
+                    return ParsedFile(
+                        url: url,
+                        cache: CachedFile(size: size, modificationDate: modificationDate, records: records)
+                    )
+                }
+            }
+            var result: [ParsedFile] = []
+            for await parsed in group { result.append(parsed) }
+            return result
+        }
+        for parsed in parsedFiles {
+            try Task.checkCancellation()
+            guard let cached = parsed.cache else {
+                cache.removeValue(forKey: parsed.url)
+                skippedSessionFileCount += 1
+                continue
+            }
+            cache[parsed.url] = cached
+            records.append(contentsOf: cached.records)
         }
         cache = cache.filter { liveFiles.contains($0.key) }
 
