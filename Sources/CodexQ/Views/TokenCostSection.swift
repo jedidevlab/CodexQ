@@ -5,6 +5,7 @@ struct TokenCostSection: View {
     let errorMessage: String?
     let isRefreshing: Bool
     let isPresented: Bool
+    let contentWillChange: () -> Void
     let contentDidChange: () -> Void
 
     @State private var hoveredKind: TokenCostPeriodSummary.Kind?
@@ -100,7 +101,12 @@ struct TokenCostSection: View {
         compact: Bool = false
     ) -> some View {
         return Button {
-            pinnedKind = pinnedKind == summary.kind ? nil : summary.kind
+            contentWillChange()
+            var transaction = Transaction(animation: nil)
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                pinnedKind = pinnedKind == summary.kind ? nil : summary.kind
+            }
         } label: {
             if compact {
                 HStack(spacing: 4) {

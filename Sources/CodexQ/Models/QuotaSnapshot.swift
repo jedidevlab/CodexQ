@@ -73,7 +73,7 @@ struct QuotaWindow: Codable, Equatable, Sendable {
             return absoluteLevelState
         }
 
-        let duration = TimeInterval(durationMinutes * 60)
+        let duration = TimeInterval(durationMinutes) * 60
         let remainingTime = resetsAt.timeIntervalSince(now)
         let elapsedTime = duration - remainingTime
         let minimumElapsed = max(60, duration * 0.01)

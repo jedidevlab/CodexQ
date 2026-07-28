@@ -624,6 +624,41 @@ struct TokenCostTests {
         #expect(snapshot.dataScope == .singleDevice)
     }
 
+    @Test("取消多设备成本读取必须向上抛出取消，不能降级成同步延迟结果")
+    func readerPropagatesSyncCancellation() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let home = root.appendingPathComponent("home", isDirectory: true)
+        let sessions = home.appendingPathComponent(".codex/sessions", isDirectory: true)
+        let folder = root.appendingPathComponent("sync", isDirectory: true)
+        try FileManager.default.createDirectory(at: sessions, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let configuration = CostSyncConfiguration(
+            folderURL: folder,
+            deviceID: "cancelled-device",
+            namespace: "cancelled-namespace"
+        )
+        let reader = TokenCostReader(
+            homeDirectory: home,
+            costLedgerCacheURL: root.appendingPathComponent("cache.json"),
+            costSyncConfiguration: { configuration }
+        )
+        let propagated = await Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            do {
+                _ = try await reader.read()
+                return false
+            } catch is CancellationError {
+                return true
+            } catch {
+                return false
+            }
+        }.value
+
+        #expect(propagated)
+    }
+
     @Test("成本界面悬浮只高亮并由点击稳定展开面板内模型明细")
     func costSectionKeepsRequestedCompactInteraction() throws {
         let source = try String(
@@ -643,6 +678,16 @@ struct TokenCostTests {
         #expect(!source.contains("Text(\"API 估算\")"))
         #expect(source.contains("hoveredKind"))
         #expect(source.contains("pinnedKind"))
+        let willChange = try #require(source.range(of: "contentWillChange()"))
+        let stateChange = try #require(
+            source.range(
+                of: "pinnedKind = pinnedKind == summary.kind ? nil : summary.kind",
+                range: willChange.upperBound..<source.endIndex
+            )
+        )
+        #expect(willChange.lowerBound < stateChange.lowerBound)
+        #expect(source.contains("transaction.disablesAnimations = true"))
+        #expect(source.contains("withTransaction(transaction)"))
         #expect(source.contains("pinnedKind ?? hoveredKind"))
         #expect(source.contains(".onChange(of: pinnedKind)"))
         #expect(source.contains("guard let pinnedKind, let snapshot"))

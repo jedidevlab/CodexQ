@@ -172,6 +172,8 @@ actor TokenCostReader {
                 syncMessage = syncMessages.isEmpty
                     ? nil
                     : syncMessages.joined(separator: "；")
+            } catch is CancellationError {
+                throw CancellationError()
             } catch {
                 if let syncError = error as? CostLedgerSyncService.SyncError,
                    syncError == .accountMismatch || syncError == .accountUnavailable {

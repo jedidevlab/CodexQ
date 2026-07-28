@@ -42,6 +42,13 @@ struct QuotaFormattingTests {
         ) == "4d 0h 后重置")
     }
 
+    @Test("异常遥远的重置时间不会因分钟换算溢出而崩溃")
+    func extremeResetIntervalDoesNotOverflow() {
+        let formatter = ResetTimeFormatter(locale: locale, timeZone: timeZone)
+
+        #expect(formatter.compactDuration(.greatestFiniteMagnitude) == nil)
+    }
+
     @Test("重置时间可切换为今天、明天或日期的绝对时间")
     func absoluteResetUsesOpenUsageDayBuckets() {
         let formatter = ResetTimeFormatter(locale: locale, timeZone: timeZone)
@@ -227,6 +234,18 @@ struct QuotaFormattingTests {
 
         #expect(tooEarly.isPlainLevel)
         #expect(ready.isRunningOut)
+    }
+
+    @Test("异常超长额度窗口不会因分钟换算整数溢出而崩溃")
+    func paceHandlesExtremeDurationWithoutOverflow() {
+        let now = Date(timeIntervalSince1970: 10_000)
+        let state = QuotaWindow(
+            usedPercent: 10,
+            resetsAt: now.addingTimeInterval(60),
+            durationMinutes: .max
+        ).paceState(at: now)
+
+        #expect(!state.isPlainLevel)
     }
 
     @Test("用量低于 5% 时不显示不可靠的提前耗尽 Pace")
@@ -610,5 +629,15 @@ struct RelativeUpdateFormatterTests {
             since: updatedAt,
             now: updatedAt.addingTimeInterval(3 * 24 * 60 * 60)
         ) == "3 天前更新")
+    }
+
+    @Test("异常遥远的更新时间不会因天数换算溢出而崩溃")
+    func extremeUpdateIntervalDoesNotOverflow() {
+        let now = Date(timeIntervalSince1970: .greatestFiniteMagnitude)
+
+        #expect(RelativeUpdateFormatter.string(
+            since: Date(timeIntervalSince1970: 0),
+            now: now
+        ) == "很久前更新")
     }
 }

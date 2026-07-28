@@ -530,8 +530,8 @@ struct TokenActivityViewTests {
         secondGate.open()
     }
 
-    @Test("弹窗依次展示 Token 活动、Token 成本、限额重置和设置")
-    func popoverOrdersTokenActivityAndCostBeforeResetCreditsAndSettings() throws {
+    @Test("弹窗依次展示 Token 活动、Token 成本和限额重置")
+    func popoverOrdersTokenActivityAndCostBeforeResetCredits() throws {
         let source = try String(
             contentsOfFile: "Sources/CodexQ/Views/QuotaPopoverView.swift",
             encoding: .utf8
@@ -539,12 +539,9 @@ struct TokenActivityViewTests {
         let activityIndex = try #require(source.range(of: "TokenActivitySection("))
         let costIndex = try #require(source.range(of: "TokenCostSection("))
         let resetCreditsIndex = try #require(source.range(of: "ResetCreditsSection("))
-        let settingsIndex = try #require(source.range(of: "EmbeddedSettingsView("))
 
         #expect(activityIndex.lowerBound < costIndex.lowerBound)
         #expect(costIndex.lowerBound < resetCreditsIndex.lowerBound)
-        #expect(activityIndex.lowerBound < settingsIndex.lowerBound)
-        #expect(resetCreditsIndex.lowerBound < settingsIndex.lowerBound)
     }
 
     @Test("弹窗顶部显示 app-server 返回的套餐类型")
@@ -653,7 +650,7 @@ struct TokenActivityViewTests {
         )
         let footerSource = try sourceSection(
             source,
-            from: "if isSettingsExpanded {",
+            from: "if let resetCredits = store.snapshot?.resetCredits {",
             to: ".padding(.bottom, 10)"
         )
 
@@ -767,8 +764,8 @@ struct TokenActivityViewTests {
         #expect(!source.contains("monthSpacing"))
     }
 
-    @Test("低频设置默认折叠并由底部齿轮控制")
-    func settingsAreCollapsedBehindGearButton() throws {
+    @Test("底部齿轮打开独立设置窗口，不在菜单弹窗内展开")
+    func settingsOpenInDedicatedWindow() throws {
         let source = try String(
             contentsOfFile: "Sources/CodexQ/Views/QuotaPopoverView.swift",
             encoding: .utf8
@@ -779,11 +776,24 @@ struct TokenActivityViewTests {
             to: "private struct QuotaRow"
         )
 
-        #expect(source.contains("@State private var isSettingsExpanded = false"))
-        #expect(source.contains("if isSettingsExpanded"))
-        #expect(source.contains("gearshape.fill"))
-        #expect(source.contains("interactionDidChange(.settings, isSettingsExpanded)"))
+        #expect(source.contains("let showSettings: () -> Void"))
+        #expect(source.contains("Button(action: showSettings)"))
+        #expect(source.contains("struct SettingsWindowView"))
+        #expect(!source.contains("@State private var isSettingsExpanded"))
+        #expect(!source.contains("if isSettingsExpanded"))
+        #expect(!source.contains("ScrollView(.vertical)"))
         #expect(settingsSource.contains("HStack(spacing: 4)"))
+    }
+
+    @Test("展开模型明细时仍保留 Token 活动区")
+    func modelDetailKeepsTokenActivityVisible() throws {
+        let source = try String(
+            contentsOfFile: "Sources/CodexQ/Views/QuotaPopoverView.swift",
+            encoding: .utf8
+        )
+
+        #expect(source.contains("TokenActivitySection("))
+        #expect(!source.contains("pinnedCostKind"))
     }
 
     @Test("iCloud 同步设置明确区分活动与成本，并始终提供文件夹选择")
@@ -797,10 +807,15 @@ struct TokenActivityViewTests {
             from: "private func syncImpactRow",
             to: "private struct QuotaRow"
         )
+        let syncControlsSource = try sourceSection(
+            source,
+            from: "HStack(spacing: 8) {\n                Toggle(\"启用 iCloud 多设备成本同步\"",
+            to: "ScrollingFolderPathText(path: settings.icloudCostSyncFolderPath)"
+        )
 
         #expect(source.contains("Toggle(\"启用 iCloud 多设备成本同步\""))
         #expect(source.contains("ScrollingFolderPathText(path: settings.icloudCostSyncFolderPath)"))
-        #expect(source.contains("Button(\"选择文件夹\")"))
+        #expect(syncControlsSource.contains("Button(\"选择文件夹\")"))
         #expect(source.contains("path ?? \"尚未选择文件夹\""))
         #expect(source.contains(".repeatForever(autoreverses: true)"))
         #expect(source.contains("\"chart.bar.fill\""))
@@ -814,8 +829,12 @@ struct TokenActivityViewTests {
         #expect(source.contains("ICloudDriveFolderPicker.chooseFolder()"))
         #expect(!source.contains("costSyncDidChange"))
         #expect(impactRowSource.contains(
-            "VStack(alignment: .leading, spacing: 2) {\n            HStack(alignment: .top, spacing: 8) {"
+            "HStack(alignment: .firstTextBaseline, spacing: 8)"
         ))
+        #expect(!impactRowSource.contains("VStack(alignment: .leading, spacing: 2)"))
+        #expect(impactRowSource.contains("Text(title)"))
+        #expect(impactRowSource.contains("Text(detail)"))
+        #expect(impactRowSource.contains(".lineLimit(1)"))
     }
 
     @Test("鼠标停留与展开状态会上报并在关闭后复位")
@@ -830,7 +849,6 @@ struct TokenActivityViewTests {
         #expect(source.contains("interactionDidChange(.resetCredits, isExpanded)"))
         #expect(source.contains(".onChange(of: store.isPopoverPresented)"))
         #expect(source.contains("isResetCreditsExpanded = false"))
-        #expect(source.contains("isSettingsExpanded = false"))
     }
 
     @Test("只有成功定位到屏幕后才标记弹窗已展示")

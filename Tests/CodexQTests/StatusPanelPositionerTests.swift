@@ -56,6 +56,36 @@ struct StatusPanelPositionerTests {
         #expect(tall.minY >= visible.minY)
     }
 
+    @Test("面板顶边跟随实际菜单栏按钮底边而不是屏幕可见区域顶边")
+    func panelTopUsesStatusItemAnchor() {
+        let frame = StatusPanelPositioner.frame(
+            panelSize: NSSize(width: 256, height: 520),
+            anchorRect: NSRect(x: 20, y: 926, width: 18, height: 22),
+            visibleFrame: NSRect(x: 0, y: 0, width: 1440, height: 900)
+        )
+
+        #expect(frame.maxY == 925)
+    }
+
+    @Test("小屏超高内容保持完整高度并只从底部超出，避免压缩后重新排版跳动")
+    func tallPanelKeepsFullHeightBelowMenuBar() {
+        let visibleFrame = NSRect(x: -1366, y: 312, width: 1366, height: 768)
+        let anchorRect = NSRect(x: -120, y: 1056, width: 69, height: 22)
+        let fittedSize = StatusPanelPositioner.fittedSize(
+            contentSize: NSSize(width: 256, height: 818),
+            visibleFrame: visibleFrame
+        )
+        let frame = StatusPanelPositioner.frame(
+            panelSize: fittedSize,
+            anchorRect: anchorRect,
+            visibleFrame: visibleFrame
+        )
+
+        #expect(fittedSize.height == 818)
+        #expect(frame.maxY == anchorRect.minY - 1)
+        #expect(frame.minY < visibleFrame.minY + 8)
+    }
+
     @Test("控制器在展示前和内容变化后重新 fitting")
     func controllerRefitsForPresentationAndPublishedContent() throws {
         let source = try String(
@@ -68,6 +98,8 @@ struct StatusPanelPositionerTests {
         #expect(source.contains("store.$tokenActivity"))
         #expect(source.contains("store.$tokenActivityErrorMessage"))
         #expect(source.contains("schedulePanelRefit()"))
+        #expect(source.contains("height: .greatestFiniteMagnitude"))
+        #expect(!source.contains("height: visibleFrame.height"))
         #expect(source.components(separatedBy: "width: QuotaPopoverLayout.width").count - 1 == 2)
         let fitIndex = try #require(source.range(of: "fitPanel(anchorRect:"))
         let showIndex = try #require(source.range(of: "panel.orderFrontRegardless()"))

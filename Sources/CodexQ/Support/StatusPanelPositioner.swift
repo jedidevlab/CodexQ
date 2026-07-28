@@ -10,10 +10,9 @@ enum StatusPanelPositioner {
         visibleFrame: NSRect
     ) -> NSSize {
         let maximumWidth = max(1, visibleFrame.width - edgeInset * 2)
-        let maximumHeight = max(1, visibleFrame.height - edgeInset - menuBarGap)
         return NSSize(
             width: min(maximumWidth, max(1, contentSize.width)),
-            height: min(maximumHeight, max(1, contentSize.height))
+            height: max(1, contentSize.height)
         )
     }
 
@@ -27,7 +26,7 @@ enum StatusPanelPositioner {
         let maxX = visibleFrame.maxX - edgeInset - panelSize.width
         let positionedX = min(maxX, max(minX, idealX))
         let x = max(minX, positionedX - horizontalOffset)
-        let y = visibleFrame.maxY - menuBarGap - panelSize.height
+        let y = anchorRect.minY - menuBarGap - panelSize.height
         return NSRect(origin: NSPoint(x: x, y: y), size: panelSize)
     }
 }

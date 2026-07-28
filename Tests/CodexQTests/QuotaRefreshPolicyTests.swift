@@ -36,6 +36,70 @@ struct QuotaNotificationTests {
         }
     }
 
+    @Test("自定义阈值参与提醒并与相同预设去重")
+    func customThresholdIsClampedAndDeduplicated() {
+        #expect(QuotaWarningThresholds.resolved(
+            notifyAt20: true,
+            notifyAt10: false,
+            notifyAt5: false,
+            notifyAtCustom: true,
+            customThreshold: 20
+        ) == [20])
+        #expect(QuotaWarningThresholds.resolved(
+            notifyAt20: true,
+            notifyAt10: false,
+            notifyAt5: false,
+            notifyAtCustom: true,
+            customThreshold: 7
+        ) == [20, 7])
+        #expect(QuotaWarningThresholds.resolved(
+            notifyAt20: false,
+            notifyAt10: false,
+            notifyAt5: false,
+            notifyAtCustom: true,
+            customThreshold: 0
+        ) == [1])
+        #expect(QuotaWarningThresholds.resolved(
+            notifyAt20: false,
+            notifyAt10: false,
+            notifyAt5: false,
+            notifyAtCustom: true,
+            customThreshold: 100
+        ) == [99])
+    }
+
+    @Test("设置页提供可持久化的自定义额度预警阈值")
+    func settingsExposePersistentCustomThreshold() throws {
+        let settingsSource = try String(
+            contentsOfFile: "Sources/CodexQ/Stores/AppSettings.swift",
+            encoding: .utf8
+        )
+        let viewSource = try String(
+            contentsOfFile: "Sources/CodexQ/Views/QuotaPopoverView.swift",
+            encoding: .utf8
+        )
+        let notificationRowStart = try #require(
+            viewSource.range(of: "HStack(spacing: 4) {\n                Toggle(\"额度预警通知\"")
+        )
+        let notificationRowEnd = try #require(
+            viewSource.range(
+                of: "if settings.notificationsEnabled,\n               let warning",
+                range: notificationRowStart.upperBound..<viewSource.endIndex
+            )
+        )
+        let notificationRow = viewSource[
+            notificationRowStart.lowerBound..<notificationRowEnd.lowerBound
+        ]
+
+        #expect(settingsSource.contains("static let notifyAtCustom = \"notifyAtCustom\""))
+        #expect(settingsSource.contains("static let customWarningThreshold = \"customWarningThreshold\""))
+        #expect(notificationRow.contains("Toggle(\"自定义\""))
+        #expect(notificationRow.contains("value: customWarningThresholdBinding"))
+        #expect(notificationRow.components(separatedBy: "HStack(spacing: 4)").count == 2)
+        #expect(viewSource.contains("输入 1–99 的剩余额度百分比"))
+        #expect(viewSource.contains(".frame(width: 380)"))
+    }
+
     @Test("缺少重置时间时不判断为同一额度周期")
     func doesNotNotifyAcrossUnknownResetCycle() {
         let previous = QuotaWindow(usedPercent: 10, resetsAt: nil, durationMinutes: 300)

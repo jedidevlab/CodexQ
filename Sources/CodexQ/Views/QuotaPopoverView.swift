@@ -32,12 +32,12 @@ enum QuotaBarLayout {
 
 struct QuotaPopoverView: View {
     @ObservedObject var store: QuotaStore
-    @ObservedObject var settings: AppSettings
     let contentDidChange: () -> Void
+    let contentWillChange: () -> Void
     let interactionDidChange: (PopoverInteraction, Bool) -> Void
+    let showSettings: () -> Void
     @State private var relativeTimeNow = Date()
     @State private var isResetCreditsExpanded = false
-    @State private var isSettingsExpanded = false
     @AppStorage("quotaResetDisplayMode") private var resetDisplayModeRawValue = ResetDisplayMode.relative.rawValue
     private let formatter = ResetTimeFormatter()
 
@@ -102,6 +102,7 @@ struct QuotaPopoverView: View {
                 errorMessage: store.tokenCostErrorMessage,
                 isRefreshing: store.isTokenActivityRefreshing,
                 isPresented: store.isPopoverPresented,
+                contentWillChange: contentWillChange,
                 contentDidChange: contentDidChange
             )
 
@@ -110,15 +111,6 @@ struct QuotaPopoverView: View {
                 ResetCreditsSection(
                     summary: resetCredits,
                     isExpanded: $isResetCreditsExpanded
-                )
-            }
-
-            if isSettingsExpanded {
-                InsetSeparator()
-                EmbeddedSettingsView(
-                    settings: settings,
-                    costSyncMessage: store.tokenCost?.syncMessage,
-                    settingsDidChange: contentDidChange
                 )
             }
 
@@ -141,12 +133,8 @@ struct QuotaPopoverView: View {
                     .monospacedDigit()
                 }
                 Spacer()
-                Button {
-                    isSettingsExpanded.toggle()
-                } label: {
-                    FooterIconButtonLabel(
-                        systemName: isSettingsExpanded ? "gearshape.fill" : "gearshape"
-                    )
+                Button(action: showSettings) {
+                    FooterIconButtonLabel(systemName: "gearshape")
                 }
                 .buttonStyle(.borderless)
                 .help("设置")
@@ -189,14 +177,9 @@ struct QuotaPopoverView: View {
             interactionDidChange(.resetCredits, isExpanded)
             contentDidChange()
         }
-        .onChange(of: isSettingsExpanded) { _, isExpanded in
-            interactionDidChange(.settings, isSettingsExpanded)
-            contentDidChange()
-        }
         .onChange(of: store.isPopoverPresented) { _, isPresented in
             guard !isPresented else { return }
             isResetCreditsExpanded = false
-            isSettingsExpanded = false
         }
         .task(id: store.isPopoverPresented) {
             guard store.isPopoverPresented else { return }
@@ -352,6 +335,21 @@ private struct DisabledContinuousQuotaBar: View {
     }
 }
 
+struct SettingsWindowView: View {
+    @ObservedObject var store: QuotaStore
+    @ObservedObject var settings: AppSettings
+
+    var body: some View {
+        EmbeddedSettingsView(
+            settings: settings,
+            costSyncMessage: store.tokenCost?.syncMessage,
+            settingsDidChange: {}
+        )
+        .padding(20)
+        .frame(width: 380)
+    }
+}
+
 private struct EmbeddedSettingsView: View {
     @ObservedObject var settings: AppSettings
     let costSyncMessage: String?
@@ -367,6 +365,19 @@ private struct EmbeddedSettingsView: View {
                     Toggle("20%", isOn: $settings.notifyAt20)
                     Toggle("10%", isOn: $settings.notifyAt10)
                     Toggle("5%", isOn: $settings.notifyAt5)
+                    Toggle("自定义", isOn: $settings.notifyAtCustom)
+                    TextField(
+                        "阈值",
+                        value: customWarningThresholdBinding,
+                        format: .number
+                    )
+                    .frame(width: 38)
+                    .multilineTextAlignment(.trailing)
+                    .disabled(!settings.notifyAtCustom)
+                    .accessibilityLabel("自定义额度预警阈值")
+                    .help("输入 1–99 的剩余额度百分比")
+                    Text("%")
+                        .foregroundStyle(.secondary)
                 }
             }
 
@@ -376,19 +387,17 @@ private struct EmbeddedSettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
-            Toggle("启用 iCloud 多设备成本同步", isOn: costSyncBinding)
-
             HStack(spacing: 8) {
-                ScrollingFolderPathText(path: settings.icloudCostSyncFolderPath)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
+                Toggle("启用 iCloud 多设备成本同步", isOn: costSyncBinding)
                 Button("选择文件夹") {
                     chooseCostSyncFolder()
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
-                .layoutPriority(1)
             }
+
+            ScrollingFolderPathText(path: settings.icloudCostSyncFolderPath)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
             CostSyncImpactCard(
                 message: settings.icloudCostSyncEnabled
@@ -414,6 +423,15 @@ private struct EmbeddedSettingsView: View {
         .onChange(of: settings.notifyAt20) { settingsDidChange() }
         .onChange(of: settings.notifyAt10) { settingsDidChange() }
         .onChange(of: settings.notifyAt5) { settingsDidChange() }
+        .onChange(of: settings.notifyAtCustom) { settingsDidChange() }
+        .onChange(of: settings.customWarningThreshold) { settingsDidChange() }
+    }
+
+    private var customWarningThresholdBinding: Binding<Int> {
+        Binding(
+            get: { settings.customWarningThreshold },
+            set: { settings.setCustomWarningThreshold($0) }
+        )
     }
 
     private var costSyncBinding: Binding<Bool> {
@@ -561,18 +579,17 @@ private struct CostSyncImpactCard: View {
     }
 
     private func syncImpactRow(icon: String, title: String, detail: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack(alignment: .top, spacing: 8) {
-                Image(systemName: icon)
-                    .font(.system(size: 13, weight: .semibold))
-                    .frame(width: 16)
-                    .foregroundStyle(.secondary)
-                Text(title)
-                    .font(.caption.weight(.semibold))
-            }
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .semibold))
+                .frame(width: 16)
+                .foregroundStyle(.secondary)
+            Text(title)
+                .font(.caption.weight(.semibold))
             Text(detail)
                 .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
         }
     }
 }

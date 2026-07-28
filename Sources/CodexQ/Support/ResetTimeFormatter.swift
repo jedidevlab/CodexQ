@@ -80,7 +80,9 @@ struct ResetTimeFormatter {
 
     func compactDuration(_ seconds: TimeInterval) -> String? {
         guard seconds.isFinite, seconds > 0 else { return nil }
-        let totalMinutes = max(1, Int((seconds / 60).rounded(.up)))
+        let roundedMinutes = (seconds / 60).rounded(.up)
+        guard roundedMinutes < Double(Int.max) else { return nil }
+        let totalMinutes = max(1, Int(roundedMinutes))
         let days = totalMinutes / (24 * 60)
         let hours = (totalMinutes % (24 * 60)) / 60
         let minutes = totalMinutes % 60

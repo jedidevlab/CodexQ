@@ -22,6 +22,7 @@ final class StatusBarController: NSObject {
     private var panelRefitTask: Task<Void, Never>?
     private var currentAnchorRect: NSRect?
     private var currentVisibleFrame: NSRect?
+    private var settingsWindowController: SettingsWindowController?
 
     override init() {
         let iconURL = Bundle.main.url(forResource: "MenuBarIcon", withExtension: "png")
@@ -40,12 +41,17 @@ final class StatusBarController: NSObject {
         let rootView = AnyView(
             QuotaPopoverView(
                 store: store,
-                settings: .shared,
                 contentDidChange: { [weak self] in
-                    self?.schedulePanelRefit()
+                    self?.refitPanelImmediately()
+                },
+                contentWillChange: { [weak self] in
+                    self?.preparePanelForInteractiveRefit()
                 },
                 interactionDidChange: { [weak self] interaction, isActive in
                     self?.interactionDidChange(interaction, isActive: isActive)
+                },
+                showSettings: { [weak self] in
+                    self?.showSettingsWindow()
                 }
             )
             .background(.thickMaterial, in: RoundedRectangle(cornerRadius: 18))
@@ -55,6 +61,7 @@ final class StatusBarController: NSObject {
             }
         )
         let hostingController = NSHostingController(rootView: rootView)
+        hostingController.sizingOptions = []
         self.hostingController = hostingController
         panel.contentViewController = hostingController
         panel.didClose = { [weak self] in
@@ -165,6 +172,14 @@ final class StatusBarController: NSObject {
         }
     }
 
+    private func showSettingsWindow() {
+        let controller = settingsWindowController
+            ?? SettingsWindowController(store: store, settings: .shared)
+        settingsWindowController = controller
+        panel.orderOut(nil)
+        controller.present()
+    }
+
     private func panelDidClose() {
         autoCloseTask?.cancel()
         autoCloseTask = nil
@@ -181,6 +196,8 @@ final class StatusBarController: NSObject {
         panelRefitTask = nil
         activeInteractions.removeAll()
         panel.orderOut(nil)
+        settingsWindowController?.close()
+        settingsWindowController = nil
         store.stop()
     }
 
@@ -239,6 +256,22 @@ final class StatusBarController: NSObject {
         }
     }
 
+    private func preparePanelForInteractiveRefit() {
+        guard panel.isVisible else { return }
+        panel.disableScreenUpdatesUntilFlush()
+    }
+
+    private func refitPanelImmediately() {
+        panelRefitTask?.cancel()
+        panelRefitTask = nil
+        guard panel.isVisible,
+              let anchorRect = currentAnchorRect,
+              let visibleFrame = currentVisibleFrame else {
+            return
+        }
+        fitPanel(anchorRect: anchorRect, visibleFrame: visibleFrame)
+    }
+
     private func currentPanelPosition(for button: NSStatusBarButton) -> (
         anchorRect: NSRect,
         visibleFrame: NSRect
@@ -256,7 +289,7 @@ final class StatusBarController: NSObject {
         guard let hostingController else { return }
         let contentSize = hostingController.sizeThatFits(in: NSSize(
             width: QuotaPopoverLayout.width,
-            height: visibleFrame.height
+            height: .greatestFiniteMagnitude
         ))
         let fittedSize = StatusPanelPositioner.fittedSize(
             contentSize: contentSize,
@@ -268,7 +301,8 @@ final class StatusBarController: NSObject {
                 anchorRect: anchorRect,
                 visibleFrame: visibleFrame
             ),
-            display: panel.isVisible
+            display: panel.isVisible,
+            animate: false
         )
     }
 
