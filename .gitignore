@@ -5,3 +5,4 @@ tmp/
 .codex/
 .worktrees/
 .DS_Store
+.workbuddy/
