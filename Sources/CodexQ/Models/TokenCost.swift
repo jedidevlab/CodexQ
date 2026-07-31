@@ -145,7 +145,7 @@ struct TokenPricing: Equatable, Sendable {
 }
 
 enum TokenPricingCatalog {
-    static let effectiveDate = "2026-07-23"
+    static let effectiveDate = "2026-07-31"
     static let longContextThreshold: Int64 = 272_000
 
     static func pricing(for model: String) -> TokenPricing? {
@@ -191,8 +191,8 @@ enum TokenPricingCatalog {
         }
 
         add(["gpt-5.6", "gpt-5.6-sol"], input: 5, cached: 0.5, cacheWrite: 6.25, output: 30, priorityMultiplier: 2, longContext: true)
-        add(["gpt-5.6-terra"], input: 2.5, cached: 0.25, cacheWrite: 3.125, output: 15, priorityMultiplier: 2, longContext: true)
-        add(["gpt-5.6-luna"], input: 1, cached: 0.1, cacheWrite: 1.25, output: 6, priorityMultiplier: 2, longContext: true)
+        add(["gpt-5.6-terra"], input: 2, cached: 0.2, cacheWrite: 2.5, output: 12, priorityMultiplier: 2.5, longContext: true)
+        add(["gpt-5.6-luna"], input: 0.2, cached: 0.02, cacheWrite: 0.25, output: 1.2, priorityMultiplier: 10, longContext: true)
         add(["gpt-5.5", "gpt-5.5-2026-04-23"], input: 5, cached: 0.5, output: 30, priorityMultiplier: 2.5, longContext: true)
         add(["gpt-5.5-pro", "gpt-5.5-pro-2026-04-23"], input: 30, output: 180, longContext: true)
         add(["gpt-5.4", "gpt-5.4-2026-03-05"], input: 2.5, cached: 0.25, output: 15, priorityMultiplier: 2, longContext: true)
@@ -250,6 +250,54 @@ enum TokenPricingCatalog {
     }()
 
     private static let historicalCatalog: [String: [HistoricalPricing]] = [
+        "gpt-5.6-terra": [
+            HistoricalPricing(
+                effectiveAt: .distantPast,
+                pricing: TokenPricing(
+                    inputPerMillion: 2.5,
+                    cachedInputPerMillion: 0.25,
+                    cacheWritePerMillion: 3.125,
+                    outputPerMillion: 15,
+                    priorityMultiplier: 2,
+                    appliesLongContextPremium: true
+                )
+            ),
+            HistoricalPricing(
+                effectiveAt: date("2026-07-31T00:00:00Z"),
+                pricing: TokenPricing(
+                    inputPerMillion: 2,
+                    cachedInputPerMillion: 0.2,
+                    cacheWritePerMillion: 2.5,
+                    outputPerMillion: 12,
+                    priorityMultiplier: 2.5,
+                    appliesLongContextPremium: true
+                )
+            )
+        ],
+        "gpt-5.6-luna": [
+            HistoricalPricing(
+                effectiveAt: .distantPast,
+                pricing: TokenPricing(
+                    inputPerMillion: 1,
+                    cachedInputPerMillion: 0.1,
+                    cacheWritePerMillion: 1.25,
+                    outputPerMillion: 6,
+                    priorityMultiplier: 2,
+                    appliesLongContextPremium: true
+                )
+            ),
+            HistoricalPricing(
+                effectiveAt: date("2026-07-31T00:00:00Z"),
+                pricing: TokenPricing(
+                    inputPerMillion: 0.2,
+                    cachedInputPerMillion: 0.02,
+                    cacheWritePerMillion: 0.25,
+                    outputPerMillion: 1.2,
+                    priorityMultiplier: 10,
+                    appliesLongContextPremium: true
+                )
+            )
+        ],
         "gpt-4o": [
             HistoricalPricing(
                 effectiveAt: date("2024-05-13T00:00:00Z"),

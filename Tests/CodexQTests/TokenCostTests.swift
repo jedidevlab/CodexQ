@@ -70,6 +70,99 @@ struct TokenCostTests {
         #expect(TokenPricingCatalog.estimatedCost(for: priority) == 1)
     }
 
+    @Test("GPT-5.6 Terra 和 Luna 降价只应用于生效后的记录")
+    func appliesGPT56PriceReductionByRecordTime() throws {
+        let oldTerra = TokenUsageRecord(
+            timestamp: try date("2026-07-30T23:59:59Z"),
+            model: "gpt-5.6-terra",
+            inputTokens: 200_000,
+            cachedInputTokens: 100_000,
+            cacheWriteInputTokens: 0,
+            outputTokens: 100_000,
+            totalTokens: 300_000
+        )
+        let newTerra = TokenUsageRecord(
+            timestamp: try date("2026-07-31T00:00:00Z"),
+            model: "gpt-5.6-terra",
+            inputTokens: 200_000,
+            cachedInputTokens: 100_000,
+            cacheWriteInputTokens: 0,
+            outputTokens: 100_000,
+            totalTokens: 300_000
+        )
+        let oldLuna = TokenUsageRecord(
+            timestamp: try date("2026-07-30T23:59:59Z"),
+            model: "gpt-5.6-luna",
+            inputTokens: 200_000,
+            cachedInputTokens: 100_000,
+            cacheWriteInputTokens: 0,
+            outputTokens: 100_000,
+            totalTokens: 300_000
+        )
+        let newLuna = TokenUsageRecord(
+            timestamp: try date("2026-07-31T00:00:00Z"),
+            model: "gpt-5.6-luna",
+            inputTokens: 200_000,
+            cachedInputTokens: 100_000,
+            cacheWriteInputTokens: 0,
+            outputTokens: 100_000,
+            totalTokens: 300_000
+        )
+
+        #expect(TokenPricingCatalog.estimatedCost(for: oldTerra) == 1.775)
+        #expect(TokenPricingCatalog.estimatedCost(for: newTerra) == 1.42)
+        #expect(TokenPricingCatalog.estimatedCost(for: oldLuna) == 0.71)
+        #expect(TokenPricingCatalog.estimatedCost(for: newLuna) == 0.142)
+    }
+
+    @Test("GPT-5.6 降价后的缓存写入和 Priority 仍使用各自官方费率")
+    func appliesCurrentGPT56CacheWriteAndPriorityRates() throws {
+        let timestamp = try date("2026-07-31T02:00:00Z")
+        let terraCacheWrite = TokenUsageRecord(
+            timestamp: timestamp,
+            model: "gpt-5.6-terra",
+            inputTokens: 100_000,
+            cachedInputTokens: 0,
+            cacheWriteInputTokens: 100_000,
+            outputTokens: 0,
+            totalTokens: 100_000
+        )
+        let lunaCacheWrite = TokenUsageRecord(
+            timestamp: timestamp,
+            model: "gpt-5.6-luna",
+            inputTokens: 100_000,
+            cachedInputTokens: 0,
+            cacheWriteInputTokens: 100_000,
+            outputTokens: 0,
+            totalTokens: 100_000
+        )
+        let terraPriority = TokenUsageRecord(
+            timestamp: timestamp,
+            model: "gpt-5.6-terra",
+            inputTokens: 100_000,
+            cachedInputTokens: 0,
+            cacheWriteInputTokens: 0,
+            outputTokens: 0,
+            totalTokens: 100_000,
+            serviceTier: .priority
+        )
+        let lunaPriority = TokenUsageRecord(
+            timestamp: timestamp,
+            model: "gpt-5.6-luna",
+            inputTokens: 100_000,
+            cachedInputTokens: 0,
+            cacheWriteInputTokens: 0,
+            outputTokens: 0,
+            totalTokens: 100_000,
+            serviceTier: .priority
+        )
+
+        #expect(TokenPricingCatalog.estimatedCost(for: terraCacheWrite) == 0.25)
+        #expect(TokenPricingCatalog.estimatedCost(for: lunaCacheWrite) == 0.025)
+        #expect(TokenPricingCatalog.estimatedCost(for: terraPriority) == 0.5)
+        #expect(TokenPricingCatalog.estimatedCost(for: lunaPriority) == 0.2)
+    }
+
     @Test("GPT-5.4 按官方标准价、长上下文和 Priority 计价")
     func pricesGPT54WithOfficialRates() throws {
         let timestamp = try date("2026-07-23T02:00:00Z")
