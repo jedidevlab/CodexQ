@@ -2,8 +2,7 @@ import AppKit
 
 enum StatusPanelPositioner {
     private static let edgeInset: CGFloat = 8
-    private static let horizontalOffset: CGFloat = 10
-    private static let menuBarGap: CGFloat = 1
+    private static let menuBarGap: CGFloat = 4
 
     static func fittedSize(
         contentSize: NSSize,
@@ -24,8 +23,7 @@ enum StatusPanelPositioner {
         let idealX = anchorRect.minX
         let minX = visibleFrame.minX + edgeInset
         let maxX = visibleFrame.maxX - edgeInset - panelSize.width
-        let positionedX = min(maxX, max(minX, idealX))
-        let x = max(minX, positionedX - horizontalOffset)
+        let x = min(maxX, max(minX, idealX))
         let y = anchorRect.minY - menuBarGap - panelSize.height
         return NSRect(origin: NSPoint(x: x, y: y), size: panelSize)
     }

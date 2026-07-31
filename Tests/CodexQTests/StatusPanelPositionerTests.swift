@@ -12,8 +12,12 @@ struct StatusPanelPositionerTests {
 
         #expect(source.contains("panel.hasShadow = false"))
         #expect(source.contains(".background(.thickMaterial"))
+        #expect(source.components(separatedBy: "RoundedRectangle(cornerRadius: 8)").count - 1 == 2)
         #expect(source.contains(".stroke(Color.primary.opacity(0.14), lineWidth: 1)"))
         #expect(!source.contains(".background(.regularMaterial"))
+        #expect(!source.contains("RoundedRectangle(cornerRadius: 10)"))
+        #expect(!source.contains("RoundedRectangle(cornerRadius: 14)"))
+        #expect(!source.contains("RoundedRectangle(cornerRadius: 18)"))
     }
 
     @Test("面板使用内容 fitting 高度而不是初始二百五十像素")
@@ -64,7 +68,19 @@ struct StatusPanelPositionerTests {
             visibleFrame: NSRect(x: 0, y: 0, width: 1440, height: 900)
         )
 
-        #expect(frame.maxY == 925)
+        #expect(frame.maxY == 922)
+    }
+
+    @Test("面板在菜单栏下方保留四点间隙，避免圆角描边与菜单栏视觉相接")
+    func panelLeavesVisibleGapBelowMenuBar() {
+        let anchorRect = NSRect(x: 500, y: 900, width: 24, height: 22)
+        let frame = StatusPanelPositioner.frame(
+            panelSize: NSSize(width: 316, height: 250),
+            anchorRect: anchorRect,
+            visibleFrame: NSRect(x: 0, y: 0, width: 1440, height: 900)
+        )
+
+        #expect(anchorRect.minY - frame.maxY == 4)
     }
 
     @Test("小屏超高内容保持完整高度并只从底部超出，避免压缩后重新排版跳动")
@@ -82,7 +98,7 @@ struct StatusPanelPositionerTests {
         )
 
         #expect(fittedSize.height == 818)
-        #expect(frame.maxY == anchorRect.minY - 1)
+        #expect(frame.maxY == anchorRect.minY - 4)
         #expect(frame.minY < visibleFrame.minY + 8)
     }
 
@@ -130,16 +146,16 @@ struct StatusPanelPositionerTests {
         #expect(source.contains("self.orderOut(nil)"))
     }
 
-    @Test("面板在现有位置基础上整体向左偏移十像素")
-    func panelOffsetsTenPixelsLeft() {
+    @Test("面板左边缘与菜单栏锚点左边缘对齐")
+    func panelAlignsWithStatusItemLeadingEdge() {
         let frame = StatusPanelPositioner.frame(
             panelSize: NSSize(width: 316, height: 250),
             anchorRect: NSRect(x: 500, y: 900, width: 24, height: 22),
             visibleFrame: NSRect(x: 0, y: 0, width: 1440, height: 900)
         )
 
-        #expect(frame.minX == 490)
-        #expect(frame.maxY == 899)
+        #expect(frame.minX == 500)
+        #expect(frame.maxY == 896)
     }
 
     @Test("面板不会超出当前屏幕右边缘")
@@ -150,6 +166,6 @@ struct StatusPanelPositionerTests {
             visibleFrame: NSRect(x: 0, y: 0, width: 1440, height: 900)
         )
 
-        #expect(frame.maxX == 1422)
+        #expect(frame.maxX == 1432)
     }
 }

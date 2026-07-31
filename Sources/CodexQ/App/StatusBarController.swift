@@ -54,9 +54,9 @@ final class StatusBarController: NSObject {
                     self?.showSettingsWindow()
                 }
             )
-            .background(.thickMaterial, in: RoundedRectangle(cornerRadius: 18))
+            .background(.thickMaterial, in: RoundedRectangle(cornerRadius: 8))
             .overlay {
-                RoundedRectangle(cornerRadius: 18)
+                RoundedRectangle(cornerRadius: 8)
                     .stroke(Color.primary.opacity(0.14), lineWidth: 1)
             }
         )
