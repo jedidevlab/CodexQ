@@ -764,6 +764,23 @@ struct TokenActivityViewTests {
         #expect(!source.contains("monthSpacing"))
     }
 
+    @Test("最右侧月份标签保持单行并向热力图内侧收边")
+    func trailingActivityMonthLabelStaysOnOneLine() throws {
+        let source = try String(
+            contentsOfFile: "Sources/CodexQ/Views/TokenActivitySection.swift",
+            encoding: .utf8
+        )
+        let gridSource = try sourceSection(
+            source,
+            from: "private struct DailyTokenActivityGrid",
+            to: "private struct ActivityMonth"
+        )
+
+        #expect(gridSource.contains(".lineLimit(1)"))
+        #expect(gridSource.contains(".fixedSize(horizontal: true, vertical: false)"))
+        #expect(gridSource.contains("span.id == monthSpans.last?.id ? .trailing : .center"))
+    }
+
     @Test("底部齿轮打开独立设置窗口，不在菜单弹窗内展开")
     func settingsOpenInDedicatedWindow() throws {
         let source = try String(

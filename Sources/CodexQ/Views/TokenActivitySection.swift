@@ -160,7 +160,12 @@ private struct DailyTokenActivityGrid: View {
                     Text(monthText(span.start))
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                        .frame(width: span.width)
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
+                        .frame(
+                            width: span.width,
+                            alignment: span.id == monthSpans.last?.id ? .trailing : .center
+                        )
                 }
             }
             .frame(width: TokenActivityGridLayout.gridWidth, alignment: .leading)
