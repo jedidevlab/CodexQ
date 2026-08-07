@@ -7,6 +7,7 @@ struct TokenHistoryQueryTests {
     private var calendar: Calendar {
         var value = Calendar(identifier: .gregorian)
         value.timeZone = TimeZone(identifier: "Asia/Shanghai")!
+        value.firstWeekday = 2
         return value
     }
 
@@ -16,15 +17,103 @@ struct TokenHistoryQueryTests {
         return value
     }
 
-    @Test("单日查询覆盖本地自然日且结束时间不包含次日")
-    func daySelectionUsesLocalCalendarDay() throws {
+    @Test("日期范围包含累计但不包含周")
+    func rangeModesIncludeCumulativeWithoutWeek() {
+        #expect(TokenHistoryRangeMode.allCases.map(\.title) == [
+            "日", "月", "年", "订阅周期", "累计", "自定义"
+        ])
+    }
+
+    @Test("日查询覆盖所选日期所在自然周的七个本地自然日")
+    func daySelectionUsesLocalCalendarWeek() throws {
         let date = try #require(ISO8601DateFormatter().date(from: "2026-08-07T04:00:00Z"))
         let selection = TokenHistorySelection.day(date)
         let interval = try #require(selection.interval(calendar: calendar, subscriptionPeriods: []))
 
-        #expect(interval.start == calendar.startOfDay(for: date))
-        #expect(interval.end == calendar.date(byAdding: .day, value: 1, to: interval.start))
+        #expect(interval.start == calendar.date(
+            from: DateComponents(year: 2026, month: 8, day: 3)
+        ))
+        #expect(interval.end == calendar.date(
+            from: DateComponents(year: 2026, month: 8, day: 10)
+        ))
+        #expect(calendar.dateComponents([.day], from: interval.start, to: interval.end).day == 7)
         #expect(selection.granularity(interval: interval, calendar: calendar) == .day)
+    }
+
+    @Test("累计范围从最早有效记录覆盖到今天并使用自适应粒度")
+    func cumulativeSelectionUsesEarliestAvailableDayThroughToday() throws {
+        let now = try date("2026-08-07T04:00:00Z")
+        let records = [
+            usage(at: "2026-08-02T02:00:00Z", model: "gpt-5.6-sol", tokens: 100)
+        ]
+        let activity = TokenActivitySnapshot(
+            peakDailyTokens: 300,
+            days: [
+                .init(startDate: "2026-07-30", tokens: 300),
+                .init(startDate: "2026-07-99", tokens: 900)
+            ]
+        )
+
+        let result = try #require(TokenHistoryAggregator.snapshot(
+            records: records,
+            activity: activity,
+            selection: .cumulative,
+            subscriptionCycles: [],
+            dataScope: .local,
+            skippedSessionFileCount: 0,
+            syncMessage: nil,
+            now: now,
+            calendar: calendar
+        ))
+
+        #expect(result.interval.start == calendar.date(
+            from: DateComponents(year: 2026, month: 7, day: 30)
+        ))
+        #expect(result.interval.end == calendar.date(
+            from: DateComponents(year: 2026, month: 8, day: 8)
+        ))
+        #expect(result.granularity == .day)
+        #expect(result.summary.totalTokens == 400)
+    }
+
+    @Test("累计范围没有历史记录时仍返回今天")
+    func emptyCumulativeSelectionUsesToday() throws {
+        let now = try date("2026-08-07T04:00:00Z")
+        let result = try #require(TokenHistoryAggregator.snapshot(
+            records: [],
+            activity: .init(peakDailyTokens: 0, days: []),
+            selection: .cumulative,
+            subscriptionCycles: [],
+            dataScope: .local,
+            skippedSessionFileCount: 0,
+            syncMessage: nil,
+            now: now,
+            calendar: calendar
+        ))
+
+        #expect(result.interval.start == calendar.startOfDay(for: now))
+        #expect(result.interval.end == calendar.date(
+            byAdding: .day,
+            value: 1,
+            to: calendar.startOfDay(for: now)
+        ))
+        #expect(result.buckets.count == 1)
+    }
+
+    @Test("累计范围沿用自定义长范围的月年聚合阈值")
+    func cumulativeSelectionUsesAdaptiveGranularity() throws {
+        let start = try date("2022-01-01T00:00:00Z")
+        let twoYears = try #require(calendar.date(byAdding: .year, value: 2, to: start))
+        let fourYears = try #require(calendar.date(byAdding: .year, value: 4, to: start))
+
+        #expect(TokenHistorySelection.cumulative.granularity(
+            interval: DateInterval(start: start, end: twoYears),
+            calendar: calendar
+        ) == .month)
+        #expect(TokenHistorySelection.cumulative.granularity(
+            interval: DateInterval(start: start, end: fourYears),
+            calendar: calendar
+        ) == .year)
     }
 
     @Test("月、年和自定义范围选择稳定的聚合粒度")

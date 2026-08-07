@@ -80,15 +80,15 @@ struct TokenHistoryView: View {
             }
             .pickerStyle(.segmented)
             .labelsHidden()
-            .frame(maxWidth: 440)
+            .frame(minWidth: 320, maxWidth: 440)
+            contextualControls
             Spacer(minLength: 0)
         }
     }
 
     private var contextRow: some View {
         HStack(spacing: 10) {
-            contextualControls
-            Spacer(minLength: 12)
+            Spacer(minLength: 0)
             Text("API 价格估算，非实际订阅账单")
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -99,7 +99,7 @@ struct TokenHistoryView: View {
     private var contextualControls: some View {
         switch store.mode {
         case .day:
-            DatePicker("日期", selection: $store.selectedDay, displayedComponents: .date)
+            DatePicker("所在周", selection: $store.selectedDay, displayedComponents: .date)
                 .datePickerStyle(.compact)
         case .month:
             Picker("年份", selection: $store.selectedYear) {
@@ -125,8 +125,10 @@ struct TokenHistoryView: View {
                         Text(cycleLabel(cycle)).tag(Optional(cycle.interval))
                     }
                 }
-                .frame(minWidth: 230)
+                .frame(width: 280)
             }
+        case .cumulative:
+            EmptyView()
         case .custom:
             DatePicker("开始", selection: $store.customStart, displayedComponents: .date)
                 .datePickerStyle(.compact)

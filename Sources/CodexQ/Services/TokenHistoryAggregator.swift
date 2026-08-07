@@ -60,9 +60,14 @@ enum TokenHistoryAggregator {
         now: Date,
         calendar: Calendar
     ) -> TokenHistorySnapshot? {
-        guard let interval = selection.interval(
-            calendar: calendar,
-            subscriptionPeriods: subscriptionCycles
+        let activityByDay = activityTokensByDay(activity, calendar: calendar)
+        guard let interval = resolvedInterval(
+            selection: selection,
+            records: records,
+            activityByDay: activityByDay,
+            subscriptionCycles: subscriptionCycles,
+            now: now,
+            calendar: calendar
         ) else {
             return nil
         }
@@ -72,7 +77,6 @@ enum TokenHistoryAggregator {
         }
         let selectedRate = unitRate(records: selectedRecords)
         let fallbackRate = selectedRate ?? unitRate(records: records) ?? 0
-        let activityByDay = activityTokensByDay(activity, calendar: calendar)
         let dayStarts = calendarDayStarts(in: interval, calendar: calendar)
 
         var recordsByDay: [Date: [TokenUsageRecord]] = [:]
@@ -241,6 +245,31 @@ enum TokenHistoryAggregator {
         }
         guard tokens > 0 else { return nil }
         return cost / Double(tokens)
+    }
+
+    private static func resolvedInterval(
+        selection: TokenHistorySelection,
+        records: [TokenUsageRecord],
+        activityByDay: [Date: Int64],
+        subscriptionCycles: [SubscriptionCycle],
+        now: Date,
+        calendar: Calendar
+    ) -> DateInterval? {
+        guard selection == .cumulative else {
+            return selection.interval(
+                calendar: calendar,
+                subscriptionPeriods: subscriptionCycles
+            )
+        }
+        let today = calendar.startOfDay(for: now)
+        guard let end = calendar.date(byAdding: .day, value: 1, to: today) else {
+            return nil
+        }
+        let recordDays = records.map { calendar.startOfDay(for: $0.timestamp) }
+            .filter { $0 < end }
+        let activityDays = activityByDay.keys.filter { $0 < end }
+        let start = (recordDays + activityDays).min() ?? today
+        return DateInterval(start: min(start, today), end: end)
     }
 
     private static func activityTokensByDay(

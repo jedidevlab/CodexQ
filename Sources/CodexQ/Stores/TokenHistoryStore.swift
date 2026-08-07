@@ -60,6 +60,8 @@ final class TokenHistoryStore: ObservableObject {
                 return .month(year: selectedYear, month: selectedMonth)
             }
             return .subscription(interval)
+        case .cumulative:
+            return .cumulative
         case .custom:
             return .custom(start: customStart, endInclusive: customEnd)
         }

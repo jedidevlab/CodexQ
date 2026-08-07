@@ -28,16 +28,17 @@ struct TokenHistoryViewTests {
         #expect(costSource.contains(".help(\"点击查看 Token 使用与成本历史\")"))
     }
 
-    @Test("历史页包含五种筛选、摘要、数据说明和完整图表契约")
+    @Test("历史页包含六种筛选、摘要、数据说明和完整图表契约")
     func historyViewContainsRequestedContracts() throws {
         let viewSource = try source("Sources/CodexQ/Views/TokenHistoryView.swift")
         let chartSource = try source("Sources/CodexQ/Views/TokenHistoryCharts.swift")
 
         #expect(viewSource.contains("ForEach(TokenHistoryRangeMode.allCases)"))
-        #expect(viewSource.contains("DatePicker(\"日期\""))
+        #expect(viewSource.contains("DatePicker(\"所在周\""))
         #expect(viewSource.contains("DatePicker(\"开始\""))
         #expect(viewSource.contains("DatePicker(\"结束\""))
         #expect(viewSource.contains("Picker(\"订阅周期\""))
+        #expect(viewSource.contains(".frame(width: 280)"))
         #expect(viewSource.contains("title: \"Token 总量\""))
         #expect(viewSource.contains("title: \"估算成本\""))
         #expect(viewSource.contains("title: \"日均 Token\""))

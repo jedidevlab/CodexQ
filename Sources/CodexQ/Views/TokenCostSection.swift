@@ -11,23 +11,16 @@ struct TokenCostSection: View {
 
     @State private var hoveredKind: TokenCostPeriodSummary.Kind?
     @State private var pinnedKind: TokenCostPeriodSummary.Kind?
-    @State private var isHeaderHovered = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Button(action: showHistory) {
-                    HStack(spacing: 4) {
-                        Text("Token 成本")
-                            .font(.headline)
-                        Image(systemName: "chevron.right")
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(isHeaderHovered ? Color.accentColor : .secondary)
-                    }
-                    .contentShape(Rectangle())
+                    Text("Token 成本")
+                        .font(.headline)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .onHover { isHeaderHovered = $0 }
                 .help("点击查看 Token 使用与成本历史")
                 .accessibilityLabel("打开 Token 使用与成本历史")
                 Text(scopeLabel)

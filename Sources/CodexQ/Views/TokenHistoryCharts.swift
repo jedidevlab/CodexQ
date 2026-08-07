@@ -1,3 +1,4 @@
+import AppKit
 import Charts
 import SwiftUI
 
@@ -10,51 +11,47 @@ struct TokenUsageHistoryChart: View {
             if buckets.allSatisfy({ $0.totalTokens == 0 }) {
                 emptyState("所选范围暂无 Token 使用记录")
             } else {
-                Chart {
-                    ForEach(buckets) { bucket in
-                        BarMark(
-                            x: .value("时段", bucket.start),
-                            y: .value("Token", bucket.totalTokens)
-                        )
-                        .foregroundStyle(Color.accentColor.gradient)
-                        .accessibilityLabel(bucket.start.formatted(date: .abbreviated, time: .omitted))
-                        .accessibilityValue("\(bucket.totalTokens) Token")
-                    }
-                    if buckets.count > 1 {
-                        RuleMark(y: .value("平均", averageTokens))
-                            .foregroundStyle(.secondary.opacity(0.55))
-                            .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
-                    }
-                    if let bucket = selectedBucket {
-                        RuleMark(x: .value("所选时段", bucket.start))
-                            .foregroundStyle(.secondary)
-                            .annotation(
-                                position: .top,
-                                alignment: .leading,
-                                overflowResolution: .init(
-                                    x: .fit(to: .chart), y: .fit(to: .chart)
-                                )
-                            ) {
-                                TokenBucketTooltip(bucket: bucket, showsCost: false)
-                            }
-                    }
-                }
-                .chartYAxis {
-                    AxisMarks { value in
-                        AxisGridLine()
-                        AxisValueLabel {
-                            if let tokens = value.as(Int64.self) {
-                                Text(TokenCountFormatter.compactNumber(tokens, fractionLength: 1))
-                            }
+                let dateLabels = TokenHistoryChartAxisLabels.dateLabels(for: buckets)
+                let valueTicks = TokenHistoryChartAxisLabels.tokenTicks(
+                    maximum: buckets.map(\.totalTokens).max() ?? 0
+                )
+                HistoryTrendChartLayout(dateLabels: dateLabels, valueTicks: valueTicks) {
+                    Chart {
+                        chartGridMarks(dateLabels: dateLabels, valueTicks: valueTicks)
+                        ForEach(buckets) { bucket in
+                            BarMark(
+                                x: .value("时段", bucket.start),
+                                y: .value("Token", Double(bucket.totalTokens))
+                            )
+                            .foregroundStyle(Color.accentColor.gradient)
+                            .accessibilityLabel(bucket.start.formatted(date: .abbreviated, time: .omitted))
+                            .accessibilityValue("\(bucket.totalTokens) Token")
+                        }
+                        if buckets.count > 1 {
+                            RuleMark(y: .value("平均", averageTokens))
+                                .foregroundStyle(.secondary.opacity(0.55))
+                                .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                        }
+                        if let bucket = selectedBucket {
+                            RuleMark(x: .value("所选时段", bucket.start))
+                                .foregroundStyle(.secondary)
+                                .annotation(
+                                    position: .top,
+                                    alignment: .leading,
+                                    overflowResolution: .init(
+                                        x: .fit(to: .chart), y: .fit(to: .chart)
+                                    )
+                                ) {
+                                    TokenBucketTooltip(bucket: bucket, showsCost: false)
+                                }
                         }
                     }
+                    .chartXSelection(value: $selectedBucketStart)
+                    .chartKeyboardSelection(
+                        buckets: buckets,
+                        selectedBucketStart: $selectedBucketStart
+                    )
                 }
-                .chartXSelection(value: $selectedBucketStart)
-                .chartKeyboardSelection(
-                    buckets: buckets,
-                    selectedBucketStart: $selectedBucketStart
-                )
-                .frame(height: 210)
             }
         }
     }
@@ -77,56 +74,219 @@ struct TokenCostHistoryChart: View {
             if buckets.allSatisfy({ $0.estimatedCostUSD == 0 }) {
                 emptyState("所选范围暂无可计价成本")
             } else {
-                Chart {
-                    ForEach(buckets) { bucket in
-                        AreaMark(
-                            x: .value("时段", bucket.start),
-                            y: .value("估算成本", bucket.estimatedCostUSD)
-                        )
-                        .foregroundStyle(Color.green.opacity(0.16))
-                        LineMark(
-                            x: .value("时段", bucket.start),
-                            y: .value("估算成本", bucket.estimatedCostUSD)
-                        )
-                        .foregroundStyle(.green)
-                        .lineStyle(StrokeStyle(lineWidth: 2))
-                        .accessibilityLabel(bucket.start.formatted(date: .abbreviated, time: .omitted))
-                        .accessibilityValue(String(format: "$%.2f", bucket.estimatedCostUSD))
-                    }
-                    if let bucket = selectedBucket {
-                        RuleMark(x: .value("所选时段", bucket.start))
-                            .foregroundStyle(.secondary)
-                            .annotation(
-                                position: .top,
-                                alignment: .leading,
-                                overflowResolution: .init(
-                                    x: .fit(to: .chart), y: .fit(to: .chart)
-                                )
-                            ) {
-                                TokenBucketTooltip(bucket: bucket, showsCost: true)
-                            }
-                        PointMark(
-                            x: .value("所选时段", bucket.start),
-                            y: .value("估算成本", bucket.estimatedCostUSD)
-                        )
-                        .foregroundStyle(.green)
-                    }
-                }
-                .chartYAxis {
-                    AxisMarks(format: Decimal.FormatStyle.Currency(code: "USD"))
-                }
-                .chartXSelection(value: $selectedBucketStart)
-                .chartKeyboardSelection(
-                    buckets: buckets,
-                    selectedBucketStart: $selectedBucketStart
+                let dateLabels = TokenHistoryChartAxisLabels.dateLabels(for: buckets)
+                let valueTicks = TokenHistoryChartAxisLabels.costTicks(
+                    maximum: buckets.map(\.estimatedCostUSD).max() ?? 0
                 )
-                .frame(height: 210)
+                HistoryTrendChartLayout(dateLabels: dateLabels, valueTicks: valueTicks) {
+                    Chart {
+                        chartGridMarks(dateLabels: dateLabels, valueTicks: valueTicks)
+                        ForEach(buckets) { bucket in
+                            AreaMark(
+                                x: .value("时段", bucket.start),
+                                y: .value("估算成本", bucket.estimatedCostUSD)
+                            )
+                            .foregroundStyle(Color.green.opacity(0.16))
+                            LineMark(
+                                x: .value("时段", bucket.start),
+                                y: .value("估算成本", bucket.estimatedCostUSD)
+                            )
+                            .foregroundStyle(.green)
+                            .lineStyle(StrokeStyle(lineWidth: 2))
+                            .accessibilityLabel(bucket.start.formatted(date: .abbreviated, time: .omitted))
+                            .accessibilityValue(String(format: "$%.2f", bucket.estimatedCostUSD))
+                        }
+                        if let bucket = selectedBucket {
+                            RuleMark(x: .value("所选时段", bucket.start))
+                                .foregroundStyle(.secondary)
+                                .annotation(
+                                    position: .top,
+                                    alignment: .leading,
+                                    overflowResolution: .init(
+                                        x: .fit(to: .chart), y: .fit(to: .chart)
+                                    )
+                                ) {
+                                    TokenBucketTooltip(bucket: bucket, showsCost: true)
+                                }
+                            PointMark(
+                                x: .value("所选时段", bucket.start),
+                                y: .value("估算成本", bucket.estimatedCostUSD)
+                            )
+                            .foregroundStyle(.green)
+                        }
+                    }
+                    .chartXSelection(value: $selectedBucketStart)
+                    .chartKeyboardSelection(
+                        buckets: buckets,
+                        selectedBucketStart: $selectedBucketStart
+                    )
+                }
             }
         }
     }
 
     private var selectedBucket: TokenHistoryBucket? {
         selectedHistoryBucket(from: buckets, selectedStart: selectedBucketStart)
+    }
+}
+
+struct TokenHistoryChartDateLabel: Identifiable, Equatable {
+    let date: Date
+    let text: String
+
+    var id: Date { date }
+}
+
+struct TokenHistoryChartValueTick: Identifiable, Equatable {
+    let value: Double
+    let text: String
+
+    var id: Double { value }
+}
+
+enum TokenHistoryChartAxisLabels {
+    static func dateLabels(
+        for buckets: [TokenHistoryBucket],
+        calendar: Calendar = .current,
+        maximumCount: Int = 5
+    ) -> [TokenHistoryChartDateLabel] {
+        guard !buckets.isEmpty, maximumCount > 0 else { return [] }
+        let count = min(maximumCount, buckets.count)
+        let indices: [Int]
+        if count == 1 {
+            indices = [0]
+        } else {
+            indices = (0..<count).map { position in
+                Int((Double(position) * Double(buckets.count - 1) / Double(count - 1)).rounded())
+            }
+        }
+        return indices.map { index in
+            let bucket = buckets[index]
+            return TokenHistoryChartDateLabel(
+                date: bucket.start,
+                text: dateText(for: bucket, calendar: calendar)
+            )
+        }
+    }
+
+    static func tokenTicks(maximum: Int64) -> [TokenHistoryChartValueTick] {
+        ticks(maximum: Double(maximum)) { value in
+            TokenCountFormatter.compactNumber(Int64(value.rounded()), fractionLength: 1)
+        }
+    }
+
+    static func costTicks(maximum: Double) -> [TokenHistoryChartValueTick] {
+        ticks(maximum: maximum) { String(format: "$%.2f", $0) }
+    }
+
+    private static func dateText(
+        for bucket: TokenHistoryBucket,
+        calendar: Calendar
+    ) -> String {
+        let components = calendar.dateComponents([.year, .month, .day], from: bucket.start)
+        if bucket.interval.duration >= 300 * 24 * 60 * 60 {
+            return components.year.map(String.init) ?? ""
+        }
+        if bucket.interval.duration >= 27 * 24 * 60 * 60 {
+            return components.month.map { "\($0)月" } ?? ""
+        }
+        guard let month = components.month, let day = components.day else { return "" }
+        return "\(month)/\(day)"
+    }
+
+    private static func ticks(
+        maximum: Double,
+        formatter: (Double) -> String
+    ) -> [TokenHistoryChartValueTick] {
+        guard maximum > 0 else {
+            return [TokenHistoryChartValueTick(value: 0, text: formatter(0))]
+        }
+        let step = niceStep(maximum / 4)
+        let upperBound = ceil(maximum / step) * step
+        return stride(from: upperBound, through: 0, by: -step).map {
+            TokenHistoryChartValueTick(value: $0, text: formatter($0))
+        }
+    }
+
+    private static func niceStep(_ value: Double) -> Double {
+        let magnitude = pow(10, floor(log10(value)))
+        let normalized = value / magnitude
+        let multiplier: Double
+        if normalized <= 1 {
+            multiplier = 1
+        } else if normalized <= 2 {
+            multiplier = 2
+        } else if normalized <= 2.5 {
+            multiplier = 2.5
+        } else if normalized <= 5 {
+            multiplier = 5
+        } else {
+            multiplier = 10
+        }
+        return multiplier * magnitude
+    }
+}
+
+private struct HistoryTrendChartLayout<ChartView: View>: View {
+    let dateLabels: [TokenHistoryChartDateLabel]
+    let valueTicks: [TokenHistoryChartValueTick]
+    @ViewBuilder let chart: ChartView
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            VStack(spacing: 4) {
+                chart
+                    .chartXAxis(.hidden)
+                    .chartYAxis(.hidden)
+                    .chartYScale(domain: 0...(valueTicks.first?.value ?? 1))
+                    .frame(height: 188)
+                HStack(spacing: 0) {
+                    ForEach(Array(dateLabels.enumerated()), id: \.element.id) { index, label in
+                        Text(label.text)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                            .fixedSize()
+                        if index < dateLabels.count - 1 {
+                            Spacer(minLength: 8)
+                        }
+                    }
+                }
+                .frame(height: 18)
+            }
+
+            VStack(alignment: .trailing, spacing: 0) {
+                ForEach(Array(valueTicks.enumerated()), id: \.element.id) { index, tick in
+                    Text(tick.text)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                        .lineLimit(1)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                    if index < valueTicks.count - 1 {
+                        Spacer(minLength: 0)
+                    }
+                }
+            }
+            .frame(width: 72, height: 188)
+        }
+        .frame(height: 210)
+    }
+}
+
+@ChartContentBuilder
+private func chartGridMarks(
+    dateLabels: [TokenHistoryChartDateLabel],
+    valueTicks: [TokenHistoryChartValueTick]
+) -> some ChartContent {
+    ForEach(valueTicks) { tick in
+        RuleMark(y: .value("纵轴刻度", tick.value))
+            .foregroundStyle(.secondary.opacity(0.16))
+    }
+    ForEach(dateLabels) { label in
+        RuleMark(x: .value("日期刻度", label.date))
+            .foregroundStyle(.secondary.opacity(0.18))
+            .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
     }
 }
 
@@ -192,6 +352,7 @@ struct TokenModelBreakdownChart: View {
                             value: value(for: model),
                             maximumValue: maximumValue,
                             valueLabel: label(for: model),
+                            labelColumnWidth: modelLabelWidth,
                             color: metric == .tokens ? .accentColor : .green
                         )
                     }
@@ -211,6 +372,14 @@ struct TokenModelBreakdownChart: View {
 
     private var maximumValue: Double {
         sortedModels.map(value(for:)).max() ?? 0
+    }
+
+    private var modelLabelWidth: CGFloat {
+        let font = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize)
+        let width = sortedModels.map {
+            ($0.model as NSString).size(withAttributes: [.font: font]).width
+        }.max() ?? 0
+        return min(180, ceil(width))
     }
 
     private func value(for model: TokenHistoryModelSummary) -> Double {
@@ -235,6 +404,7 @@ struct TokenModelBreakdownRow: View {
     let value: Double
     let maximumValue: Double
     let valueLabel: String
+    let labelColumnWidth: CGFloat
     let color: Color
 
     var body: some View {
@@ -243,7 +413,7 @@ struct TokenModelBreakdownRow: View {
                 .font(.caption)
                 .lineLimit(1)
                 .truncationMode(.middle)
-                .frame(width: 180, alignment: .trailing)
+                .frame(width: labelColumnWidth, alignment: .leading)
                 .help(model.model)
 
             GeometryReader { geometry in
@@ -304,8 +474,8 @@ private struct HistoryChartCard<Content: View>: View {
             Text(title).font(.headline)
             content
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background {
             TokenHistoryCardSurface(cornerRadius: 12)
         }

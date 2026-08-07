@@ -5,6 +5,7 @@ enum TokenHistoryRangeMode: String, CaseIterable, Identifiable, Sendable {
     case month
     case year
     case subscription
+    case cumulative
     case custom
 
     var id: Self { self }
@@ -15,6 +16,7 @@ enum TokenHistoryRangeMode: String, CaseIterable, Identifiable, Sendable {
         case .month: return "月"
         case .year: return "年"
         case .subscription: return "订阅周期"
+        case .cumulative: return "累计"
         case .custom: return "自定义"
         }
     }
@@ -50,6 +52,7 @@ enum TokenHistorySelection: Hashable, Sendable {
     case month(year: Int, month: Int)
     case year(Int)
     case subscription(DateInterval)
+    case cumulative
     case custom(start: Date, endInclusive: Date)
 
     func interval(
@@ -58,10 +61,7 @@ enum TokenHistorySelection: Hashable, Sendable {
     ) -> DateInterval? {
         switch self {
         case .day(let date):
-            let start = calendar.startOfDay(for: date)
-            return calendar.date(byAdding: .day, value: 1, to: start).map {
-                DateInterval(start: start, end: $0)
-            }
+            return calendar.dateInterval(of: .weekOfYear, for: date)
         case .month(let year, let month):
             guard let start = calendar.date(from: DateComponents(year: year, month: month)),
                   let end = calendar.date(byAdding: .month, value: 1, to: start) else {
@@ -76,6 +76,8 @@ enum TokenHistorySelection: Hashable, Sendable {
             return DateInterval(start: start, end: end)
         case .subscription(let requested):
             return subscriptionPeriods.first { $0.interval == requested }?.interval
+        case .cumulative:
+            return nil
         case .custom(let first, let last):
             let start = calendar.startOfDay(for: min(first, last))
             let finalDay = calendar.startOfDay(for: max(first, last))
@@ -94,7 +96,7 @@ enum TokenHistorySelection: Hashable, Sendable {
             return .day
         case .year:
             return .month
-        case .custom:
+        case .cumulative, .custom:
             let days = calendar.dateComponents(
                 [.day],
                 from: interval.start,

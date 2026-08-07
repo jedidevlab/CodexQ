@@ -6,6 +6,16 @@ import Testing
 struct TokenHistoryStoreTests {
     private let now = ISO8601DateFormatter().date(from: "2026-08-07T00:00:00Z")!
 
+    @Test("累计模式映射为累计查询")
+    @MainActor
+    func cumulativeModeMapsToCumulativeSelection() {
+        let store = TokenHistoryStore(now: { self.now }, calendar: calendar)
+
+        store.mode = .cumulative
+
+        #expect(store.selection == .cumulative)
+    }
+
     @Test("账号活动失败时仍显示设备历史并公开警告")
     func activityFailureKeepsDeviceHistory() async throws {
         let reader = TokenHistoryReader(
