@@ -18,6 +18,7 @@ CodexQ is a native macOS menu bar utility. It brings ChatGPT (formerly Codex) fi
 - **Run-out projection:** see whether your current pace is sustainable and when the quota may run out.
 - **Token activity:** review three months of daily activity plus the latest completed day and lifetime Token usage.
 - **Token cost:** estimate yesterday, the current subscription period, and lifetime cost from local sessions, with optional multi-Mac merging through device records in a user-selected iCloud Drive folder.
+- **History analysis:** click either the `Token Activity` or `Token Cost` title to open the same history window, with day, month, year, subscription-cycle, and custom-range queries plus Token, estimated-cost, and model charts.
 - **Reliable refresh:** quota and Token activity share one app-server session; temporary refresh failures retain the last successful data with a clear status.
 - **Timely alerts:** enable automatic refresh, launch at login, and quota warnings at 20%, 10%, or 5%.
 - **Native experience:** built with SwiftUI and AppKit to stay available without interrupting your work.
@@ -54,6 +55,14 @@ Open settings from the bottom of the popover, enable `iCloud Cost Sync`, and sel
 - Multi-device merging deduplicates stable event identifiers, so the same session event is counted once even if it appears in more than one file.
 - If official Token totals are higher than device records, CodexQ shows the missing portion separately as the official difference and estimates it from the average device-record rate.
 - Sanitized sync files are not additionally encrypted by CodexQ. Do not choose a publicly shared folder.
+
+## Token History Data Notes
+
+- Token activity is account-level daily data from app-server; historical availability depends on its retained daily coverage.
+- Cost comes from local sessions or the sanitized multi-device ledger when iCloud sync is enabled; availability depends on retained session and ledger records.
+- When official daily Token usage is higher than device records, the history window shows the positive official difference per day; higher device totals are never reduced.
+- Unknown or historically unpriced models remain in Token totals and are labeled as unpriced instead of being presented as zero-cost usage.
+- Costs use timestamp-aware official API prices where catalog history exists. They are estimates, not the actual ChatGPT subscription bill.
 
 ## Build and Run
 

@@ -51,6 +51,24 @@ struct TokenHistoryQueryTests {
         #expect(mediumCustom.granularity(interval: mediumInterval, calendar: calendar) == .month)
     }
 
+    @Test("反向自定义日期会归一化为包含首尾两天的范围")
+    func reversedCustomRangeIsNormalized() throws {
+        let earlier = try date("2026-08-01T04:00:00Z")
+        let later = try date("2026-08-07T04:00:00Z")
+        let selection = TokenHistorySelection.custom(start: later, endInclusive: earlier)
+        let interval = try #require(selection.interval(
+            calendar: calendar,
+            subscriptionPeriods: []
+        ))
+
+        #expect(interval.start == calendar.startOfDay(for: earlier))
+        #expect(interval.end == calendar.date(
+            byAdding: .day,
+            value: 1,
+            to: calendar.startOfDay(for: later)
+        ))
+    }
+
     @Test("月度订阅按续费锚点生成当前和历史周期")
     func generatesMonthlySubscriptionCycles() throws {
         let anchor = SubscriptionAnchor(

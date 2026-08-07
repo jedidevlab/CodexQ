@@ -31,9 +31,48 @@ struct TokenCostBenchmarkTests {
             return elapsed
         }
 
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .autoupdatingCurrent
+        let year = calendar.component(.year, from: now)
+        let historySelection = TokenHistorySelection.year(year)
+        let coldHistoryRecords = try await TokenCostReader(
+            homeDirectory: home
+        ).readRecordSet(now: now)
+        let coldHistoryStartedAt = DispatchTime.now().uptimeNanoseconds
+        let coldHistory = try #require(TokenHistoryAggregator.snapshot(
+            records: coldHistoryRecords.records,
+            activity: nil,
+            selection: historySelection,
+            subscriptionCycles: [],
+            dataScope: coldHistoryRecords.dataScope,
+            skippedSessionFileCount: coldHistoryRecords.skippedSessionFileCount,
+            syncMessage: coldHistoryRecords.syncMessage,
+            now: now,
+            calendar: calendar
+        ))
+        let coldHistoryElapsed = DispatchTime.now().uptimeNanoseconds - coldHistoryStartedAt
+        let warmHistoryRecords = try await warmReader.readRecordSet(now: now)
+        let warmHistoryStartedAt = DispatchTime.now().uptimeNanoseconds
+        let warmHistory = try #require(TokenHistoryAggregator.snapshot(
+            records: warmHistoryRecords.records,
+            activity: nil,
+            selection: historySelection,
+            subscriptionCycles: [],
+            dataScope: warmHistoryRecords.dataScope,
+            skippedSessionFileCount: warmHistoryRecords.skippedSessionFileCount,
+            syncMessage: warmHistoryRecords.syncMessage,
+            now: now,
+            calendar: calendar
+        ))
+        let warmHistoryElapsed = DispatchTime.now().uptimeNanoseconds - warmHistoryStartedAt
+
+        #expect(warmHistory == coldHistory)
+
         print(
             "TOKEN_COST_BENCHMARK records=\(reference.recordCount) cost_usd=\(reference.costUSD) "
-                + "cold_median_ms=\(milliseconds(median(cold))) warm_median_ms=\(milliseconds(median(warm)))"
+                + "cold_median_ms=\(milliseconds(median(cold))) warm_median_ms=\(milliseconds(median(warm))) "
+                + "history_cold_ms=\(milliseconds(coldHistoryElapsed)) "
+                + "history_warm_ms=\(milliseconds(warmHistoryElapsed))"
         )
     }
 
