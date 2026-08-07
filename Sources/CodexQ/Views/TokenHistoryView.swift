@@ -244,7 +244,7 @@ private struct HistorySummaryCard: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Text(value)
-                .font(.title3.weight(.semibold))
+                .font(.title2.weight(.semibold))
                 .foregroundStyle(accent)
                 .monospacedDigit()
                 .lineLimit(1)
