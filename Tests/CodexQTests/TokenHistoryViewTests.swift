@@ -23,6 +23,7 @@ struct TokenHistoryViewTests {
         #expect(windowSource.contains("window.isReleasedWhenClosed = false"))
         #expect(windowSource.contains("window.minSize = NSSize(width: 760, height: 560)"))
         #expect(windowSource.contains("window.setFrameAutosaveName(\"TokenHistoryWindow\")"))
+        #expect(windowSource.contains("hostingController.sizingOptions = []"))
         #expect(activitySource.contains(".help(\"点击查看 Token 使用与成本历史\")"))
         #expect(costSource.contains(".help(\"点击查看 Token 使用与成本历史\")"))
     }
