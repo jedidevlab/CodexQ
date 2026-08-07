@@ -28,7 +28,13 @@ struct TokenUsageHistoryChart: View {
                     if let bucket = selectedBucket {
                         RuleMark(x: .value("所选时段", bucket.start))
                             .foregroundStyle(.secondary)
-                            .annotation(position: .top, alignment: .leading) {
+                            .annotation(
+                                position: .top,
+                                alignment: .leading,
+                                overflowResolution: .init(
+                                    x: .fit(to: .chart), y: .fit(to: .chart)
+                                )
+                            ) {
                                 TokenBucketTooltip(bucket: bucket, showsCost: false)
                             }
                     }
@@ -90,7 +96,13 @@ struct TokenCostHistoryChart: View {
                     if let bucket = selectedBucket {
                         RuleMark(x: .value("所选时段", bucket.start))
                             .foregroundStyle(.secondary)
-                            .annotation(position: .top, alignment: .leading) {
+                            .annotation(
+                                position: .top,
+                                alignment: .leading,
+                                overflowResolution: .init(
+                                    x: .fit(to: .chart), y: .fit(to: .chart)
+                                )
+                            ) {
                                 TokenBucketTooltip(bucket: bucket, showsCost: true)
                             }
                         PointMark(
@@ -189,6 +201,18 @@ struct TokenModelBreakdownChart: View {
                 }
                 .chartXAxis {
                     AxisMarks(position: .bottom)
+                }
+                .chartYAxis {
+                    AxisMarks(position: .leading) { value in
+                        AxisGridLine()
+                        AxisValueLabel {
+                            if let modelName = value.as(String.self) {
+                                Text(modelName)
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+                            }
+                        }
+                    }
                 }
                 .frame(height: CGFloat(max(180, sortedModels.count * 30)))
             }

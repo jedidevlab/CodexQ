@@ -91,6 +91,28 @@ struct TokenHistoryViewTests {
         #expect(!chartSource.contains(".background(.thinMaterial"))
     }
 
+    @Test("趋势图悬浮提示只调整位置而不扩张标尺")
+    func historyChartTooltipUsesStableOverflowResolution() throws {
+        let chartSource = try source("Sources/CodexQ/Views/TokenHistoryCharts.swift")
+
+        #expect(chartSource.components(
+            separatedBy: "overflowResolution: .init("
+        ).count - 1 == 2)
+        #expect(chartSource.components(
+            separatedBy: "x: .fit(to: .chart), y: .fit(to: .chart)"
+        ).count - 1 == 2)
+        #expect(!chartSource.contains(".padScale"))
+    }
+
+    @Test("模型分布显式显示左侧模型名称")
+    func modelBreakdownShowsModelNamesOnLeadingAxis() throws {
+        let chartSource = try source("Sources/CodexQ/Views/TokenHistoryCharts.swift")
+
+        #expect(chartSource.contains("AxisMarks(position: .leading) { value in"))
+        #expect(chartSource.contains("if let modelName = value.as(String.self)"))
+        #expect(chartSource.contains("Text(modelName)"))
+    }
+
     @Test("十个模型压缩为前八名加其他且总量守恒")
     func compactsModelsWithoutLosingTotals() {
         let models = (1...10).map { value in
