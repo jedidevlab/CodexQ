@@ -75,6 +75,22 @@ struct TokenHistoryViewTests {
         #expect(!viewSource.contains(".preferredColorScheme(.dark)"))
     }
 
+    @Test("趋势图宽屏双栏且窄屏自动纵向回退")
+    func historyChartsUseResponsiveTwoColumnLayout() throws {
+        let viewSource = try source("Sources/CodexQ/Views/TokenHistoryView.swift")
+        let chartSource = try source("Sources/CodexQ/Views/TokenHistoryCharts.swift")
+
+        #expect(viewSource.contains("ResponsiveTokenHistoryCharts("))
+        #expect(viewSource.contains("TokenModelBreakdownChart(models: snapshot.models)"))
+        #expect(chartSource.contains("struct ResponsiveTokenHistoryCharts"))
+        #expect(chartSource.contains("ViewThatFits(in: .horizontal)"))
+        #expect(chartSource.contains("HStack(alignment: .top, spacing: 16)"))
+        #expect(chartSource.contains(".frame(minWidth: 900)"))
+        #expect(chartSource.contains("VStack(alignment: .leading, spacing: 16)"))
+        #expect(chartSource.contains("TokenHistoryCardSurface(cornerRadius: 12)"))
+        #expect(!chartSource.contains(".background(.thinMaterial"))
+    }
+
     @Test("十个模型压缩为前八名加其他且总量守恒")
     func compactsModelsWithoutLosingTotals() {
         let models = (1...10).map { value in

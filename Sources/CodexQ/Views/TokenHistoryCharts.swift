@@ -118,6 +118,40 @@ struct TokenCostHistoryChart: View {
     }
 }
 
+struct ResponsiveTokenHistoryCharts: View {
+    let buckets: [TokenHistoryBucket]
+    @Binding var selectedBucketStart: Date?
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: 16) {
+                TokenUsageHistoryChart(
+                    buckets: buckets,
+                    selectedBucketStart: $selectedBucketStart
+                )
+                .frame(maxWidth: .infinity)
+                TokenCostHistoryChart(
+                    buckets: buckets,
+                    selectedBucketStart: $selectedBucketStart
+                )
+                .frame(maxWidth: .infinity)
+            }
+            .frame(minWidth: 900)
+
+            VStack(alignment: .leading, spacing: 16) {
+                TokenUsageHistoryChart(
+                    buckets: buckets,
+                    selectedBucketStart: $selectedBucketStart
+                )
+                TokenCostHistoryChart(
+                    buckets: buckets,
+                    selectedBucketStart: $selectedBucketStart
+                )
+            }
+        }
+    }
+}
+
 struct TokenModelBreakdownChart: View {
     enum Metric: String, CaseIterable, Identifiable {
         case tokens = "Token"
@@ -219,10 +253,8 @@ private struct HistoryChartCard<Content: View>: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12))
-        .overlay {
-            RoundedRectangle(cornerRadius: 12)
-                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+        .background {
+            TokenHistoryCardSurface(cornerRadius: 12)
         }
     }
 }

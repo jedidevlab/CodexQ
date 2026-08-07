@@ -12,12 +12,8 @@ struct TokenHistoryView: View {
                 summaryStrip(snapshot.summary)
                 qualityRow(snapshot)
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 20) {
-                        TokenUsageHistoryChart(
-                            buckets: snapshot.buckets,
-                            selectedBucketStart: $selectedBucketStart
-                        )
-                        TokenCostHistoryChart(
+                    VStack(alignment: .leading, spacing: 16) {
+                        ResponsiveTokenHistoryCharts(
                             buckets: snapshot.buckets,
                             selectedBucketStart: $selectedBucketStart
                         )
