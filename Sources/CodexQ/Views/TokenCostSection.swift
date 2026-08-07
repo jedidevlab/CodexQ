@@ -15,14 +15,9 @@ struct TokenCostSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Button(action: showHistory) {
-                    Text("Token 成本")
-                        .font(.headline)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .help("点击查看 Token 使用与成本历史")
-                .accessibilityLabel("打开 Token 使用与成本历史")
+                TokenHistoryNavigationButton(title: "Token 成本", action: showHistory)
+                    .help("点击查看 Token 使用与成本历史")
+                    .accessibilityLabel("打开 Token 使用与成本历史")
                 Text(scopeLabel)
                     .font(.caption2)
                     .foregroundStyle(.tertiary)

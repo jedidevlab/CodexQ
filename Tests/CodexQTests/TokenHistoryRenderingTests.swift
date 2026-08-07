@@ -6,6 +6,34 @@ import Vision
 
 @Suite("TokenHistoryRenderingTests", .serialized)
 struct TokenHistoryRenderingTests {
+    @Test("历史入口标题悬浮时使用可点击指针")
+    @MainActor
+    func historyNavigationTitleUsesPointingHandCursor() {
+        NSCursor.arrow.set()
+        defer { TokenHistoryNavigationCursor.update(isHovered: false) }
+
+        TokenHistoryNavigationCursor.update(isHovered: true)
+
+        #expect(NSCursor.current == NSCursor.pointingHand)
+    }
+
+    @Test("历史入口标题悬浮时文字明显变淡")
+    @MainActor
+    func historyNavigationTitleFadesOnHover() {
+        let normal = render(
+            TokenHistoryNavigationLabel(title: "Token 活动", isHovered: false),
+            width: 120,
+            height: 40
+        )
+        let hovered = render(
+            TokenHistoryNavigationLabel(title: "Token 活动", isHovered: true),
+            width: 120,
+            height: 40
+        )
+
+        #expect(darkPixelCount(in: hovered) < darkPixelCount(in: normal))
+    }
+
     @Test("日模式显示所在周且范围选择包含累计")
     @MainActor
     func dayModeShowsWeekContextAndCumulativeRange() throws {
@@ -155,6 +183,27 @@ struct TokenHistoryRenderingTests {
         #expect(costTicks.map(\.text) == ["$20.00", "$15.00", "$10.00", "$5.00", "$0.00"])
     }
 
+    @Test("右侧纵轴数值紧贴数据图表边缘")
+    @MainActor
+    func trailingAxisValuesAlignWithChartEdge() throws {
+        let observations = try recognizedText(
+            in: render(
+                TokenCostHistoryChart(
+                    buckets: buckets,
+                    selectedBucketStart: .constant(nil)
+                ),
+                width: 800,
+                height: 270
+            )
+        )
+        let topValue = try #require(observation(containing: "$20.00", in: observations))
+        let finalDate = try #require(observation(containing: "8/7", in: observations))
+        let gap = (topValue.boundingBox.minX - finalDate.boundingBox.maxX) * 800
+
+        #expect(gap >= 4)
+        #expect(gap <= 18)
+    }
+
     private var calendar: Calendar {
         var value = Calendar(identifier: .gregorian)
         value.locale = Locale(identifier: "zh_CN")
@@ -247,5 +296,23 @@ struct TokenHistoryRenderingTests {
 
     private func containsChevron(_ text: String) -> Bool {
         [">", "〉", "›", "❯"].contains { text.contains($0) }
+    }
+
+    private func darkPixelCount(in image: CGImage) -> Int {
+        let bitmap = NSBitmapImageRep(cgImage: image)
+        var count = 0
+        for y in 0..<image.height {
+            for x in 0..<image.width {
+                guard let color = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB) else {
+                    continue
+                }
+                if color.redComponent < 0.3,
+                   color.greenComponent < 0.3,
+                   color.blueComponent < 0.3 {
+                    count += 1
+                }
+            }
+        }
+        return count
     }
 }

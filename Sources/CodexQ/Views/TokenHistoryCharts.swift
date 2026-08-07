@@ -255,14 +255,14 @@ private struct HistoryTrendChartLayout<ChartView: View>: View {
                 .frame(height: 18)
             }
 
-            VStack(alignment: .trailing, spacing: 0) {
+            VStack(alignment: .leading, spacing: 0) {
                 ForEach(Array(valueTicks.enumerated()), id: \.element.id) { index, tick in
                     Text(tick.text)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
                         .lineLimit(1)
-                        .frame(maxWidth: .infinity, alignment: .trailing)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     if index < valueTicks.count - 1 {
                         Spacer(minLength: 0)
                     }

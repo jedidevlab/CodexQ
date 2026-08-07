@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct TokenActivitySection: View {
@@ -10,14 +11,9 @@ struct TokenActivitySection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Button(action: showHistory) {
-                    Text("Token 活动")
-                        .font(.headline)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .help("点击查看 Token 使用与成本历史")
-                .accessibilityLabel("打开 Token 使用与成本历史")
+                TokenHistoryNavigationButton(title: "Token 活动", action: showHistory)
+                    .help("点击查看 Token 使用与成本历史")
+                    .accessibilityLabel("打开 Token 使用与成本历史")
                 Spacer(minLength: 6)
                 if let snapshot {
                     let latestDay = TokenActivityPresentation.latestRecordedDay(
@@ -86,6 +82,51 @@ struct TokenActivitySection: View {
         calendar.timeZone = .autoupdatingCurrent
         calendar.firstWeekday = 2
         return calendar
+    }
+}
+
+struct TokenHistoryNavigationButton: View {
+    let title: String
+    let action: () -> Void
+
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: action) {
+            TokenHistoryNavigationLabel(title: title, isHovered: isHovered)
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering in
+            isHovered = hovering
+            TokenHistoryNavigationCursor.update(isHovered: hovering)
+        }
+        .onDisappear {
+            if isHovered {
+                TokenHistoryNavigationCursor.update(isHovered: false)
+            }
+        }
+    }
+}
+
+struct TokenHistoryNavigationLabel: View {
+    let title: String
+    let isHovered: Bool
+
+    var body: some View {
+        Text(title)
+            .font(.headline)
+            .foregroundStyle(Color.primary.opacity(isHovered ? 0.55 : 1))
+            .contentShape(Rectangle())
+    }
+}
+
+enum TokenHistoryNavigationCursor {
+    static func update(isHovered: Bool) {
+        if isHovered {
+            NSCursor.pointingHand.push()
+        } else {
+            NSCursor.pop()
+        }
     }
 }
 
