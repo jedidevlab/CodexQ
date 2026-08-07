@@ -597,11 +597,20 @@ struct TokenCostTests {
         let authURL = home.appendingPathComponent(".codex/auth.json")
         try auth.write(to: authURL, atomically: true, encoding: .utf8)
 
-        let snapshot = try await TokenCostReader(homeDirectory: home).read(
-            now: try date("2026-07-23T20:00:00Z")
+        let reader = TokenCostReader(
+            homeDirectory: home,
+            costSyncConfiguration: { nil }
         )
+        let now = try date("2026-07-23T20:00:00Z")
+        let records = try await reader.readRecordSet(now: now)
+        let snapshot = try await reader.read(now: now)
         let expectedStart = try date("2026-07-06T02:29:39Z")
 
+        #expect(records.records.count == 1)
+        #expect(records.localRecordCount == snapshot.sourceRecordCount)
+        #expect(records.dataScope == snapshot.dataScope)
+        #expect(records.skippedSessionFileCount == snapshot.skippedSessionFileCount)
+        #expect(records.subscriptionAnchor?.cadence == .month)
         #expect(snapshot.today.totalTokens == 110)
         #expect(snapshot.subscription?.totalTokens == 110)
         #expect(snapshot.subscriptionPeriod?.start == expectedStart)

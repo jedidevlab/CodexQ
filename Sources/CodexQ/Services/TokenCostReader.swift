@@ -4,6 +4,15 @@ func readCurrentTokenCost() async throws -> TokenCostSnapshot {
     try await TokenCostReader.shared.read()
 }
 
+struct TokenCostRecordSet: Sendable {
+    let records: [TokenUsageRecord]
+    let localRecordCount: Int
+    let skippedSessionFileCount: Int
+    let dataScope: TokenCostDataScope
+    let syncMessage: String?
+    let subscriptionAnchor: SubscriptionAnchor?
+}
+
 actor TokenCostReader {
     static let shared = TokenCostReader()
 
@@ -64,6 +73,32 @@ actor TokenCostReader {
     }
 
     func read(now: Date = Date()) async throws -> TokenCostSnapshot {
+        let result = try await readRecordSet(now: now)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .autoupdatingCurrent
+        var utcCalendar = Calendar(identifier: .gregorian)
+        utcCalendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let subscriptionPeriod = result.subscriptionAnchor.flatMap {
+            SubscriptionPeriodResolver.currentPeriod(
+                activeStart: $0.start,
+                activeUntil: $0.end,
+                now: now,
+                calendar: utcCalendar
+            )
+        }
+        return TokenCostCalculator.snapshot(
+            records: result.records,
+            now: now,
+            calendar: calendar,
+            subscriptionPeriod: subscriptionPeriod,
+            skippedSessionFileCount: result.skippedSessionFileCount,
+            dataScope: result.dataScope,
+            syncMessage: result.syncMessage,
+            sourceRecordCount: result.localRecordCount
+        )
+    }
+
+    func readRecordSet(now: Date = Date()) async throws -> TokenCostRecordSet {
         let configuration = costSyncConfiguration()
         let listing: SessionFileListing
         do {
@@ -132,9 +167,6 @@ actor TokenCostReader {
         }
         cache = cache.filter { liveFiles.contains($0.key) }
 
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = .autoupdatingCurrent
-        let subscriptionPeriod = try? subscriptionPeriod(now: now)
         let uniqueRecords = Self.mergedRecords(records).sorted {
             if $0.timestamp != $1.timestamp { return $0.timestamp < $1.timestamp }
             if $0.model != $1.model { return $0.model < $1.model }
@@ -188,15 +220,13 @@ actor TokenCostReader {
                 syncMessage = error.localizedDescription
             }
         }
-        return TokenCostCalculator.snapshot(
+        return TokenCostRecordSet(
             records: costRecords,
-            now: now,
-            calendar: calendar,
-            subscriptionPeriod: subscriptionPeriod,
+            localRecordCount: uniqueRecords.count,
             skippedSessionFileCount: skippedSessionFileCount,
             dataScope: dataScope,
             syncMessage: syncMessage,
-            sourceRecordCount: uniqueRecords.count
+            subscriptionAnchor: try? subscriptionAnchor()
         )
     }
 
@@ -238,7 +268,7 @@ actor TokenCostReader {
         )
     }
 
-    private func subscriptionPeriod(now: Date) throws -> DateInterval {
+    private func subscriptionAnchor() throws -> SubscriptionAnchor {
         let data = try Data(contentsOf: authURL)
         let auth = try JSONDecoder().decode(AuthFile.self, from: data)
         guard let payload = Self.jwtPayload(auth.tokens.idToken),
@@ -255,17 +285,13 @@ actor TokenCostReader {
                 ?? ISO8601DateFormatter().date(from: untilValue) else {
             throw ReaderError.subscriptionUnavailable
         }
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
-        guard let period = SubscriptionPeriodResolver.currentPeriod(
-            activeStart: start,
-            activeUntil: until,
-            now: now,
-            calendar: calendar
-        ) else {
+        guard until > start else {
             throw ReaderError.subscriptionUnavailable
         }
-        return period
+        let cadence: SubscriptionAnchor.Cadence = until.timeIntervalSince(start) > 300 * 86_400
+            ? .year
+            : .month
+        return SubscriptionAnchor(start: start, end: until, cadence: cadence)
     }
 
     private static func jwtPayload(_ token: String) -> Data? {
