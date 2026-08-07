@@ -10,14 +10,14 @@ final class TokenHistoryWindowController: NSWindowController {
         let hostingController = NSHostingController(rootView: TokenHistoryView(store: store))
         hostingController.sizingOptions = []
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 920, height: 680),
+            contentRect: NSRect(x: 0, y: 0, width: 1080, height: 720),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
         )
         window.title = "Token 使用与成本"
         window.contentViewController = hostingController
-        window.minSize = NSSize(width: 760, height: 560)
+        window.minSize = NSSize(width: 840, height: 600)
         window.isReleasedWhenClosed = false
         window.collectionBehavior = [.moveToActiveSpace]
         window.center()

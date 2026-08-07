@@ -49,37 +49,53 @@ struct TokenHistoryView: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 12) {
-                Text("Token 使用与成本")
-                    .font(.title2.weight(.semibold))
-                Picker("范围", selection: $store.mode) {
-                    ForEach(TokenHistoryRangeMode.allCases) { mode in
-                        Text(mode.title).tag(mode)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .frame(maxWidth: 430)
-                Spacer(minLength: 8)
-                if store.isLoading, store.snapshot != nil {
-                    ProgressView()
-                        .controlSize(.small)
-                }
-                Button(action: store.reload) {
-                    Label("刷新", systemImage: "arrow.clockwise")
-                }
-                .labelStyle(.iconOnly)
-                .help("刷新历史数据")
-            }
+        VStack(alignment: .leading, spacing: 12) {
+            titleRow
+            rangeRow
+            contextRow
+        }
+    }
 
-            HStack(spacing: 10) {
-                contextualControls
-                Spacer(minLength: 0)
-                Text("API 价格估算，非实际订阅账单")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+    private var titleRow: some View {
+        HStack(spacing: 12) {
+            Text("Token 使用与成本")
+                .font(.largeTitle.weight(.bold))
+            Spacer(minLength: 12)
+            if store.isLoading, store.snapshot != nil {
+                ProgressView().controlSize(.small)
             }
+            Button(action: store.reload) {
+                Label("刷新", systemImage: "arrow.clockwise")
+            }
+            .labelStyle(.iconOnly)
+            .help("刷新历史数据")
+        }
+    }
+
+    private var rangeRow: some View {
+        HStack(spacing: 12) {
+            Label("日期", systemImage: "clock")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            Picker("范围", selection: $store.mode) {
+                ForEach(TokenHistoryRangeMode.allCases) { mode in
+                    Text(mode.title).tag(mode)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .frame(maxWidth: 440)
+            Spacer(minLength: 0)
+        }
+    }
+
+    private var contextRow: some View {
+        HStack(spacing: 10) {
+            contextualControls
+            Spacer(minLength: 12)
+            Text("API 价格估算，非实际订阅账单")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 
@@ -128,12 +144,12 @@ struct TokenHistoryView: View {
             HistorySummaryCard(
                 title: "Token 总量",
                 value: TokenCountFormatter.compactNumber(summary.totalTokens, fractionLength: 1),
-                color: .blue
+                accent: .blue
             )
             HistorySummaryCard(
                 title: "估算成本",
                 value: currency(summary.estimatedCostUSD),
-                color: .green
+                accent: .green
             )
             HistorySummaryCard(
                 title: "日均 Token",
@@ -141,12 +157,12 @@ struct TokenHistoryView: View {
                     Int64(summary.averageDailyTokens.rounded()),
                     fractionLength: 1
                 ),
-                color: .indigo
+                accent: .indigo
             )
             HistorySummaryCard(
                 title: "日均成本",
                 value: currency(summary.averageDailyCostUSD),
-                color: .orange
+                accent: .orange
             )
         }
     }
@@ -204,10 +220,23 @@ struct TokenHistoryView: View {
     }
 }
 
+struct TokenHistoryCardSurface: View {
+    let cornerRadius: CGFloat
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            .fill(Color(nsColor: .controlBackgroundColor))
+            .overlay {
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .strokeBorder(Color(nsColor: .separatorColor).opacity(0.65), lineWidth: 1)
+            }
+    }
+}
+
 private struct HistorySummaryCard: View {
     let title: String
     let value: String
-    let color: Color
+    let accent: Color
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -216,16 +245,15 @@ private struct HistorySummaryCard: View {
                 .foregroundStyle(.secondary)
             Text(value)
                 .font(.title3.weight(.semibold))
+                .foregroundStyle(accent)
                 .monospacedDigit()
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
-        .background(color.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
-        .overlay {
-            RoundedRectangle(cornerRadius: 10)
-                .strokeBorder(color.opacity(0.16), lineWidth: 1)
+        .background {
+            TokenHistoryCardSurface(cornerRadius: 12)
         }
     }
 }

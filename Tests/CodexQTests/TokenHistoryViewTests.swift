@@ -21,7 +21,7 @@ struct TokenHistoryViewTests {
         #expect(controllerSource.contains("panel.orderOut(nil)"))
         #expect(windowSource.contains("window.title = \"Token 使用与成本\""))
         #expect(windowSource.contains("window.isReleasedWhenClosed = false"))
-        #expect(windowSource.contains("window.minSize = NSSize(width: 760, height: 560)"))
+        #expect(windowSource.contains("window.minSize = NSSize(width: 840, height: 600)"))
         #expect(windowSource.contains("window.setFrameAutosaveName(\"TokenHistoryWindow\")"))
         #expect(windowSource.contains("hostingController.sizingOptions = []"))
         #expect(activitySource.contains(".help(\"点击查看 Token 使用与成本历史\")"))
@@ -56,6 +56,23 @@ struct TokenHistoryViewTests {
         #expect(chartSource.contains("chartXSelection"))
         #expect(!chartSource.contains("SectorMark("))
         #expect(!chartSource.contains("dualAxis"))
+    }
+
+    @Test("历史窗口使用系统背景、分行筛选和统一摘要卡")
+    func historyViewUsesAdaptiveDashboardLayout() throws {
+        let windowSource = try source("Sources/CodexQ/App/TokenHistoryWindowController.swift")
+        let viewSource = try source("Sources/CodexQ/Views/TokenHistoryView.swift")
+
+        #expect(windowSource.contains("width: 1080, height: 720"))
+        #expect(windowSource.contains("window.minSize = NSSize(width: 840, height: 600)"))
+        #expect(viewSource.contains("private var titleRow: some View"))
+        #expect(viewSource.contains("private var rangeRow: some View"))
+        #expect(viewSource.contains("private var contextRow: some View"))
+        #expect(viewSource.contains("TokenHistoryCardSurface(cornerRadius: 12)"))
+        #expect(viewSource.contains(".foregroundStyle(accent)"))
+        #expect(!viewSource.contains(".background(color.opacity(0.08)"))
+        #expect(!viewSource.contains("Color.black"))
+        #expect(!viewSource.contains(".preferredColorScheme(.dark)"))
     }
 
     @Test("十个模型压缩为前八名加其他且总量守恒")
