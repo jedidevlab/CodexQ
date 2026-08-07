@@ -36,6 +36,7 @@ struct QuotaPopoverView: View {
     let contentWillChange: () -> Void
     let interactionDidChange: (PopoverInteraction, Bool) -> Void
     let showSettings: () -> Void
+    let showTokenHistory: () -> Void
     @State private var relativeTimeNow = Date()
     @State private var isResetCreditsExpanded = false
     @AppStorage("quotaResetDisplayMode") private var resetDisplayModeRawValue = ResetDisplayMode.relative.rawValue
@@ -92,7 +93,8 @@ struct QuotaPopoverView: View {
                 snapshot: store.tokenActivity,
                 errorMessage: store.tokenActivityErrorMessage,
                 isRefreshing: store.isTokenActivityRefreshing,
-                now: relativeTimeNow
+                now: relativeTimeNow,
+                showHistory: showTokenHistory
             )
 
             InsetSeparator()
@@ -103,7 +105,8 @@ struct QuotaPopoverView: View {
                 isRefreshing: store.isTokenActivityRefreshing,
                 isPresented: store.isPopoverPresented,
                 contentWillChange: contentWillChange,
-                contentDidChange: contentDidChange
+                contentDidChange: contentDidChange,
+                showHistory: showTokenHistory
             )
 
             if let resetCredits = store.snapshot?.resetCredits {

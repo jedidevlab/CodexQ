@@ -23,6 +23,7 @@ final class StatusBarController: NSObject {
     private var currentAnchorRect: NSRect?
     private var currentVisibleFrame: NSRect?
     private var settingsWindowController: SettingsWindowController?
+    private var tokenHistoryWindowController: TokenHistoryWindowController?
 
     override init() {
         let iconURL = Bundle.main.url(forResource: "MenuBarIcon", withExtension: "png")
@@ -52,6 +53,9 @@ final class StatusBarController: NSObject {
                 },
                 showSettings: { [weak self] in
                     self?.showSettingsWindow()
+                },
+                showTokenHistory: { [weak self] in
+                    self?.showTokenHistoryWindow()
                 }
             )
             .background(.thickMaterial, in: RoundedRectangle(cornerRadius: 8))
@@ -180,6 +184,13 @@ final class StatusBarController: NSObject {
         controller.present()
     }
 
+    private func showTokenHistoryWindow() {
+        let controller = tokenHistoryWindowController ?? TokenHistoryWindowController()
+        tokenHistoryWindowController = controller
+        panel.orderOut(nil)
+        controller.present()
+    }
+
     private func panelDidClose() {
         autoCloseTask?.cancel()
         autoCloseTask = nil
@@ -198,6 +209,8 @@ final class StatusBarController: NSObject {
         panel.orderOut(nil)
         settingsWindowController?.close()
         settingsWindowController = nil
+        tokenHistoryWindowController?.close()
+        tokenHistoryWindowController = nil
         store.stop()
     }
 
