@@ -185,36 +185,18 @@ struct TokenModelBreakdownChart: View {
             if compactedModels.isEmpty {
                 emptyState("所选范围暂无模型记录")
             } else {
-                Chart(sortedModels) { model in
-                    BarMark(
-                        x: .value(metric.rawValue, value(for: model)),
-                        y: .value("模型", model.model)
-                    )
-                    .foregroundStyle(metric == .tokens ? Color.accentColor : .green)
-                    .annotation(position: .trailing) {
-                        Text(label(for: model))
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-                    .accessibilityLabel(model.model)
-                    .accessibilityValue(label(for: model))
-                }
-                .chartXAxis {
-                    AxisMarks(position: .bottom)
-                }
-                .chartYAxis {
-                    AxisMarks(position: .leading) { value in
-                        AxisGridLine()
-                        AxisValueLabel {
-                            if let modelName = value.as(String.self) {
-                                Text(modelName)
-                                    .lineLimit(1)
-                                    .truncationMode(.middle)
-                            }
-                        }
+                VStack(spacing: 8) {
+                    ForEach(sortedModels) { model in
+                        TokenModelBreakdownRow(
+                            model: model,
+                            value: value(for: model),
+                            maximumValue: maximumValue,
+                            valueLabel: label(for: model),
+                            color: metric == .tokens ? .accentColor : .green
+                        )
                     }
                 }
-                .frame(height: CGFloat(max(180, sortedModels.count * 30)))
+                .frame(minHeight: 180, alignment: .top)
             }
         }
     }
@@ -225,6 +207,10 @@ struct TokenModelBreakdownChart: View {
 
     private var sortedModels: [TokenHistoryModelSummary] {
         compactedModels.sorted { value(for: $0) > value(for: $1) }
+    }
+
+    private var maximumValue: Double {
+        sortedModels.map(value(for:)).max() ?? 0
     }
 
     private func value(for model: TokenHistoryModelSummary) -> Double {
@@ -241,6 +227,49 @@ struct TokenModelBreakdownChart: View {
         case .cost:
             return model.estimatedCostUSD.map { String(format: "$%.2f", $0) } ?? "未计价"
         }
+    }
+}
+
+struct TokenModelBreakdownRow: View {
+    let model: TokenHistoryModelSummary
+    let value: Double
+    let maximumValue: Double
+    let valueLabel: String
+    let color: Color
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Text(model.model)
+                .font(.caption)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .frame(width: 180, alignment: .trailing)
+                .help(model.model)
+
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(Color.secondary.opacity(0.08))
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(color)
+                        .frame(width: barWidth(in: geometry.size.width))
+                }
+            }
+            .frame(height: 18)
+
+            Text(valueLabel)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .frame(width: 72, alignment: .leading)
+        }
+        .frame(height: 22)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(model.model)，\(valueLabel)")
+    }
+
+    private func barWidth(in availableWidth: CGFloat) -> CGFloat {
+        guard value > 0, maximumValue > 0 else { return 0 }
+        return max(2, availableWidth * value / maximumValue)
     }
 }
 

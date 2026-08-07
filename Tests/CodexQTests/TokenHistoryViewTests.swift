@@ -104,13 +104,13 @@ struct TokenHistoryViewTests {
         #expect(!chartSource.contains(".padScale"))
     }
 
-    @Test("模型分布显式显示左侧模型名称")
-    func modelBreakdownShowsModelNamesOnLeadingAxis() throws {
+    @Test("模型分布使用独立文字列显示模型名称而非依赖图表坐标轴推断")
+    func modelBreakdownUsesExplicitModelLabels() throws {
         let chartSource = try source("Sources/CodexQ/Views/TokenHistoryCharts.swift")
 
-        #expect(chartSource.contains("AxisMarks(position: .leading) { value in"))
-        #expect(chartSource.contains("if let modelName = value.as(String.self)"))
-        #expect(chartSource.contains("Text(modelName)"))
+        #expect(chartSource.contains("struct TokenModelBreakdownRow: View"))
+        #expect(chartSource.contains("Text(model.model)"))
+        #expect(!chartSource.contains("if let modelName = value.as(String.self)"))
     }
 
     @Test("十个模型压缩为前八名加其他且总量守恒")
