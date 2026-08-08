@@ -124,6 +124,16 @@ struct TokenHistoryRenderingTests {
         #expect(Double(barStart) - labelEnd < 24)
     }
 
+    @Test("模型分布高度随模型数量自然增长")
+    @MainActor
+    func modelBreakdownHeightTracksModelCount() {
+        let compactHeight = modelBreakdownFittingHeight(modelCount: 2)
+        let expandedHeight = modelBreakdownFittingHeight(modelCount: 8)
+
+        #expect(compactHeight < expandedHeight)
+        #expect(expandedHeight - compactHeight >= 150)
+    }
+
     @Test("Token 活动和 Token 成本标题不显示箭头")
     @MainActor
     func tokenSectionHeadersDoNotShowChevrons() throws {
@@ -229,6 +239,26 @@ struct TokenHistoryRenderingTests {
                 unpricedTokens: 0
             )
         }
+    }
+
+    @MainActor
+    private func modelBreakdownFittingHeight(modelCount: Int) -> CGFloat {
+        let models = (1...modelCount).map { index in
+            TokenHistoryModelSummary(
+                model: "model-\(index)",
+                totalTokens: Int64(index * 1_000_000),
+                estimatedCostUSD: Double(index)
+            )
+        }
+        let host = NSHostingView(
+            rootView: TokenModelBreakdownChart(models: models)
+                .environment(\.locale, Locale(identifier: "zh_CN"))
+                .environment(\.colorScheme, .light)
+        )
+        host.appearance = NSAppearance(named: .aqua)
+        host.frame = NSRect(x: 0, y: 0, width: 800, height: 1)
+        host.layoutSubtreeIfNeeded()
+        return host.fittingSize.height
     }
 
     @MainActor

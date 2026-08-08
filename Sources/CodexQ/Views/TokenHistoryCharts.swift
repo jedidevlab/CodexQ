@@ -357,7 +357,6 @@ struct TokenModelBreakdownChart: View {
                         )
                     }
                 }
-                .frame(minHeight: 180, alignment: .top)
             }
         }
     }
