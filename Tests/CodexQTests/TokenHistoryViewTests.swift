@@ -59,6 +59,34 @@ struct TokenHistoryViewTests {
         #expect(!chartSource.contains("dualAxis"))
     }
 
+    @Test("所有历史注释位于模型分布之后且价格说明最后显示")
+    func historyNotesFollowModelBreakdown() throws {
+        let viewSource = try source("Sources/CodexQ/Views/TokenHistoryView.swift")
+        let modelCall = try #require(
+            viewSource.range(of: "TokenModelBreakdownChart(models: snapshot.models)")
+        )
+        let footerCall = try #require(viewSource.range(
+            of: "footerNotes(snapshot)",
+            range: modelCall.upperBound..<viewSource.endIndex
+        ))
+        let footerStart = try #require(
+            viewSource.range(of: "private func footerNotes(_ snapshot: TokenHistorySnapshot)")
+        )
+        let footerEnd = try #require(viewSource.range(
+            of: "private func qualityRow(_ snapshot: TokenHistorySnapshot)",
+            range: footerStart.upperBound..<viewSource.endIndex
+        ))
+        let footerSource = viewSource[footerStart.lowerBound..<footerEnd.lowerBound]
+        let quality = try #require(footerSource.range(of: "qualityRow(snapshot)"))
+        let disclaimer = try #require(
+            footerSource.range(of: "API 价格估算，非实际订阅账单")
+        )
+
+        #expect(modelCall.lowerBound < footerCall.lowerBound)
+        #expect(quality.lowerBound < disclaimer.lowerBound)
+        #expect(!viewSource.contains("private var contextRow: some View"))
+    }
+
     @Test("历史窗口使用系统背景、分行筛选和统一摘要卡")
     func historyViewUsesAdaptiveDashboardLayout() throws {
         let windowSource = try source("Sources/CodexQ/App/TokenHistoryWindowController.swift")
@@ -68,7 +96,7 @@ struct TokenHistoryViewTests {
         #expect(windowSource.contains("window.minSize = NSSize(width: 840, height: 600)"))
         #expect(viewSource.contains("private var titleRow: some View"))
         #expect(viewSource.contains("private var rangeRow: some View"))
-        #expect(viewSource.contains("private var contextRow: some View"))
+        #expect(viewSource.contains("private func footerNotes(_ snapshot: TokenHistorySnapshot)"))
         #expect(viewSource.contains("TokenHistoryCardSurface(cornerRadius: 12)"))
         #expect(viewSource.contains(".foregroundStyle(accent)"))
         #expect(!viewSource.contains(".background(color.opacity(0.08)"))

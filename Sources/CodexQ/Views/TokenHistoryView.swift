@@ -10,7 +10,6 @@ struct TokenHistoryView: View {
 
             if let snapshot = store.snapshot {
                 summaryStrip(snapshot.summary)
-                qualityRow(snapshot)
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
                         ResponsiveTokenHistoryCharts(
@@ -18,6 +17,7 @@ struct TokenHistoryView: View {
                             selectedBucketStart: $selectedBucketStart
                         )
                         TokenModelBreakdownChart(models: snapshot.models)
+                        footerNotes(snapshot)
                     }
                     .padding(.bottom, 12)
                 }
@@ -48,7 +48,6 @@ struct TokenHistoryView: View {
         VStack(alignment: .leading, spacing: 12) {
             titleRow
             rangeRow
-            contextRow
         }
     }
 
@@ -83,15 +82,6 @@ struct TokenHistoryView: View {
             .frame(minWidth: 320, maxWidth: 440)
             contextualControls
             Spacer(minLength: 0)
-        }
-    }
-
-    private var contextRow: some View {
-        HStack(spacing: 10) {
-            Spacer(minLength: 0)
-            Text("API 价格估算，非实际订阅账单")
-                .font(.caption)
-                .foregroundStyle(.secondary)
         }
     }
 
@@ -163,6 +153,16 @@ struct TokenHistoryView: View {
                 accent: .orange
             )
         }
+    }
+
+    private func footerNotes(_ snapshot: TokenHistorySnapshot) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            qualityRow(snapshot)
+            Text("API 价格估算，非实际订阅账单")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func qualityRow(_ snapshot: TokenHistorySnapshot) -> some View {
