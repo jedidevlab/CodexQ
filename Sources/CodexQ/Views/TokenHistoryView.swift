@@ -119,7 +119,7 @@ struct TokenHistoryView: View {
                         Text(cycleLabel(cycle)).tag(Optional(cycle.interval))
                     }
                 }
-                .frame(width: 280)
+                .fixedSize(horizontal: true, vertical: false)
             }
         case .cumulative:
             EmptyView()

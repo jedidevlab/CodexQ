@@ -38,7 +38,7 @@ struct TokenHistoryViewTests {
         #expect(viewSource.contains("DatePicker(\"开始\""))
         #expect(viewSource.contains("DatePicker(\"结束\""))
         #expect(viewSource.contains("Picker(\"订阅周期\""))
-        #expect(viewSource.contains(".frame(width: 280)"))
+        #expect(viewSource.contains(".fixedSize(horizontal: true, vertical: false)"))
         #expect(viewSource.contains("title: \"Token 总量\""))
         #expect(viewSource.contains("title: \"估算成本\""))
         #expect(viewSource.contains("title: \"日均 Token\""))
@@ -123,6 +123,24 @@ struct TokenHistoryViewTests {
 
         #expect(monthSource.contains(".frame(minWidth: 110)"))
         #expect(!monthSource.contains(".frame(width: 86)"))
+    }
+
+    @Test("订阅周期选择器按当前选项内容采用自身宽度")
+    func subscriptionPickerUsesSelectedContentWidth() throws {
+        let viewSource = try source("Sources/CodexQ/Views/TokenHistoryView.swift")
+        let subscriptionStart = try #require(viewSource.range(of: "case .subscription:"))
+        let subscriptionEnd = try #require(viewSource.range(
+            of: "case .cumulative:",
+            range: subscriptionStart.upperBound..<viewSource.endIndex
+        ))
+        let subscriptionSource = viewSource[
+            subscriptionStart.lowerBound..<subscriptionEnd.lowerBound
+        ]
+
+        #expect(subscriptionSource.contains(
+            ".fixedSize(horizontal: true, vertical: false)"
+        ))
+        #expect(!subscriptionSource.contains(".frame(width: 280)"))
     }
 
     @Test("历史窗口使用系统背景、分行筛选和统一摘要卡")
