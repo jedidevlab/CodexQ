@@ -52,9 +52,13 @@ struct TokenHistoryView: View {
     }
 
     private var titleRow: some View {
-        HStack(spacing: 12) {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
             Text("Token 使用与成本")
                 .font(.largeTitle.weight(.bold))
+            Text("API 价格估算，非实际订阅账单")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
             Spacer(minLength: 12)
             if store.isLoading, store.snapshot != nil {
                 ProgressView().controlSize(.small)
@@ -99,7 +103,7 @@ struct TokenHistoryView: View {
             Picker("月份", selection: $store.selectedMonth) {
                 ForEach(1...12, id: \.self) { Text("\($0)月").tag($0) }
             }
-            .frame(width: 86)
+            .frame(minWidth: 110)
         case .year:
             Picker("年份", selection: $store.selectedYear) {
                 ForEach(years, id: \.self) { Text(String($0)).tag($0) }
@@ -158,9 +162,11 @@ struct TokenHistoryView: View {
     private func footerNotes(_ snapshot: TokenHistorySnapshot) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             qualityRow(snapshot)
-            Text("API 价格估算，非实际订阅账单")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            if snapshot.summary.unpricedTokens > 0 {
+                Text("未计价 Token：\(TokenCountFormatter.compactNumber(snapshot.summary.unpricedTokens))。这部分 Token 缺少对应 API 价格，会计入 Token 总量，但不计入估算成本。")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -169,10 +175,6 @@ struct TokenHistoryView: View {
         HStack(spacing: 8) {
             Label(scopeLabel(snapshot.coverage.dataScope), systemImage: "externaldrive")
             Text("官方活动覆盖 \(snapshot.coverage.activityDaysAvailable)/\(snapshot.coverage.calendarDaysInRange) 天")
-            if snapshot.summary.unpricedTokens > 0 {
-                Text("未计价 Token：\(TokenCountFormatter.compactNumber(snapshot.summary.unpricedTokens))")
-                    .foregroundStyle(.orange)
-            }
             if snapshot.coverage.skippedSessionFileCount > 0 {
                 Text("跳过 \(snapshot.coverage.skippedSessionFileCount) 个会话文件")
             }

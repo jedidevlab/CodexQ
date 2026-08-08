@@ -59,7 +59,7 @@ struct TokenHistoryViewTests {
         #expect(!chartSource.contains("dualAxis"))
     }
 
-    @Test("所有历史注释位于模型分布之后且价格说明最后显示")
+    @Test("底部数据注释位于模型分布之后且未计价说明最后显示")
     func historyNotesFollowModelBreakdown() throws {
         let viewSource = try source("Sources/CodexQ/Views/TokenHistoryView.swift")
         let modelCall = try #require(
@@ -78,13 +78,51 @@ struct TokenHistoryViewTests {
         ))
         let footerSource = viewSource[footerStart.lowerBound..<footerEnd.lowerBound]
         let quality = try #require(footerSource.range(of: "qualityRow(snapshot)"))
-        let disclaimer = try #require(
-            footerSource.range(of: "API 价格估算，非实际订阅账单")
+        let unpricedNote = try #require(
+            footerSource.range(of: "未计价 Token：")
         )
 
         #expect(modelCall.lowerBound < footerCall.lowerBound)
-        #expect(quality.lowerBound < disclaimer.lowerBound)
+        #expect(quality.lowerBound < unpricedNote.lowerBound)
         #expect(!viewSource.contains("private var contextRow: some View"))
+    }
+
+    @Test("价格估算提示紧邻标题且底部单独解释未计价 Token")
+    func historyAnnotationsUseRequestedPositions() throws {
+        let viewSource = try source("Sources/CodexQ/Views/TokenHistoryView.swift")
+        let titleStart = try #require(viewSource.range(of: "private var titleRow: some View"))
+        let titleEnd = try #require(viewSource.range(
+            of: "private var rangeRow: some View",
+            range: titleStart.upperBound..<viewSource.endIndex
+        ))
+        let titleSource = viewSource[titleStart.lowerBound..<titleEnd.lowerBound]
+        let footerStart = try #require(
+            viewSource.range(of: "private func footerNotes(_ snapshot: TokenHistorySnapshot)")
+        )
+        let footerEnd = try #require(viewSource.range(
+            of: "private func qualityRow(_ snapshot: TokenHistorySnapshot)",
+            range: footerStart.upperBound..<viewSource.endIndex
+        ))
+        let footerSource = viewSource[footerStart.lowerBound..<footerEnd.lowerBound]
+
+        #expect(titleSource.contains("API 价格估算，非实际订阅账单"))
+        #expect(!footerSource.contains("API 价格估算，非实际订阅账单"))
+        #expect(footerSource.contains("缺少对应 API 价格"))
+        #expect(footerSource.contains("计入 Token 总量，但不计入估算成本"))
+    }
+
+    @Test("月份选择器保留足够宽度完整显示月份")
+    func monthPickerKeepsReadableWidth() throws {
+        let viewSource = try source("Sources/CodexQ/Views/TokenHistoryView.swift")
+        let monthStart = try #require(viewSource.range(of: "Picker(\"月份\""))
+        let monthEnd = try #require(viewSource.range(
+            of: "case .year:",
+            range: monthStart.upperBound..<viewSource.endIndex
+        ))
+        let monthSource = viewSource[monthStart.lowerBound..<monthEnd.lowerBound]
+
+        #expect(monthSource.contains(".frame(minWidth: 110)"))
+        #expect(!monthSource.contains(".frame(width: 86)"))
     }
 
     @Test("历史窗口使用系统背景、分行筛选和统一摘要卡")
