@@ -41,10 +41,14 @@ struct TokenHistoryRenderingTests {
         store.mode = .day
 
         let observations = try recognizedText(
-            in: render(TokenHistoryView(store: store), width: 1080, height: 720)
+            in: render(TokenHistoryView(store: store), width: 840, height: 720)
         )
 
-        #expect(observation(containing: "所在周", in: observations) != nil)
+        let weekControl = try #require(observation(containing: "所在周", in: observations))
+        let dateControl = try #require(observation(containing: "2026", in: observations))
+        let dateControlText = try #require(dateControl.topCandidates(1).first?.string)
+        #expect(dateControlText.contains("9"))
+        #expect(abs(weekControl.boundingBox.midY - dateControl.boundingBox.midY) < 0.02)
         #expect(observation(containing: "累计", in: observations) != nil)
         #expect(observation(containing: "周", in: observations)?.topCandidates(1).first?.string != "周")
     }

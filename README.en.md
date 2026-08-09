@@ -11,6 +11,8 @@
 
 CodexQ is a native macOS menu bar utility. It brings ChatGPT (formerly Codex) five-hour and weekly quota, plan type, remaining capacity, projected run-out time, Token activity, and Token cost estimates into one floating panel.
 
+## Current version: v1.1.0 — **Major release: Token statistics dashboard**
+
 ## Your usage pace at a glance
 
 - **Quota progress:** follow five-hour and weekly limits together; a temporarily absent five-hour window is clearly shown as unlimited.
@@ -18,7 +20,7 @@ CodexQ is a native macOS menu bar utility. It brings ChatGPT (formerly Codex) fi
 - **Run-out projection:** see whether your current pace is sustainable and when the quota may run out.
 - **Token activity:** review three months of daily activity plus the latest completed day and lifetime Token usage.
 - **Token cost:** estimate yesterday, the current subscription period, and lifetime cost from local sessions, with optional multi-Mac merging through device records in a user-selected iCloud Drive folder.
-- **History analysis:** click either the `Token Activity` or `Token Cost` title to open the same history window, with day, month, year, subscription-cycle, and custom-range queries plus Token, estimated-cost, and model charts.
+- **History analysis:** click either the `Token Activity` or `Token Cost` title to open the same statistics window, with day, month, year, subscription-cycle, cumulative, and custom-range queries plus Token, estimated-cost, and model charts.
 - **Reliable refresh:** quota and Token activity share one app-server session; temporary refresh failures retain the last successful data with a clear status.
 - **Timely alerts:** enable automatic refresh, launch at login, and quota warnings at 20%, 10%, or 5%.
 - **Native experience:** built with SwiftUI and AppKit to stay available without interrupting your work.
@@ -29,8 +31,8 @@ Download the archive for your Mac from [GitHub Releases](https://github.com/jedi
 
 | Mac | Archive |
 | --- | --- |
-| Apple Silicon | `CodexQ-1.0.22-arm64.zip` |
-| Intel | `CodexQ-1.0.22-x86_64.zip` |
+| Apple Silicon | `CodexQ-1.1.0-arm64.zip` |
+| Intel | `CodexQ-1.1.0-x86_64.zip` |
 
 Unzip the archive, then move `CodexQ.app` to Applications.
 
@@ -90,15 +92,15 @@ swift test
 Build an ad-hoc signed archive:
 
 ```bash
-./script/package_release.sh 1.0.22 arm64
-./script/package_release.sh 1.0.22 x86_64
+./script/package_release.sh 1.1.0 arm64
+./script/package_release.sh 1.1.0 x86_64
 ```
 
 The archive is written to:
 
 ```text
-dist/CodexQ-1.0.22-arm64.zip
-dist/CodexQ-1.0.22-x86_64.zip
+dist/CodexQ-1.1.0-arm64.zip
+dist/CodexQ-1.1.0-x86_64.zip
 ```
 
 The helper script builds a local `.app` bundle in `dist/CodexQ.app` for development use. Generated build artifacts are excluded from Git.

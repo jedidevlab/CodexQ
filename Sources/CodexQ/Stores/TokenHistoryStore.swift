@@ -46,6 +46,11 @@ final class TokenHistoryStore: ObservableObject {
 
     var selectionIdentity: TokenHistorySelection { selection }
 
+    var visibleSnapshot: TokenHistorySnapshot? {
+        guard snapshot?.selection == selection else { return nil }
+        return snapshot
+    }
+
     var selection: TokenHistorySelection {
         switch mode {
         case .day:

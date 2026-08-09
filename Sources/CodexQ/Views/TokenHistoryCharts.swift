@@ -407,7 +407,7 @@ struct TokenModelBreakdownRow: View {
     let color: Color
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 3) {
             Text(model.model)
                 .font(.caption)
                 .lineLimit(1)

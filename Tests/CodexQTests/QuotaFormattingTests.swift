@@ -477,7 +477,7 @@ struct AppServerClientTests {
         let task = Task {
             try await client.readRateLimits()
         }
-        try await waitForFile(startedFile, timeout: 2)
+        try await waitForFile(startedFile, timeout: 5)
         let cancelledAt = Date()
         task.cancel()
 

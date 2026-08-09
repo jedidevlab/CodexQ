@@ -61,7 +61,9 @@ enum TokenHistorySelection: Hashable, Sendable {
     ) -> DateInterval? {
         switch self {
         case .day(let date):
-            return calendar.dateInterval(of: .weekOfYear, for: date)
+            var mondayFirstCalendar = calendar
+            mondayFirstCalendar.firstWeekday = 2
+            return mondayFirstCalendar.dateInterval(of: .weekOfYear, for: date)
         case .month(let year, let month):
             guard let start = calendar.date(from: DateComponents(year: year, month: month)),
                   let end = calendar.date(byAdding: .month, value: 1, to: start) else {

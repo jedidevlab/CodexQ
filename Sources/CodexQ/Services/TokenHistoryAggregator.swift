@@ -27,15 +27,18 @@ enum TokenHistoryAggregator {
         var interval = current
 
         while interval.start > dataInterval.start {
-            guard let previousStart = calendar.date(
-                byAdding: component,
-                value: -1,
-                to: interval.start
-            ), let previousEnd = calendar.date(
-                byAdding: component,
-                value: -1,
-                to: interval.end
-            ), previousEnd > previousStart else {
+            let previousEnd = interval.start
+            let previousStart: Date?
+            if previousEnd == anchor.end {
+                previousStart = anchor.start
+            } else {
+                previousStart = calendar.date(
+                    byAdding: component,
+                    value: -1,
+                    to: previousEnd
+                )
+            }
+            guard let previousStart, previousEnd > previousStart else {
                 break
             }
             interval = DateInterval(start: previousStart, end: previousEnd)
@@ -96,7 +99,10 @@ enum TokenHistoryAggregator {
                     unpricedTokens += record.totalTokens
                 }
             }
-            let officialTokens = activityByDay[dayStart]
+            let nextDay = calendar.date(byAdding: .day, value: 1, to: dayStart)
+            let containsWholeDay = dayStart >= interval.start
+                && nextDay.map { $0 <= interval.end } == true
+            let officialTokens = containsWholeDay ? activityByDay[dayStart] : nil
             let totalTokens = max(deviceTokens, officialTokens ?? deviceTokens)
             let supplementTokens = max(0, totalTokens - deviceTokens)
             return DailyValue(
@@ -119,6 +125,12 @@ enum TokenHistoryAggregator {
         let supplementCostUSD = days.reduce(0.0) { $0 + $1.supplementCostUSD }
         let unpricedTokens = days.reduce(Int64(0)) { $0 + $1.unpricedTokens }
 
+        let calendarDayCount = max(
+            1,
+            calendar.dateComponents([.day], from: interval.start, to: interval.end).day
+                ?? days.count
+        )
+
         return TokenHistorySnapshot(
             selection: selection,
             interval: interval,
@@ -131,13 +143,13 @@ enum TokenHistoryAggregator {
                 supplementTokens: supplementTokens,
                 supplementCostUSD: supplementCostUSD,
                 unpricedTokens: unpricedTokens,
-                calendarDayCount: days.count
+                calendarDayCount: calendarDayCount
             ),
             models: modelSummaries(records: selectedRecords),
             coverage: TokenHistoryCoverage(
                 hasOfficialActivity: activity != nil,
                 activityDaysAvailable: days.filter(\.hasOfficialActivity).count,
-                calendarDaysInRange: days.count,
+                calendarDaysInRange: calendarDayCount,
                 dataScope: dataScope,
                 skippedSessionFileCount: skippedSessionFileCount,
                 syncMessage: syncMessage
@@ -286,17 +298,18 @@ enum TokenHistoryAggregator {
     }
 
     private static func strictDate(_ value: String, calendar: Calendar) -> Date? {
+        let parsingCalendar = CodexQCalendar.gregorian(timeZone: calendar.timeZone)
         let parts = value.split(separator: "-", omittingEmptySubsequences: false)
         guard parts.count == 3,
               let year = Int(parts[0]),
               let month = Int(parts[1]),
               let day = Int(parts[2]),
-              let date = calendar.date(
+              let date = parsingCalendar.date(
                 from: DateComponents(year: year, month: month, day: day)
               ) else {
             return nil
         }
-        let resolved = calendar.dateComponents([.year, .month, .day], from: date)
+        let resolved = parsingCalendar.dateComponents([.year, .month, .day], from: date)
         guard resolved.year == year, resolved.month == month, resolved.day == day else {
             return nil
         }

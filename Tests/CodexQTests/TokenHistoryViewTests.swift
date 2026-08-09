@@ -34,7 +34,8 @@ struct TokenHistoryViewTests {
         let chartSource = try source("Sources/CodexQ/Views/TokenHistoryCharts.swift")
 
         #expect(viewSource.contains("ForEach(TokenHistoryRangeMode.allCases)"))
-        #expect(viewSource.contains("DatePicker(\"所在周\""))
+        #expect(viewSource.contains("if let snapshot = store.visibleSnapshot"))
+        #expect(viewSource.contains("TokenHistoryWeekDatePicker("))
         #expect(viewSource.contains("DatePicker(\"开始\""))
         #expect(viewSource.contains("DatePicker(\"结束\""))
         #expect(viewSource.contains("Picker(\"订阅周期\""))
@@ -123,6 +124,22 @@ struct TokenHistoryViewTests {
 
         #expect(monthSource.contains(".frame(minWidth: 110)"))
         #expect(!monthSource.contains(".frame(width: 86)"))
+    }
+
+    @Test("日日期选择器直接控制输入框宽度")
+    func dayPickerControlsDateFieldWidth() throws {
+        let viewSource = try source("Sources/CodexQ/Views/TokenHistoryView.swift")
+        let dayStart = try #require(viewSource.range(of: "case .day:"))
+        let dayEnd = try #require(viewSource.range(
+            of: "case .month:",
+            range: dayStart.upperBound..<viewSource.endIndex
+        ))
+        let daySource = viewSource[dayStart.lowerBound..<dayEnd.lowerBound]
+
+        #expect(daySource.contains("TokenHistoryWeekDatePicker("))
+        #expect(daySource.contains(".frame(width: 124, height: 22)"))
+        #expect(!daySource.contains("DatePicker(\"所在周\""))
+        #expect(!daySource.contains(".frame(minWidth: 200)"))
     }
 
     @Test("订阅周期选择器按当前选项内容采用自身宽度")

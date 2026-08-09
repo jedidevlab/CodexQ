@@ -11,6 +11,8 @@
 
 CodexQ 是一款原生 macOS 菜单栏工具。它把 ChatGPT（原 Codex）5 小时与周限额、套餐类型、剩余额度、预计耗尽时间、每日 Token 活动和 Token 成本集中在一个浮动面板中显示。
 
+## 当前版本：v1.1.0 — **重要版本：增加 Token 统计界面**
+
 ## 一眼掌握使用节奏
 
 - **额度进度**：同时查看 5 小时与周限额；临时没有 5 小时限制时会明确显示“无限制”。
@@ -18,7 +20,7 @@ CodexQ 是一款原生 macOS 菜单栏工具。它把 ChatGPT（原 Codex）5 �
 - **耗尽预测**：根据当前使用节奏判断额度是否够用，并显示预计耗尽时间。
 - **Token 活动**：查看按弹窗宽度自动扩展的每日热力图、最近完整日与累计 Token 用量。
 - **Token 成本**：默认按本机会话估算昨日、本订阅周期与累计成本；也可以通过用户选择的 iCloud Drive 文件夹合并多台 Mac 的设备记录。
-- **历史分析**：点击 `Token 活动` 或 `Token 成本` 标题会打开同一个历史窗口，可按日、月、年、订阅周期或自定义范围查看 Token 趋势、估算成本趋势和模型分布。
+- **历史分析**：点击 `Token 活动` 或 `Token 成本` 标题会打开同一个统计窗口，可按日、月、年、订阅周期、累计或自定义范围查看 Token 趋势、估算成本趋势和模型分布。
 - **可靠刷新**：额度与 Token 活动共用一次 app-server 会话；短暂刷新失败时保留上次成功数据并明确提示。
 - **及时提醒**：支持自动刷新、登录时启动，以及 20% / 10% / 5% 额度预警。
 - **原生体验**：使用 SwiftUI 与 AppKit 构建，常驻菜单栏，不打断当前工作。
@@ -29,8 +31,8 @@ CodexQ 是一款原生 macOS 菜单栏工具。它把 ChatGPT（原 Codex）5 �
 
 | Mac | 安装包 |
 | --- | --- |
-| Apple Silicon | `CodexQ-1.0.22-arm64.zip` |
-| Intel | `CodexQ-1.0.22-x86_64.zip` |
+| Apple Silicon | `CodexQ-1.1.0-arm64.zip` |
+| Intel | `CodexQ-1.1.0-x86_64.zip` |
 
 解压后，将 `CodexQ.app` 移入“应用程序”文件夹。
 
@@ -92,15 +94,15 @@ swift test
 生成 ad-hoc 签名的安装包：
 
 ```bash
-./script/package_release.sh 1.0.22 arm64
-./script/package_release.sh 1.0.22 x86_64
+./script/package_release.sh 1.1.0 arm64
+./script/package_release.sh 1.1.0 x86_64
 ```
 
 生成文件位于：
 
 ```text
-dist/CodexQ-1.0.22-arm64.zip
-dist/CodexQ-1.0.22-x86_64.zip
+dist/CodexQ-1.1.0-arm64.zip
+dist/CodexQ-1.1.0-x86_64.zip
 ```
 
 开发运行脚本会在 `dist/CodexQ.app` 生成本地 `.app` bundle；构建产物不会提交到 Git。

@@ -8,7 +8,7 @@ struct TokenHistoryView: View {
         VStack(alignment: .leading, spacing: 14) {
             header
 
-            if let snapshot = store.snapshot {
+            if let snapshot = store.visibleSnapshot {
                 summaryStrip(snapshot.summary)
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
@@ -93,8 +93,12 @@ struct TokenHistoryView: View {
     private var contextualControls: some View {
         switch store.mode {
         case .day:
-            DatePicker("所在周", selection: $store.selectedDay, displayedComponents: .date)
-                .datePickerStyle(.compact)
+            HStack(spacing: 8) {
+                Text("所在周")
+                TokenHistoryWeekDatePicker(selection: $store.selectedDay)
+                    .frame(width: 124, height: 22)
+            }
+            .fixedSize(horizontal: true, vertical: false)
         case .month:
             Picker("年份", selection: $store.selectedYear) {
                 ForEach(years, id: \.self) { Text(String($0)).tag($0) }

@@ -24,11 +24,16 @@ struct TokenHistoryQueryTests {
         ])
     }
 
-    @Test("日查询覆盖所选日期所在自然周的七个本地自然日")
-    func daySelectionUsesLocalCalendarWeek() throws {
+    @Test("日查询无论系统设置都从周一开始覆盖七天")
+    func daySelectionAlwaysUsesMondayFirstWeek() throws {
+        var sundayFirstCalendar = calendar
+        sundayFirstCalendar.firstWeekday = 1
         let date = try #require(ISO8601DateFormatter().date(from: "2026-08-07T04:00:00Z"))
         let selection = TokenHistorySelection.day(date)
-        let interval = try #require(selection.interval(calendar: calendar, subscriptionPeriods: []))
+        let interval = try #require(selection.interval(
+            calendar: sundayFirstCalendar,
+            subscriptionPeriods: []
+        ))
 
         #expect(interval.start == calendar.date(
             from: DateComponents(year: 2026, month: 8, day: 3)
@@ -183,6 +188,30 @@ struct TokenHistoryQueryTests {
         #expect(cycles.allSatisfy { $0.isInferred })
     }
 
+    @Test("月底续费锚点生成连续周期且保留认证区间")
+    func endOfMonthSubscriptionCyclesStayContiguous() throws {
+        let anchor = SubscriptionAnchor(
+            start: try date("2026-01-31T00:00:00Z"),
+            end: try date("2026-02-28T00:00:00Z"),
+            cadence: .month
+        )
+        let cycles = TokenHistoryAggregator.subscriptionCycles(
+            anchor: anchor,
+            dataInterval: DateInterval(
+                start: try date("2025-12-01T00:00:00Z"),
+                end: try date("2026-04-01T00:00:00Z")
+            ),
+            now: try date("2026-03-15T00:00:00Z"),
+            calendar: utcCalendar
+        )
+
+        #expect(cycles.count >= 3)
+        #expect(cycles[1].interval == DateInterval(start: anchor.start, end: anchor.end))
+        #expect(zip(cycles, cycles.dropFirst()).allSatisfy { newer, older in
+            older.interval.end == newer.interval.start
+        })
+    }
+
     @Test("官方日数据逐日补差且不会下调更高的设备账本")
     func reconcilesEachDayBeforeBucketing() throws {
         let records = [
@@ -214,6 +243,79 @@ struct TokenHistoryQueryTests {
         #expect(result.summary.supplementTokens == 200)
         #expect(result.coverage.activityDaysAvailable == 2)
         #expect(result.coverage.calendarDaysInRange == 31)
+    }
+
+    @Test("精确订阅周期只用完整整日的官方数据补算")
+    func exactSubscriptionUsesOnlyFullyContainedOfficialDays() throws {
+        let interval = DateInterval(
+            start: try date("2026-07-06T02:29:39Z"),
+            end: try date("2026-08-06T02:29:39Z")
+        )
+        let cycle = SubscriptionCycle(
+            interval: interval,
+            isCurrent: true,
+            isInferred: false
+        )
+        let result = try #require(TokenHistoryAggregator.snapshot(
+            records: [
+                usage(at: "2026-07-06T03:00:00Z", model: "gpt-5.6-sol", tokens: 10),
+                usage(at: "2026-08-06T01:00:00Z", model: "gpt-5.6-sol", tokens: 20),
+                usage(at: "2026-08-06T03:00:00Z", model: "gpt-5.6-sol", tokens: 999)
+            ],
+            activity: TokenActivitySnapshot(
+                peakDailyTokens: 300,
+                days: [
+                    .init(startDate: "2026-07-06", tokens: 100),
+                    .init(startDate: "2026-07-07", tokens: 200),
+                    .init(startDate: "2026-08-06", tokens: 300)
+                ]
+            ),
+            selection: .subscription(interval),
+            subscriptionCycles: [cycle],
+            dataScope: .local,
+            skippedSessionFileCount: 0,
+            syncMessage: nil,
+            now: try date("2026-08-06T02:00:00Z"),
+            calendar: utcCalendar
+        ))
+
+        #expect(result.summary.deviceTokens == 30)
+        #expect(result.summary.totalTokens == 230)
+        #expect(result.summary.calendarDayCount == 31)
+        #expect(result.coverage.activityDaysAvailable == 1)
+        #expect(result.coverage.calendarDaysInRange == 31)
+    }
+
+    @Test("非公历系统下历史活动日期仍按公历解析")
+    func historyUsesGregorianActivityDates() throws {
+        var buddhistCalendar = Calendar(identifier: .buddhist)
+        buddhistCalendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let interval = DateInterval(
+            start: try date("2026-08-09T00:00:00Z"),
+            end: try date("2026-08-10T00:00:00Z")
+        )
+        let cycle = SubscriptionCycle(
+            interval: interval,
+            isCurrent: true,
+            isInferred: false
+        )
+        let result = try #require(TokenHistoryAggregator.snapshot(
+            records: [],
+            activity: .init(
+                peakDailyTokens: 123,
+                days: [.init(startDate: "2026-08-09", tokens: 123)]
+            ),
+            selection: .subscription(interval),
+            subscriptionCycles: [cycle],
+            dataScope: .local,
+            skippedSessionFileCount: 0,
+            syncMessage: nil,
+            now: try date("2026-08-09T12:00:00Z"),
+            calendar: buddhistCalendar
+        ))
+
+        #expect(result.summary.totalTokens == 123)
+        #expect(result.coverage.activityDaysAvailable == 1)
     }
 
     @Test("未定价模型保留 Token 且不伪造零成本")

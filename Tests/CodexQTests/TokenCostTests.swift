@@ -435,12 +435,38 @@ struct TokenCostTests {
         )
 
         #expect(reconciled.lifetime.recordedTokens == 1_000_000)
-        #expect(reconciled.lifetime.totalTokens == 900_000)
+        #expect(reconciled.lifetime.totalTokens == 1_000_000)
         #expect(reconciled.lifetime.supplement == nil)
         #expect(
             reconciled.lifetime.estimatedCostUSD
                 == recorded.lifetime.recordedEstimatedCostUSD
         )
+    }
+
+    @Test("非公历系统下仍按公历解析账号活动日期")
+    func reconcilerUsesGregorianActivityDates() throws {
+        let now = try date("2026-08-09T12:00:00Z")
+        var buddhistCalendar = Calendar(identifier: .buddhist)
+        buddhistCalendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let recorded = TokenCostCalculator.snapshot(
+            records: [],
+            now: now,
+            calendar: buddhistCalendar,
+            subscriptionPeriod: nil
+        )
+        let activity = TokenActivitySnapshot(
+            peakDailyTokens: 123,
+            days: [TokenActivityDay(startDate: "2026-08-09", tokens: 123)]
+        )
+
+        let reconciled = TokenCostReconciler.reconcile(
+            recorded,
+            with: activity,
+            now: now,
+            calendar: buddhistCalendar
+        )
+
+        #expect(reconciled.today.totalTokens == 123)
     }
 
     @Test("非法活动日期不能归一化后参与成本补算")

@@ -63,6 +63,35 @@ struct TokenHistoryStoreTests {
         #expect(store.errorMessage != nil)
     }
 
+    @Test("切换范围失败时不把旧范围数据当作当前数据展示")
+    @MainActor
+    func failedNewSelectionDoesNotExposeOldSnapshot() async throws {
+        let attempts = AttemptCounter()
+        let reader = TokenHistoryReader(
+            readActivity: { .init(peakDailyTokens: 0, days: []) },
+            readCostRecords: {
+                if await attempts.increment() == 1 {
+                    return self.recordSet(tokens: 800, month: 8)
+                }
+                throw FixtureError.costUnavailable
+            }
+        )
+        let store = TokenHistoryStore(
+            reader: reader,
+            now: { self.now },
+            calendar: calendar
+        )
+
+        store.reload()
+        try await waitUntil { store.snapshot != nil && !store.isLoading }
+        store.selectedMonth = 7
+        store.reload()
+        try await waitUntil { store.errorMessage != nil && !store.isLoading }
+
+        #expect(store.snapshot?.selection == .month(year: 2026, month: 8))
+        #expect(store.visibleSnapshot == nil)
+    }
+
     @Test("旧查询晚返回时不能覆盖最新筛选")
     @MainActor
     func staleResultCannotReplaceLatestSelection() async throws {

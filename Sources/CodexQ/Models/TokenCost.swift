@@ -97,7 +97,7 @@ struct TokenCostPeriodSummary: Equatable, Sendable, Identifiable {
 
     var id: Kind { kind }
     var recordedTokens: Int64 { models.reduce(0) { $0 + $1.totalTokens } }
-    var totalTokens: Int64 { accountTokens ?? recordedTokens }
+    var totalTokens: Int64 { max(recordedTokens, accountTokens ?? recordedTokens) }
     var recordedEstimatedCostUSD: Double {
         models.reduce(0) { $0 + $1.estimatedCostUSD }
     }
@@ -541,17 +541,18 @@ enum TokenCostReconciler {
     }
 
     private static func date(_ value: String, calendar: Calendar) -> Date? {
+        let parsingCalendar = CodexQCalendar.gregorian(timeZone: calendar.timeZone)
         let parts = value.split(separator: "-", omittingEmptySubsequences: false)
         guard parts.count == 3,
               let year = Int(parts[0]),
               let month = Int(parts[1]),
               let day = Int(parts[2]),
-              let date = calendar.date(
+              let date = parsingCalendar.date(
                 from: DateComponents(year: year, month: month, day: day)
               ) else {
             return nil
         }
-        let resolved = calendar.dateComponents([.year, .month, .day], from: date)
+        let resolved = parsingCalendar.dateComponents([.year, .month, .day], from: date)
         guard resolved.year == year, resolved.month == month, resolved.day == day else {
             return nil
         }
