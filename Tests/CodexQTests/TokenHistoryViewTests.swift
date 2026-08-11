@@ -112,8 +112,8 @@ struct TokenHistoryViewTests {
         #expect(footerSource.contains("计入 Token 总量，但不计入估算成本"))
     }
 
-    @Test("月份选择器保留足够宽度完整显示月份")
-    func monthPickerKeepsReadableWidth() throws {
+    @Test("月份选择器按当前月份内容采用自身宽度")
+    func monthPickerUsesSelectedContentWidth() throws {
         let viewSource = try source("Sources/CodexQ/Views/TokenHistoryView.swift")
         let monthStart = try #require(viewSource.range(of: "Picker(\"月份\""))
         let monthEnd = try #require(viewSource.range(
@@ -122,8 +122,9 @@ struct TokenHistoryViewTests {
         ))
         let monthSource = viewSource[monthStart.lowerBound..<monthEnd.lowerBound]
 
-        #expect(monthSource.contains(".frame(minWidth: 110)"))
-        #expect(!monthSource.contains(".frame(width: 86)"))
+        #expect(monthSource.contains(".fixedSize(horizontal: true, vertical: false)"))
+        #expect(!monthSource.contains(".frame(minWidth:"))
+        #expect(!monthSource.contains(".frame(width:"))
     }
 
     @Test("日日期选择器使用系统日历菜单和内容固有宽度")

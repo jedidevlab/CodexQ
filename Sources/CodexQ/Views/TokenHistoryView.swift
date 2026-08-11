@@ -130,7 +130,7 @@ struct TokenHistoryView: View {
             Picker("月份", selection: $store.selectedMonth) {
                 ForEach(1...12, id: \.self) { Text("\($0)月").tag($0) }
             }
-            .frame(minWidth: 110)
+            .fixedSize(horizontal: true, vertical: false)
         case .year:
             Picker("年份", selection: $store.selectedYear) {
                 ForEach(years, id: \.self) { Text(String($0)).tag($0) }
