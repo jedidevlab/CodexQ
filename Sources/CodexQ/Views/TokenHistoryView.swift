@@ -21,9 +21,6 @@ struct TokenHistoryView: View {
                     }
                     .padding(.bottom, 12)
                 }
-            } else if store.isLoading {
-                ProgressView("正在读取 Token 历史...")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let error = store.errorMessage {
                 ContentUnavailableView {
                     Label("历史数据暂不可用", systemImage: "exclamationmark.triangle")
@@ -32,6 +29,9 @@ struct TokenHistoryView: View {
                 } actions: {
                     Button("重试", action: store.reload)
                 }
+            } else if store.isLoading || store.snapshot != nil {
+                ProgressView("正在读取 Token 历史...")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ContentUnavailableView("暂无历史数据", systemImage: "chart.xyaxis.line")
             }

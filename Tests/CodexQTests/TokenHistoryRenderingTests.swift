@@ -6,6 +6,62 @@ import Vision
 
 @Suite("TokenHistoryRenderingTests", .serialized)
 struct TokenHistoryRenderingTests {
+    @Test("从自定义切换到累计时不误报无历史数据且能显示累计图表")
+    @MainActor
+    func switchingFromCustomToCumulativeLoadsVisibleSnapshot() async throws {
+        let reader = TokenHistoryReader(
+            readActivity: { .init(peakDailyTokens: 0, days: []) },
+            readCostRecords: {
+                TokenCostRecordSet(
+                    records: [
+                        TokenUsageRecord(
+                            timestamp: self.startDate,
+                            model: "gpt-5.6-sol",
+                            inputTokens: 800,
+                            cachedInputTokens: 0,
+                            cacheWriteInputTokens: 0,
+                            outputTokens: 0,
+                            totalTokens: 800
+                        )
+                    ],
+                    localRecordCount: 1,
+                    skippedSessionFileCount: 0,
+                    dataScope: .local,
+                    syncMessage: nil,
+                    subscriptionAnchor: nil
+                )
+            }
+        )
+        let store = TokenHistoryStore(
+            reader: reader,
+            now: { self.startDate },
+            calendar: calendar
+        )
+        store.mode = .custom
+        store.customStart = startDate
+        store.customEnd = startDate
+        store.reload()
+
+        try await waitUntil {
+            store.visibleSnapshot?.selection == store.selection && !store.isLoading
+        }
+        store.mode = .cumulative
+        let transitionText = try recognizedText(
+            in: render(TokenHistoryView(store: store), width: 840, height: 600)
+        )
+
+        #expect(observation(containing: "正在读取", in: transitionText) != nil)
+        #expect(observation(containing: "暂无历史数据", in: transitionText) == nil)
+
+        store.reload()
+        try await waitUntil {
+            store.snapshot?.selection == .cumulative && !store.isLoading
+        }
+
+        #expect(store.visibleSnapshot?.selection == .cumulative)
+        #expect(store.visibleSnapshot?.buckets.isEmpty == false)
+    }
+
     @Test("历史入口标题悬浮时使用可点击指针")
     @MainActor
     func historyNavigationTitleUsesPointingHandCursor() {
@@ -292,6 +348,16 @@ struct TokenHistoryRenderingTests {
         request.recognitionLevel = .accurate
         try VNImageRequestHandler(cgImage: image).perform([request])
         return request.results ?? []
+    }
+
+    @MainActor
+    private func waitUntil(
+        _ condition: @escaping @MainActor () -> Bool
+    ) async throws {
+        for _ in 0..<100 where !condition() {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(condition())
     }
 
     private func observation(
