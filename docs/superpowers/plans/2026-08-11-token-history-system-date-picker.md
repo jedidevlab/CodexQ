@@ -4,14 +4,14 @@
 
 **Goal:** Replace the day-mode fixed-width custom date field with the natural-width macOS system date picker, label it “日期选择”, and preserve selection of the date whose natural week is queried.
 
-**Architecture:** Keep `TokenHistoryStore.selectedDay` and all range/query logic unchanged. Change only the day branch of `TokenHistoryView.contextualControls`, remove the now-unused AppKit wrapper, and protect the visible wording, alignment, system-control choice, and absence of a fixed width with focused tests.
+**Architecture:** Keep `TokenHistoryStore.selectedDay` and all range/query logic unchanged. Change only the day branch of `TokenHistoryView.contextualControls`, remove the now-unused AppKit wrapper, and protect the visible wording, alignment, graphical system calendar popover, and absence of a fixed width with focused tests.
 
 **Tech Stack:** Swift 6, SwiftUI, macOS 14+, Swift Testing, AppKit/Vision rendering tests.
 
 ## Global Constraints
 
 - The visible label is exactly `日期选择`.
-- Use SwiftUI's compact system `DatePicker` with `displayedComponents: .date` so macOS provides the default calendar menu.
+- Use an intrinsic-width system button and SwiftUI popover containing a graphical `DatePicker` with `displayedComponents: .date`; macOS 14's compact style was verified to expose only a stepper and no calendar.
 - Use intrinsic width via `fixedSize(horizontal: true, vertical: false)` and do not set a fixed width on the date picker.
 - Preserve `TokenHistoryStore.selectedDay`, natural-week query semantics, all other range modes, charts, and window layout.
 - Remove `TokenHistoryWeekDatePicker.swift` after its only caller is replaced.
@@ -28,7 +28,7 @@
 
 **Interfaces:**
 - Consumes: `TokenHistoryStore.selectedDay: Date` through `$store.selectedDay`.
-- Produces: a compact system `DatePicker` bound to `selectedDay`, with the external visible label `日期选择` and intrinsic horizontal size.
+- Produces: an intrinsic-width system button that opens a graphical system `DatePicker` bound to `selectedDay`, with the external visible label `日期选择`.
 
 - [ ] **Step 1: Write the failing rendering and source-contract expectations**
 

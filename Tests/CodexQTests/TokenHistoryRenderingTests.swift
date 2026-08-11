@@ -90,9 +90,9 @@ struct TokenHistoryRenderingTests {
         #expect(darkPixelCount(in: hovered) < darkPixelCount(in: normal))
     }
 
-    @Test("日模式显示所在周且范围选择包含累计")
+    @Test("日模式显示日期选择、所选日期且范围包含累计")
     @MainActor
-    func dayModeShowsWeekContextAndCumulativeRange() throws {
+    func dayModeShowsSystemDatePickerAndCumulativeRange() throws {
         let store = TokenHistoryStore(now: { self.startDate }, calendar: calendar)
         store.mode = .day
 
@@ -100,13 +100,12 @@ struct TokenHistoryRenderingTests {
             in: render(TokenHistoryView(store: store), width: 840, height: 720)
         )
 
-        let weekControl = try #require(observation(containing: "所在周", in: observations))
+        let label = try #require(observation(containing: "日期选择", in: observations))
         let dateControl = try #require(observation(containing: "2026", in: observations))
         let dateControlText = try #require(dateControl.topCandidates(1).first?.string)
         #expect(dateControlText.contains("9"))
-        #expect(abs(weekControl.boundingBox.midY - dateControl.boundingBox.midY) < 0.02)
+        #expect(abs(label.boundingBox.midY - dateControl.boundingBox.midY) < 0.02)
         #expect(observation(containing: "累计", in: observations) != nil)
-        #expect(observation(containing: "周", in: observations)?.topCandidates(1).first?.string != "周")
     }
 
     @Test("自定义日期控件与日期范围选择器保持同一行")

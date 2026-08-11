@@ -3,6 +3,7 @@ import SwiftUI
 struct TokenHistoryView: View {
     @ObservedObject var store: TokenHistoryStore
     @State private var selectedBucketStart: Date?
+    @State private var isDayCalendarPresented = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -94,9 +95,31 @@ struct TokenHistoryView: View {
         switch store.mode {
         case .day:
             HStack(spacing: 8) {
-                Text("所在周")
-                TokenHistoryWeekDatePicker(selection: $store.selectedDay)
-                    .frame(width: 124, height: 22)
+                Text("日期选择")
+                Button {
+                    isDayCalendarPresented.toggle()
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(store.selectedDay, format: .dateTime.year().month().day())
+                        Image(systemName: "chevron.down")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .popover(isPresented: $isDayCalendarPresented, arrowEdge: .bottom) {
+                    DatePicker(
+                        "日期选择",
+                        selection: $store.selectedDay,
+                        displayedComponents: .date
+                    )
+                    .datePickerStyle(.graphical)
+                    .labelsHidden()
+                    .padding(12)
+                }
+                .onChange(of: store.selectedDay) { _, _ in
+                    isDayCalendarPresented = false
+                }
+                .fixedSize(horizontal: true, vertical: false)
             }
             .fixedSize(horizontal: true, vertical: false)
         case .month:
