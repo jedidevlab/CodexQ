@@ -6,31 +6,31 @@ import Vision
 
 @Suite("TokenHistoryRenderingTests", .serialized)
 struct TokenHistoryRenderingTests {
-    @Test("从自定义切换到累计时不误报无历史数据且能显示累计图表")
+    @Test("从自定义切换到累计时视图自动加载且不误报无历史数据")
     @MainActor
     func switchingFromCustomToCumulativeLoadsVisibleSnapshot() async throws {
+        let recordSet = TokenCostRecordSet(
+            records: [
+                TokenUsageRecord(
+                    timestamp: startDate,
+                    model: "gpt-5.6-sol",
+                    inputTokens: 800,
+                    cachedInputTokens: 0,
+                    cacheWriteInputTokens: 0,
+                    outputTokens: 0,
+                    totalTokens: 800
+                )
+            ],
+            localRecordCount: 1,
+            skippedSessionFileCount: 0,
+            dataScope: .local,
+            syncMessage: nil,
+            subscriptionAnchor: nil
+        )
+        let gate = RenderingRecordSetGate(value: recordSet)
         let reader = TokenHistoryReader(
             readActivity: { .init(peakDailyTokens: 0, days: []) },
-            readCostRecords: {
-                TokenCostRecordSet(
-                    records: [
-                        TokenUsageRecord(
-                            timestamp: self.startDate,
-                            model: "gpt-5.6-sol",
-                            inputTokens: 800,
-                            cachedInputTokens: 0,
-                            cacheWriteInputTokens: 0,
-                            outputTokens: 0,
-                            totalTokens: 800
-                        )
-                    ],
-                    localRecordCount: 1,
-                    skippedSessionFileCount: 0,
-                    dataScope: .local,
-                    syncMessage: nil,
-                    subscriptionAnchor: nil
-                )
-            }
+            readCostRecords: { await gate.read() }
         )
         let store = TokenHistoryStore(
             reader: reader,
@@ -40,20 +40,28 @@ struct TokenHistoryRenderingTests {
         store.mode = .custom
         store.customStart = startDate
         store.customEnd = startDate
-        store.reload()
+        let host = NSHostingView(
+            rootView: TokenHistoryView(store: store)
+                .environment(\.locale, Locale(identifier: "zh_CN"))
+                .environment(\.colorScheme, .light)
+                .background(Color.white)
+        )
+        host.appearance = NSAppearance(named: .aqua)
+        host.frame = NSRect(x: 0, y: 0, width: 840, height: 600)
+        host.layoutSubtreeIfNeeded()
 
         try await waitUntil {
             store.visibleSnapshot?.selection == store.selection && !store.isLoading
         }
         store.mode = .cumulative
-        let transitionText = try recognizedText(
-            in: render(TokenHistoryView(store: store), width: 840, height: 600)
-        )
+        try await waitUntil { await gate.readCount() == 2 && store.isLoading }
+        host.layoutSubtreeIfNeeded()
+        let transitionText = try recognizedText(in: render(host))
 
         #expect(observation(containing: "正在读取", in: transitionText) != nil)
         #expect(observation(containing: "暂无历史数据", in: transitionText) == nil)
 
-        store.reload()
+        await gate.releaseSecondRead()
         try await waitUntil {
             store.snapshot?.selection == .cumulative && !store.isLoading
         }
@@ -341,6 +349,14 @@ struct TokenHistoryRenderingTests {
         return representation.cgImage!
     }
 
+    @MainActor
+    private func render(_ host: NSView) -> CGImage {
+        host.layoutSubtreeIfNeeded()
+        let representation = host.bitmapImageRepForCachingDisplay(in: host.bounds)!
+        host.cacheDisplay(in: host.bounds, to: representation)
+        return representation.cgImage!
+    }
+
     private func recognizedText(in image: CGImage) throws -> [VNRecognizedTextObservation] {
         let request = VNRecognizeTextRequest()
         request.recognitionLanguages = ["zh-Hans", "en-US"]
@@ -357,6 +373,16 @@ struct TokenHistoryRenderingTests {
             try await Task.sleep(for: .milliseconds(10))
         }
         #expect(condition())
+    }
+
+    @MainActor
+    private func waitUntil(
+        _ condition: @escaping @MainActor () async -> Bool
+    ) async throws {
+        for _ in 0..<100 where !(await condition()) {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(await condition())
     }
 
     private func observation(
@@ -413,5 +439,33 @@ struct TokenHistoryRenderingTests {
             }
         }
         return count
+    }
+}
+
+private actor RenderingRecordSetGate {
+    private let value: TokenCostRecordSet
+    private var reads = 0
+    private var secondReadContinuation: CheckedContinuation<Void, Never>?
+
+    init(value: TokenCostRecordSet) {
+        self.value = value
+    }
+
+    func read() async -> TokenCostRecordSet {
+        reads += 1
+        guard reads > 1 else { return value }
+        await withCheckedContinuation { continuation in
+            secondReadContinuation = continuation
+        }
+        return value
+    }
+
+    func readCount() -> Int {
+        reads
+    }
+
+    func releaseSecondRead() {
+        secondReadContinuation?.resume()
+        secondReadContinuation = nil
     }
 }

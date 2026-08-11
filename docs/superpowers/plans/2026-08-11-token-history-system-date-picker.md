@@ -68,10 +68,12 @@ func dayPickerUsesSystemCalendarAndIntrinsicWidth() throws {
     let daySource = viewSource[dayStart.lowerBound..<dayEnd.lowerBound]
 
     #expect(daySource.contains("Text(\"日期选择\")"))
+    #expect(daySource.contains("Button {"))
+    #expect(daySource.contains(".popover(isPresented: $isDayCalendarPresented"))
     #expect(daySource.contains("DatePicker("))
     #expect(daySource.contains("selection: $store.selectedDay"))
     #expect(daySource.contains("displayedComponents: .date"))
-    #expect(daySource.contains(".datePickerStyle(.compact)"))
+    #expect(daySource.contains(".datePickerStyle(.graphical)"))
     #expect(daySource.contains(".labelsHidden()"))
     #expect(daySource.contains(".fixedSize(horizontal: true, vertical: false)"))
     #expect(!daySource.contains("TokenHistoryWeekDatePicker"))
@@ -98,13 +100,21 @@ Replace the day branch with:
 case .day:
     HStack(spacing: 8) {
         Text("日期选择")
-        DatePicker(
-            "日期选择",
-            selection: $store.selectedDay,
-            displayedComponents: .date
-        )
-        .datePickerStyle(.compact)
-        .labelsHidden()
+        Button {
+            isDayCalendarPresented.toggle()
+        } label: {
+            Text(store.selectedDay, format: .dateTime.year().month().day())
+        }
+        .popover(isPresented: $isDayCalendarPresented, arrowEdge: .bottom) {
+            DatePicker(
+                "日期选择",
+                selection: $store.selectedDay,
+                displayedComponents: .date
+            )
+            .datePickerStyle(.graphical)
+            .labelsHidden()
+            .padding(12)
+        }
         .fixedSize(horizontal: true, vertical: false)
     }
     .fixedSize(horizontal: true, vertical: false)
