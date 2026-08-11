@@ -81,6 +81,7 @@ enum TokenHistoryAggregator {
         let selectedRate = unitRate(records: selectedRecords)
         let fallbackRate = selectedRate ?? unitRate(records: records) ?? 0
         let dayStarts = calendarDayStarts(in: interval, calendar: calendar)
+        let completedDayCutoff = min(interval.end, calendar.startOfDay(for: now))
 
         var recordsByDay: [Date: [TokenUsageRecord]] = [:]
         for record in selectedRecords {
@@ -102,6 +103,8 @@ enum TokenHistoryAggregator {
             let nextDay = calendar.date(byAdding: .day, value: 1, to: dayStart)
             let containsWholeDay = dayStart >= interval.start
                 && nextDay.map { $0 <= interval.end } == true
+            let isCoverageEligible = containsWholeDay
+                && nextDay.map { $0 <= completedDayCutoff } == true
             let officialTokens = containsWholeDay ? activityByDay[dayStart] : nil
             let totalTokens = max(deviceTokens, officialTokens ?? deviceTokens)
             let supplementTokens = max(0, totalTokens - deviceTokens)
@@ -113,7 +116,8 @@ enum TokenHistoryAggregator {
                 supplementTokens: supplementTokens,
                 supplementCostUSD: Double(supplementTokens) * fallbackRate,
                 unpricedTokens: unpricedTokens,
-                hasOfficialActivity: officialTokens != nil
+                hasOfficialActivity: officialTokens != nil,
+                isCoverageEligible: isCoverageEligible
             )
         }
 
@@ -148,8 +152,10 @@ enum TokenHistoryAggregator {
             models: modelSummaries(records: selectedRecords),
             coverage: TokenHistoryCoverage(
                 hasOfficialActivity: activity != nil,
-                activityDaysAvailable: days.filter(\.hasOfficialActivity).count,
-                calendarDaysInRange: calendarDayCount,
+                activityDaysAvailable: days.filter {
+                    $0.isCoverageEligible && $0.hasOfficialActivity
+                }.count,
+                calendarDaysInRange: days.filter(\.isCoverageEligible).count,
                 dataScope: dataScope,
                 skippedSessionFileCount: skippedSessionFileCount,
                 syncMessage: syncMessage
@@ -168,6 +174,7 @@ enum TokenHistoryAggregator {
         let supplementCostUSD: Double
         let unpricedTokens: Int64
         let hasOfficialActivity: Bool
+        let isCoverageEligible: Bool
     }
 
     private struct BucketValue {

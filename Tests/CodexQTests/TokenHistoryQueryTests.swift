@@ -242,7 +242,69 @@ struct TokenHistoryQueryTests {
         #expect(result.summary.totalTokens == 500)
         #expect(result.summary.supplementTokens == 200)
         #expect(result.coverage.activityDaysAvailable == 2)
-        #expect(result.coverage.calendarDaysInRange == 31)
+        #expect(result.coverage.calendarDaysInRange == 6)
+    }
+
+    @Test("当前日月年覆盖不包含今天和尚未到来的日期")
+    func currentDayMonthAndYearCoverageUsesCompletedDays() throws {
+        let now = try date("2026-08-11T06:00:00Z")
+        let activity = activity(
+            from: try localDate(year: 2026, month: 1, day: 1),
+            through: try localDate(year: 2026, month: 8, day: 10),
+            calendar: calendar
+        )
+
+        for (selection, expectedDays) in [
+            (TokenHistorySelection.day(now), 1),
+            (.month(year: 2026, month: 8), 10),
+            (.year(2026), 222)
+        ] {
+            let result = try snapshot(
+                selection: selection,
+                activity: activity,
+                now: now,
+                calendar: calendar
+            )
+
+            #expect(result.coverage.activityDaysAvailable == expectedDays)
+            #expect(result.coverage.calendarDaysInRange == expectedDays)
+        }
+    }
+
+    @Test("累计与含未来日期的自定义范围只统计已结束日期")
+    func cumulativeAndFutureCustomCoverageUsesCompletedDays() throws {
+        let now = try date("2026-08-11T06:00:00Z")
+        let cumulative = try snapshot(
+            records: [
+                usage(at: "2026-06-06T02:00:00Z", model: "gpt-5.6-sol", tokens: 100)
+            ],
+            selection: .cumulative,
+            activity: activity(
+                from: try localDate(year: 2026, month: 6, day: 7),
+                through: try localDate(year: 2026, month: 8, day: 10),
+                calendar: calendar
+            ),
+            now: now,
+            calendar: calendar
+        )
+        let custom = try snapshot(
+            selection: .custom(
+                start: try localDate(year: 2026, month: 8, day: 1),
+                endInclusive: try localDate(year: 2026, month: 8, day: 20)
+            ),
+            activity: activity(
+                from: try localDate(year: 2026, month: 8, day: 1),
+                through: try localDate(year: 2026, month: 8, day: 10),
+                calendar: calendar
+            ),
+            now: now,
+            calendar: calendar
+        )
+
+        #expect(cumulative.coverage.activityDaysAvailable == 65)
+        #expect(cumulative.coverage.calendarDaysInRange == 66)
+        #expect(custom.coverage.activityDaysAvailable == 10)
+        #expect(custom.coverage.calendarDaysInRange == 10)
     }
 
     @Test("精确订阅周期只用完整整日的官方数据补算")
@@ -283,7 +345,50 @@ struct TokenHistoryQueryTests {
         #expect(result.summary.totalTokens == 230)
         #expect(result.summary.calendarDayCount == 31)
         #expect(result.coverage.activityDaysAvailable == 1)
-        #expect(result.coverage.calendarDaysInRange == 31)
+        #expect(result.coverage.calendarDaysInRange == 30)
+    }
+
+    @Test("非零点订阅周期覆盖只统计已结束的完整自然日")
+    func nonMidnightSubscriptionCoverageUsesCompletedWholeDays() throws {
+        let historicalInterval = DateInterval(
+            start: try date("2026-07-06T02:29:39Z"),
+            end: try date("2026-08-06T02:29:39Z")
+        )
+        let historical = try snapshot(
+            selection: .subscription(historicalInterval),
+            activity: activity(
+                from: try date("2026-07-07T00:00:00Z"),
+                through: try date("2026-08-05T00:00:00Z"),
+                calendar: utcCalendar
+            ),
+            subscriptionCycles: [
+                .init(interval: historicalInterval, isCurrent: false, isInferred: false)
+            ],
+            now: try date("2026-08-11T06:00:00Z"),
+            calendar: utcCalendar
+        )
+        let currentInterval = DateInterval(
+            start: try date("2026-08-06T02:29:39Z"),
+            end: try date("2026-09-06T02:29:39Z")
+        )
+        let current = try snapshot(
+            selection: .subscription(currentInterval),
+            activity: activity(
+                from: try date("2026-08-07T00:00:00Z"),
+                through: try date("2026-08-10T00:00:00Z"),
+                calendar: utcCalendar
+            ),
+            subscriptionCycles: [
+                .init(interval: currentInterval, isCurrent: true, isInferred: false)
+            ],
+            now: try date("2026-08-11T06:00:00Z"),
+            calendar: utcCalendar
+        )
+
+        #expect(historical.coverage.activityDaysAvailable == 30)
+        #expect(historical.coverage.calendarDaysInRange == 30)
+        #expect(current.coverage.activityDaysAvailable == 4)
+        #expect(current.coverage.calendarDaysInRange == 4)
     }
 
     @Test("非公历系统下历史活动日期仍按公历解析")
@@ -310,7 +415,7 @@ struct TokenHistoryQueryTests {
             dataScope: .local,
             skippedSessionFileCount: 0,
             syncMessage: nil,
-            now: try date("2026-08-09T12:00:00Z"),
+            now: try date("2026-08-11T12:00:00Z"),
             calendar: buddhistCalendar
         ))
 
@@ -346,6 +451,58 @@ struct TokenHistoryQueryTests {
 
     private func date(_ value: String) throws -> Date {
         try #require(ISO8601DateFormatter().date(from: value))
+    }
+
+    private func localDate(year: Int, month: Int, day: Int) throws -> Date {
+        try #require(calendar.date(from: DateComponents(
+            year: year,
+            month: month,
+            day: day
+        )))
+    }
+
+    private func activity(
+        from start: Date,
+        through end: Date,
+        calendar: Calendar
+    ) -> TokenActivitySnapshot {
+        let formatter = DateFormatter()
+        formatter.calendar = CodexQCalendar.gregorian(timeZone: calendar.timeZone)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = calendar.timeZone
+        formatter.dateFormat = "yyyy-MM-dd"
+        var days: [TokenActivityDay] = []
+        var day = calendar.startOfDay(for: start)
+        let finalDay = calendar.startOfDay(for: end)
+        while day <= finalDay {
+            days.append(.init(startDate: formatter.string(from: day), tokens: 100))
+            guard let next = calendar.date(byAdding: .day, value: 1, to: day) else {
+                break
+            }
+            day = next
+        }
+        return TokenActivitySnapshot(peakDailyTokens: 100, days: days)
+    }
+
+    private func snapshot(
+        records: [TokenUsageRecord] = [],
+        selection: TokenHistorySelection,
+        activity: TokenActivitySnapshot,
+        subscriptionCycles: [SubscriptionCycle] = [],
+        now: Date,
+        calendar: Calendar
+    ) throws -> TokenHistorySnapshot {
+        try #require(TokenHistoryAggregator.snapshot(
+            records: records,
+            activity: activity,
+            selection: selection,
+            subscriptionCycles: subscriptionCycles,
+            dataScope: .local,
+            skippedSessionFileCount: 0,
+            syncMessage: nil,
+            now: now,
+            calendar: calendar
+        ))
     }
 
     private func usage(at value: String, model: String, tokens: Int64) -> TokenUsageRecord {
