@@ -144,7 +144,7 @@ struct QuotaPopoverView: View {
                 .accessibilityLabel("设置")
 
                 Button(action: showTokenHistory) {
-                    FooterIconButtonLabel(systemName: "chart.bar.fill")
+                    FooterIconButtonLabel(systemName: "chart.bar")
                 }
                 .buttonStyle(.borderless)
                 .help("Token 使用与成本")

@@ -4,7 +4,7 @@ import Testing
 
 @Suite("TokenHistoryViewTests")
 struct TokenHistoryViewTests {
-    @Test("底部柱状图入口位于设置与刷新之间并打开 Token 使用与成本窗口")
+    @Test("底部镂空柱状图入口位于设置与刷新之间并打开 Token 使用与成本窗口")
     func footerShortcutOpensHistoryBetweenSettingsAndRefresh() throws {
         let popoverSource = try source("Sources/CodexQ/Views/QuotaPopoverView.swift")
         let settingsButton = try #require(
@@ -26,7 +26,8 @@ struct TokenHistoryViewTests {
             historyButton.lowerBound..<refreshButton.lowerBound
         ]
 
-        #expect(historyButtonSource.contains("FooterIconButtonLabel(systemName: \"chart.bar.fill\")"))
+        #expect(historyButtonSource.contains("FooterIconButtonLabel(systemName: \"chart.bar\")"))
+        #expect(!historyButtonSource.contains("FooterIconButtonLabel(systemName: \"chart.bar.fill\")"))
         #expect(historyButtonSource.contains(".help(\"Token 使用与成本\")"))
         #expect(historyButtonSource.contains(".accessibilityLabel(\"Token 使用与成本\")"))
     }
