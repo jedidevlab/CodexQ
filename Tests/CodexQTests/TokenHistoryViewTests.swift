@@ -4,6 +4,33 @@ import Testing
 
 @Suite("TokenHistoryViewTests")
 struct TokenHistoryViewTests {
+    @Test("底部柱状图入口位于设置与刷新之间并打开 Token 使用与成本窗口")
+    func footerShortcutOpensHistoryBetweenSettingsAndRefresh() throws {
+        let popoverSource = try source("Sources/CodexQ/Views/QuotaPopoverView.swift")
+        let settingsButton = try #require(
+            popoverSource.range(of: "Button(action: showSettings)")
+        )
+        let historyButton = try #require(
+            popoverSource.range(
+                of: "Button(action: showTokenHistory)",
+                range: settingsButton.upperBound..<popoverSource.endIndex
+            )
+        )
+        let refreshButton = try #require(
+            popoverSource.range(
+                of: "Task { await store.refreshFromButton() }",
+                range: historyButton.upperBound..<popoverSource.endIndex
+            )
+        )
+        let historyButtonSource = popoverSource[
+            historyButton.lowerBound..<refreshButton.lowerBound
+        ]
+
+        #expect(historyButtonSource.contains("FooterIconButtonLabel(systemName: \"chart.bar.fill\")"))
+        #expect(historyButtonSource.contains(".help(\"Token 使用与成本\")"))
+        #expect(historyButtonSource.contains(".accessibilityLabel(\"Token 使用与成本\")"))
+    }
+
     @Test("两个标题共用同一历史窗口路由且窗口保留用户尺寸")
     func titlesShareOneWindowRoute() throws {
         let popoverSource = try source("Sources/CodexQ/Views/QuotaPopoverView.swift")
