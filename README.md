@@ -11,7 +11,7 @@
 
 CodexQ 是一款原生 macOS 菜单栏工具。它把 ChatGPT（原 Codex）5 小时与周限额、套餐类型、剩余额度、预计耗尽时间、每日 Token 活动和 Token 成本集中在一个浮动面板中显示。
 
-## 当前版本：v1.1.1 — **Token 统计修复**
+## 当前版本：v1.1.2 — **Token 统计快捷入口**
 
 ## 一眼掌握使用节奏
 
@@ -31,8 +31,8 @@ CodexQ 是一款原生 macOS 菜单栏工具。它把 ChatGPT（原 Codex）5 �
 
 | Mac | 安装包 |
 | --- | --- |
-| Apple Silicon | `CodexQ-1.1.1-arm64.zip` |
-| Intel | `CodexQ-1.1.1-x86_64.zip` |
+| Apple Silicon | `CodexQ-1.1.2-arm64.zip` |
+| Intel | `CodexQ-1.1.2-x86_64.zip` |
 
 解压后，将 `CodexQ.app` 移入“应用程序”文件夹。
 
@@ -94,15 +94,15 @@ swift test
 生成 ad-hoc 签名的安装包：
 
 ```bash
-./script/package_release.sh 1.1.1 arm64
-./script/package_release.sh 1.1.1 x86_64
+./script/package_release.sh 1.1.2 arm64
+./script/package_release.sh 1.1.2 x86_64
 ```
 
 生成文件位于：
 
 ```text
-dist/CodexQ-1.1.1-arm64.zip
-dist/CodexQ-1.1.1-x86_64.zip
+dist/CodexQ-1.1.2-arm64.zip
+dist/CodexQ-1.1.2-x86_64.zip
 ```
 
 开发运行脚本会在 `dist/CodexQ.app` 生成本地 `.app` bundle；构建产物不会提交到 Git。
