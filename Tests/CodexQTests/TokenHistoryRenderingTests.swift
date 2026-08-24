@@ -337,6 +337,8 @@ struct TokenHistoryRenderingTests {
         let host = NSHostingView(
             rootView: content
                 .environment(\.locale, Locale(identifier: "zh_CN"))
+                .environment(\.calendar, calendar)
+                .environment(\.timeZone, calendar.timeZone)
                 .environment(\.colorScheme, .light)
                 .background(Color.white)
         )

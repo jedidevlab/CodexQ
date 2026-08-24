@@ -16,7 +16,7 @@ final class TokenHistoryStore: ObservableObject {
     @Published private(set) var availableSubscriptionCycles: [SubscriptionCycle]
 
     private let reader: TokenHistoryReader
-    private let calendar: Calendar
+    let calendar: Calendar
     private let now: @Sendable () -> Date
     private var loadTask: Task<Void, Never>?
     private var loadGeneration = 0

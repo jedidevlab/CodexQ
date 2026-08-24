@@ -2,6 +2,7 @@ import SwiftUI
 
 struct TokenHistoryView: View {
     @ObservedObject var store: TokenHistoryStore
+    @Environment(\.locale) private var locale
     @State private var selectedBucketStart: Date?
     @State private var isDayCalendarPresented = false
 
@@ -39,6 +40,8 @@ struct TokenHistoryView: View {
         }
         .padding(20)
         .frame(minWidth: 720, minHeight: 520)
+        .environment(\.calendar, store.calendar)
+        .environment(\.timeZone, store.calendar.timeZone)
         .task(id: store.selectionIdentity) {
             selectedBucketStart = nil
             store.loadIfNeeded()
@@ -100,7 +103,7 @@ struct TokenHistoryView: View {
                     isDayCalendarPresented.toggle()
                 } label: {
                     HStack(spacing: 4) {
-                        Text(store.selectedDay, format: .dateTime.year().month().day())
+                        Text(store.selectedDay, format: selectedDayFormat)
                         Image(systemName: "chevron.down")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
@@ -223,6 +226,14 @@ struct TokenHistoryView: View {
     private var years: [Int] {
         let current = Calendar.current.component(.year, from: Date())
         return Array((current - 10)...current).reversed()
+    }
+
+    private var selectedDayFormat: Date.FormatStyle {
+        var format = Date.FormatStyle.dateTime.year().month().day()
+        format.calendar = store.calendar
+        format.timeZone = store.calendar.timeZone
+        format.locale = locale
+        return format
     }
 
     private func cycleLabel(_ cycle: SubscriptionCycle) -> String {

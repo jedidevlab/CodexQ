@@ -5,13 +5,17 @@ import SwiftUI
 struct TokenUsageHistoryChart: View {
     let buckets: [TokenHistoryBucket]
     @Binding var selectedBucketStart: Date?
+    @Environment(\.calendar) private var calendar
 
     var body: some View {
         HistoryChartCard(title: "Token 趋势") {
             if buckets.allSatisfy({ $0.totalTokens == 0 }) {
                 emptyState("所选范围暂无 Token 使用记录")
             } else {
-                let dateLabels = TokenHistoryChartAxisLabels.dateLabels(for: buckets)
+                let dateLabels = TokenHistoryChartAxisLabels.dateLabels(
+                    for: buckets,
+                    calendar: calendar
+                )
                 let valueTicks = TokenHistoryChartAxisLabels.tokenTicks(
                     maximum: buckets.map(\.totalTokens).max() ?? 0
                 )
@@ -68,13 +72,17 @@ struct TokenUsageHistoryChart: View {
 struct TokenCostHistoryChart: View {
     let buckets: [TokenHistoryBucket]
     @Binding var selectedBucketStart: Date?
+    @Environment(\.calendar) private var calendar
 
     var body: some View {
         HistoryChartCard(title: "估算成本趋势") {
             if buckets.allSatisfy({ $0.estimatedCostUSD == 0 }) {
                 emptyState("所选范围暂无可计价成本")
             } else {
-                let dateLabels = TokenHistoryChartAxisLabels.dateLabels(for: buckets)
+                let dateLabels = TokenHistoryChartAxisLabels.dateLabels(
+                    for: buckets,
+                    calendar: calendar
+                )
                 let valueTicks = TokenHistoryChartAxisLabels.costTicks(
                     maximum: buckets.map(\.estimatedCostUSD).max() ?? 0
                 )
