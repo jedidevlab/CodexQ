@@ -70,6 +70,58 @@ struct TokenCostTests {
         #expect(TokenPricingCatalog.estimatedCost(for: priority) == 1)
     }
 
+    @Test("GPT-5.6 Sol 促销价只应用于生效后的记录和别名")
+    func appliesGPT56SolPromotionalPriceByRecordTime() throws {
+        let oldSol = TokenUsageRecord(
+            timestamp: try date("2026-08-20T23:59:59Z"),
+            model: "gpt-5.6-sol",
+            inputTokens: 200_000,
+            cachedInputTokens: 100_000,
+            cacheWriteInputTokens: 0,
+            outputTokens: 100_000,
+            totalTokens: 300_000
+        )
+        let currentAlias = TokenUsageRecord(
+            timestamp: try date("2026-08-21T00:00:00Z"),
+            model: "gpt-5.6",
+            inputTokens: 200_000,
+            cachedInputTokens: 100_000,
+            cacheWriteInputTokens: 0,
+            outputTokens: 100_000,
+            totalTokens: 300_000
+        )
+
+        #expect(TokenPricingCatalog.estimatedCost(for: oldSol) == 3.55)
+        #expect(TokenPricingCatalog.estimatedCost(for: currentAlias) == 2.44)
+    }
+
+    @Test("GPT-5.6 Sol 促销价同步覆盖缓存写入和 Fast 计价")
+    func appliesCurrentGPT56SolCacheWriteAndFastRates() throws {
+        let timestamp = try date("2026-08-21T02:00:00Z")
+        let cacheWrite = TokenUsageRecord(
+            timestamp: timestamp,
+            model: "gpt-5.6-sol",
+            inputTokens: 100_000,
+            cachedInputTokens: 0,
+            cacheWriteInputTokens: 100_000,
+            outputTokens: 0,
+            totalTokens: 100_000
+        )
+        let fast = TokenUsageRecord(
+            timestamp: timestamp,
+            model: "gpt-5.6-sol",
+            inputTokens: 100_000,
+            cachedInputTokens: 0,
+            cacheWriteInputTokens: 0,
+            outputTokens: 0,
+            totalTokens: 100_000,
+            serviceTier: .priority
+        )
+
+        #expect(TokenPricingCatalog.estimatedCost(for: cacheWrite) == 0.5)
+        #expect(TokenPricingCatalog.estimatedCost(for: fast) == 0.8)
+    }
+
     @Test("GPT-5.6 Terra 和 Luna 降价只应用于生效后的记录")
     func appliesGPT56PriceReductionByRecordTime() throws {
         let oldTerra = TokenUsageRecord(

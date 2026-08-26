@@ -145,7 +145,7 @@ struct TokenPricing: Equatable, Sendable {
 }
 
 enum TokenPricingCatalog {
-    static let effectiveDate = "2026-07-31"
+    static let effectiveDate = "2026-08-21"
     static let longContextThreshold: Int64 = 272_000
 
     static func pricing(for model: String) -> TokenPricing? {
@@ -190,7 +190,7 @@ enum TokenPricingCatalog {
             }
         }
 
-        add(["gpt-5.6", "gpt-5.6-sol"], input: 5, cached: 0.5, cacheWrite: 6.25, output: 30, priorityMultiplier: 2, longContext: true)
+        add(["gpt-5.6", "gpt-5.6-sol"], input: 4, cached: 0.4, cacheWrite: 5, output: 20, priorityMultiplier: 2, longContext: true)
         add(["gpt-5.6-terra"], input: 2, cached: 0.2, cacheWrite: 2.5, output: 12, priorityMultiplier: 2.5, longContext: true)
         add(["gpt-5.6-luna"], input: 0.2, cached: 0.02, cacheWrite: 0.25, output: 1.2, priorityMultiplier: 10, longContext: true)
         add(["gpt-5.5", "gpt-5.5-2026-04-23"], input: 5, cached: 0.5, output: 30, priorityMultiplier: 2.5, longContext: true)
@@ -250,6 +250,8 @@ enum TokenPricingCatalog {
     }()
 
     private static let historicalCatalog: [String: [HistoricalPricing]] = [
+        "gpt-5.6": gpt56SolHistoricalPricing,
+        "gpt-5.6-sol": gpt56SolHistoricalPricing,
         "gpt-5.6-terra": [
             HistoricalPricing(
                 effectiveAt: .distantPast,
@@ -322,6 +324,31 @@ enum TokenPricingCatalog {
                 )
             )
         ]
+    ]
+
+    private static let gpt56SolHistoricalPricing = [
+        HistoricalPricing(
+            effectiveAt: .distantPast,
+            pricing: TokenPricing(
+                inputPerMillion: 5,
+                cachedInputPerMillion: 0.5,
+                cacheWritePerMillion: 6.25,
+                outputPerMillion: 30,
+                priorityMultiplier: 2,
+                appliesLongContextPremium: true
+            )
+        ),
+        HistoricalPricing(
+            effectiveAt: date("2026-08-21T00:00:00Z"),
+            pricing: TokenPricing(
+                inputPerMillion: 4,
+                cachedInputPerMillion: 0.4,
+                cacheWritePerMillion: 5,
+                outputPerMillion: 20,
+                priorityMultiplier: 2,
+                appliesLongContextPremium: true
+            )
+        )
     ]
 
     private static func date(_ value: String) -> Date {
