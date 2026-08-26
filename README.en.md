@@ -11,7 +11,7 @@
 
 CodexQ is a native macOS menu bar utility. It brings ChatGPT (formerly Codex) five-hour and weekly quota, plan type, remaining capacity, projected run-out time, Token activity, and Token cost estimates into one floating panel.
 
-## Current version: v1.1.2 — **Token statistics shortcut**
+## Current version: v1.1.3 — **GPT-5.6 Sol pricing update**
 
 ## Your usage pace at a glance
 
@@ -31,8 +31,8 @@ Download the archive for your Mac from [GitHub Releases](https://github.com/jedi
 
 | Mac | Archive |
 | --- | --- |
-| Apple Silicon | `CodexQ-1.1.2-arm64.zip` |
-| Intel | `CodexQ-1.1.2-x86_64.zip` |
+| Apple Silicon | `CodexQ-1.1.3-arm64.zip` |
+| Intel | `CodexQ-1.1.3-x86_64.zip` |
 
 Unzip the archive, then move `CodexQ.app` to Applications.
 
@@ -92,15 +92,15 @@ swift test
 Build an ad-hoc signed archive:
 
 ```bash
-./script/package_release.sh 1.1.2 arm64
-./script/package_release.sh 1.1.2 x86_64
+./script/package_release.sh 1.1.3 arm64
+./script/package_release.sh 1.1.3 x86_64
 ```
 
 The archive is written to:
 
 ```text
-dist/CodexQ-1.1.2-arm64.zip
-dist/CodexQ-1.1.2-x86_64.zip
+dist/CodexQ-1.1.3-arm64.zip
+dist/CodexQ-1.1.3-x86_64.zip
 ```
 
 The helper script builds a local `.app` bundle in `dist/CodexQ.app` for development use. Generated build artifacts are excluded from Git.
