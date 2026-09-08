@@ -9,6 +9,56 @@ struct TokenCostTests {
         return calendar
     }()
 
+    @Test("GPT-6 Astra 按官方标准价计算缓存输入与缓存写入")
+    func pricesGPT6AstraTokenCategories() throws {
+        let record = TokenUsageRecord(
+            timestamp: try date("2026-09-08T00:00:00Z"),
+            model: "gpt-6-astra",
+            inputTokens: 200_000,
+            cachedInputTokens: 50_000,
+            cacheWriteInputTokens: 50_000,
+            outputTokens: 20_000,
+            totalTokens: 220_000
+        )
+
+        let cost = try #require(TokenPricingCatalog.estimatedCost(for: record))
+
+        #expect(abs(cost - 2.675) < 0.000_001)
+    }
+
+    @Test("GPT-6 Astra 超过 272K 输入时使用官方长上下文价格")
+    func pricesGPT6AstraLongContext() throws {
+        let record = TokenUsageRecord(
+            timestamp: try date("2026-09-08T00:00:00Z"),
+            model: "gpt-6-astra",
+            inputTokens: 300_000,
+            cachedInputTokens: 0,
+            cacheWriteInputTokens: 0,
+            outputTokens: 10_000,
+            totalTokens: 310_000
+        )
+
+        let cost = try #require(TokenPricingCatalog.estimatedCost(for: record))
+
+        #expect(abs(cost - 6.75) < 0.000_001)
+    }
+
+    @Test("GPT-6 Astra Fast 模式使用两倍标准价格")
+    func pricesGPT6AstraFastMode() throws {
+        let record = TokenUsageRecord(
+            timestamp: try date("2026-09-08T00:00:00Z"),
+            model: "gpt-6-astra",
+            inputTokens: 100_000,
+            cachedInputTokens: 0,
+            cacheWriteInputTokens: 0,
+            outputTokens: 0,
+            totalTokens: 100_000,
+            serviceTier: .priority
+        )
+
+        #expect(TokenPricingCatalog.estimatedCost(for: record) == 2)
+    }
+
     @Test("成本按非缓存输入、缓存输入和输出分别使用官方价格")
     func calculatesOfficialTokenCategories() throws {
         let record = TokenUsageRecord(
@@ -255,7 +305,7 @@ struct TokenCostTests {
     @Test("官方文档列价的文本模型和快照都有本地价格")
     func officialTextModelsAndSnapshotsHaveLocalPricing() {
         let models = [
-            "gpt-5.6", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
+            "gpt-6-astra", "gpt-5.6", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
             "gpt-5.5", "gpt-5.5-2026-04-23", "gpt-5.5-pro", "gpt-5.5-pro-2026-04-23",
             "gpt-5.4", "gpt-5.4-2026-03-05", "gpt-5.4-mini", "gpt-5.4-mini-2026-03-17",
             "gpt-5.4-nano", "gpt-5.4-nano-2026-03-17", "gpt-5.4-pro", "gpt-5.4-pro-2026-03-05",

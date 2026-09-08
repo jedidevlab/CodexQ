@@ -145,7 +145,7 @@ struct TokenPricing: Equatable, Sendable {
 }
 
 enum TokenPricingCatalog {
-    static let effectiveDate = "2026-08-21"
+    static let effectiveDate = "2026-09-08"
     static let longContextThreshold: Int64 = 272_000
 
     static func pricing(for model: String) -> TokenPricing? {
@@ -190,6 +190,7 @@ enum TokenPricingCatalog {
             }
         }
 
+        add(["gpt-6-astra"], input: 10, cached: 1, cacheWrite: 12.5, output: 50, priorityMultiplier: 2, longContext: true)
         add(["gpt-5.6", "gpt-5.6-sol"], input: 4, cached: 0.4, cacheWrite: 5, output: 20, priorityMultiplier: 2, longContext: true)
         add(["gpt-5.6-terra"], input: 2, cached: 0.2, cacheWrite: 2.5, output: 12, priorityMultiplier: 2.5, longContext: true)
         add(["gpt-5.6-luna"], input: 0.2, cached: 0.02, cacheWrite: 0.25, output: 1.2, priorityMultiplier: 10, longContext: true)

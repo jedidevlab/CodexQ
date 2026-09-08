@@ -125,12 +125,12 @@ struct TokenHistoryRenderingTests {
         let observations = try recognizedText(
             in: render(TokenHistoryView(store: store), width: 840, height: 600)
         )
-        let rangeRow = try #require(observation(containing: "开始", in: observations))
-        let rangeText = try #require(rangeRow.topCandidates(1).first?.string)
+        let start = try #require(observation(containing: "开始", in: observations))
+        let end = try #require(observation(containing: "结束", in: observations))
         let custom = try #require(observation(containing: "自定义", in: observations))
 
-        #expect(rangeText.contains("结束"))
-        #expect(abs(rangeRow.boundingBox.midY - custom.boundingBox.midY) < 0.035)
+        #expect(abs(start.boundingBox.midY - custom.boundingBox.midY) < 0.035)
+        #expect(abs(end.boundingBox.midY - custom.boundingBox.midY) < 0.035)
     }
 
     @Test("模型名称与模型分布标题左端对齐")
