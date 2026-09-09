@@ -11,6 +11,10 @@
 
 CodexQ 是一款原生 macOS 菜单栏工具。它把 ChatGPT（原 Codex）5 小时与周限额、套餐类型、剩余额度、预计耗尽时间、每日 Token 活动和 Token 成本集中在一个浮动面板中显示。
 
+<p align="center">
+  <img src="docs/images/codexq-usage-overview.png" alt="CodexQ 用量、Token 活动和成本概览" width="275">
+</p>
+
 ## 当前版本：v1.1.4 — **GPT-6 Astra 价格支持**
 
 ## 一眼掌握使用节奏
