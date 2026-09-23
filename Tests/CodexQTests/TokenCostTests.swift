@@ -28,8 +28,9 @@ struct TokenCostTests {
 
     @Test("GPT-6 Astra 超过 272K 输入时使用官方长上下文价格")
     func pricesGPT6AstraLongContext() throws {
-        let record = TokenUsageRecord(
-            timestamp: try date("2026-09-08T00:00:00Z"),
+        let timestamp = try date("2026-09-08T00:00:00Z")
+        let standard = TokenUsageRecord(
+            timestamp: timestamp,
             model: "gpt-6-astra",
             inputTokens: 300_000,
             cachedInputTokens: 0,
@@ -37,10 +38,22 @@ struct TokenCostTests {
             outputTokens: 10_000,
             totalTokens: 310_000
         )
+        let fast = TokenUsageRecord(
+            timestamp: timestamp,
+            model: "gpt-6-astra",
+            inputTokens: 300_000,
+            cachedInputTokens: 0,
+            cacheWriteInputTokens: 0,
+            outputTokens: 10_000,
+            totalTokens: 310_000,
+            serviceTier: .priority
+        )
 
-        let cost = try #require(TokenPricingCatalog.estimatedCost(for: record))
+        let standardCost = try #require(TokenPricingCatalog.estimatedCost(for: standard))
+        let fastCost = try #require(TokenPricingCatalog.estimatedCost(for: fast))
 
-        #expect(abs(cost - 6.75) < 0.000_001)
+        #expect(abs(standardCost - 6.75) < 0.000_001)
+        #expect(abs(fastCost - 13.5) < 0.000_001)
     }
 
     @Test("GPT-6 Astra Fast 模式使用两倍标准价格")
@@ -57,6 +70,92 @@ struct TokenCostTests {
         )
 
         #expect(TokenPricingCatalog.estimatedCost(for: record) == 2)
+    }
+
+    @Test("GPT-6 Sol 和 Luna 按官方标准价计算全部 Token 类型")
+    func pricesGPT6SolAndLunaTokenCategories() throws {
+        let timestamp = try date("2026-09-23T00:00:00Z")
+        let sol = TokenUsageRecord(
+            timestamp: timestamp,
+            model: "gpt-6-sol",
+            inputTokens: 200_000,
+            cachedInputTokens: 50_000,
+            cacheWriteInputTokens: 50_000,
+            outputTokens: 20_000,
+            totalTokens: 220_000
+        )
+        let luna = TokenUsageRecord(
+            timestamp: timestamp,
+            model: "gpt-6-luna",
+            inputTokens: 200_000,
+            cachedInputTokens: 50_000,
+            cacheWriteInputTokens: 50_000,
+            outputTokens: 20_000,
+            totalTokens: 220_000
+        )
+
+        let solCost = try #require(TokenPricingCatalog.estimatedCost(for: sol))
+        let lunaCost = try #require(TokenPricingCatalog.estimatedCost(for: luna))
+
+        #expect(abs(solCost - 0.535) < 0.000_001)
+        #expect(abs(lunaCost - 0.02675) < 0.000_001)
+    }
+
+    @Test("GPT-6 Sol 和 Luna 支持官方长上下文与 Fast 价格")
+    func pricesGPT6SolAndLunaLongContextAndFastMode() throws {
+        let timestamp = try date("2026-09-23T00:00:00Z")
+        let solLongContext = TokenUsageRecord(
+            timestamp: timestamp,
+            model: "gpt-6-sol",
+            inputTokens: 300_000,
+            cachedInputTokens: 0,
+            cacheWriteInputTokens: 0,
+            outputTokens: 10_000,
+            totalTokens: 310_000,
+            serviceTier: .priority
+        )
+        let lunaLongContext = TokenUsageRecord(
+            timestamp: timestamp,
+            model: "gpt-6-luna",
+            inputTokens: 300_000,
+            cachedInputTokens: 0,
+            cacheWriteInputTokens: 0,
+            outputTokens: 10_000,
+            totalTokens: 310_000,
+            serviceTier: .priority
+        )
+        let solFast = TokenUsageRecord(
+            timestamp: timestamp,
+            model: "gpt-6-sol",
+            inputTokens: 100_000,
+            cachedInputTokens: 0,
+            cacheWriteInputTokens: 0,
+            outputTokens: 0,
+            totalTokens: 100_000,
+            serviceTier: .priority
+        )
+        let lunaFast = TokenUsageRecord(
+            timestamp: timestamp,
+            model: "gpt-6-luna",
+            inputTokens: 100_000,
+            cachedInputTokens: 0,
+            cacheWriteInputTokens: 0,
+            outputTokens: 0,
+            totalTokens: 100_000,
+            serviceTier: .priority
+        )
+
+        let solLongContextCost = try #require(
+            TokenPricingCatalog.estimatedCost(for: solLongContext)
+        )
+        let lunaLongContextCost = try #require(
+            TokenPricingCatalog.estimatedCost(for: lunaLongContext)
+        )
+
+        #expect(abs(solLongContextCost - 2.7) < 0.000_001)
+        #expect(abs(lunaLongContextCost - 0.135) < 0.000_001)
+        #expect(TokenPricingCatalog.estimatedCost(for: solFast) == 0.4)
+        #expect(TokenPricingCatalog.estimatedCost(for: lunaFast) == 0.02)
     }
 
     @Test("成本按非缓存输入、缓存输入和输出分别使用官方价格")
@@ -305,7 +404,8 @@ struct TokenCostTests {
     @Test("官方文档列价的文本模型和快照都有本地价格")
     func officialTextModelsAndSnapshotsHaveLocalPricing() {
         let models = [
-            "gpt-6-astra", "gpt-5.6", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
+            "gpt-6-astra", "gpt-6-sol", "gpt-6-luna",
+            "gpt-5.6", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
             "gpt-5.5", "gpt-5.5-2026-04-23", "gpt-5.5-pro", "gpt-5.5-pro-2026-04-23",
             "gpt-5.4", "gpt-5.4-2026-03-05", "gpt-5.4-mini", "gpt-5.4-mini-2026-03-17",
             "gpt-5.4-nano", "gpt-5.4-nano-2026-03-17", "gpt-5.4-pro", "gpt-5.4-pro-2026-03-05",

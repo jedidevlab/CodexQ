@@ -142,10 +142,29 @@ struct TokenPricing: Equatable, Sendable {
     let outputPerMillion: Double
     let priorityMultiplier: Double
     let appliesLongContextPremium: Bool
+    let supportsPriorityLongContext: Bool
+
+    init(
+        inputPerMillion: Double,
+        cachedInputPerMillion: Double,
+        cacheWritePerMillion: Double,
+        outputPerMillion: Double,
+        priorityMultiplier: Double,
+        appliesLongContextPremium: Bool,
+        supportsPriorityLongContext: Bool = false
+    ) {
+        self.inputPerMillion = inputPerMillion
+        self.cachedInputPerMillion = cachedInputPerMillion
+        self.cacheWritePerMillion = cacheWritePerMillion
+        self.outputPerMillion = outputPerMillion
+        self.priorityMultiplier = priorityMultiplier
+        self.appliesLongContextPremium = appliesLongContextPremium
+        self.supportsPriorityLongContext = supportsPriorityLongContext
+    }
 }
 
 enum TokenPricingCatalog {
-    static let effectiveDate = "2026-09-08"
+    static let effectiveDate = "2026-09-23"
     static let longContextThreshold: Int64 = 272_000
 
     static func pricing(for model: String) -> TokenPricing? {
@@ -175,7 +194,8 @@ enum TokenPricingCatalog {
             cacheWrite: Double? = nil,
             output: Double,
             priorityMultiplier: Double? = nil,
-            longContext: Bool = false
+            longContext: Bool = false,
+            priorityLongContext: Bool = false
         ) {
             let pricing = TokenPricing(
                 inputPerMillion: input,
@@ -183,14 +203,17 @@ enum TokenPricingCatalog {
                 cacheWritePerMillion: cacheWrite ?? input,
                 outputPerMillion: output,
                 priorityMultiplier: priorityMultiplier ?? 1,
-                appliesLongContextPremium: longContext
+                appliesLongContextPremium: longContext,
+                supportsPriorityLongContext: priorityLongContext
             )
             for alias in aliases {
                 result[alias.lowercased()] = pricing
             }
         }
 
-        add(["gpt-6-astra"], input: 10, cached: 1, cacheWrite: 12.5, output: 50, priorityMultiplier: 2, longContext: true)
+        add(["gpt-6-astra"], input: 10, cached: 1, cacheWrite: 12.5, output: 50, priorityMultiplier: 2, longContext: true, priorityLongContext: true)
+        add(["gpt-6-sol"], input: 2, cached: 0.2, cacheWrite: 2.5, output: 10, priorityMultiplier: 2, longContext: true, priorityLongContext: true)
+        add(["gpt-6-luna"], input: 0.1, cached: 0.01, cacheWrite: 0.125, output: 0.5, priorityMultiplier: 2, longContext: true, priorityLongContext: true)
         add(["gpt-5.6", "gpt-5.6-sol"], input: 4, cached: 0.4, cacheWrite: 5, output: 20, priorityMultiplier: 2, longContext: true)
         add(["gpt-5.6-terra"], input: 2, cached: 0.2, cacheWrite: 2.5, output: 12, priorityMultiplier: 2.5, longContext: true)
         add(["gpt-5.6-luna"], input: 0.2, cached: 0.02, cacheWrite: 0.25, output: 1.2, priorityMultiplier: 10, longContext: true)
@@ -364,12 +387,13 @@ enum TokenPricingCatalog {
             max(0, record.inputTokens - cached)
         )
         let uncached = max(0, record.inputTokens - cached - cacheWrite)
-        // OpenAI Priority Processing excludes long-context requests. If a historical setting says
-        // priority but the prompt crossed that boundary, charge the published Standard long-context
-        // rate instead of inventing a Priority long-context price.
+        // Only apply Fast/Priority to long-context requests when OpenAI publishes that combination.
+        // Older models keep their historical Standard long-context fallback.
         let hasLongContextPremium = pricing.appliesLongContextPremium
             && record.inputTokens > longContextThreshold
-        let priorityMultiplier = record.serviceTier == .priority && !hasLongContextPremium
+        let supportsRequestedTier = !hasLongContextPremium
+            || pricing.supportsPriorityLongContext
+        let priorityMultiplier = record.serviceTier == .priority && supportsRequestedTier
             ? pricing.priorityMultiplier
             : 1.0
         let inputMultiplier = hasLongContextPremium ? 2.0 : 1.0
