@@ -500,15 +500,19 @@ struct AppServerClientTests {
             == "未找到 ChatGPT/Codex app-server")
     }
 
-    @Test("默认候选优先新版 ChatGPT 并兼容旧版 Codex")
+    @Test("默认候选优先新版 CLI 布局并兼容旧版路径")
     func defaultCandidatesCoverCurrentAndLegacyApps() {
         let homeDirectory = URL(fileURLWithPath: "/Users/example", isDirectory: true)
 
         #expect(AppServerClient.defaultExecutableURLs(
             homeDirectory: homeDirectory
         ).map(\.path) == [
+            "/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex",
+            "/Users/example/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex",
             "/Applications/ChatGPT.app/Contents/Resources/codex",
             "/Users/example/Applications/ChatGPT.app/Contents/Resources/codex",
+            "/Applications/Codex.app/Contents/Resources/codex-cli/bin/codex",
+            "/Users/example/Applications/Codex.app/Contents/Resources/codex-cli/bin/codex",
             "/Applications/Codex.app/Contents/Resources/codex",
             "/Users/example/Applications/Codex.app/Contents/Resources/codex"
         ])

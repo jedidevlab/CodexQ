@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2] - 2026-09-28
+
+**重要版本更新：适配 ChatGPT 新版 app-server 路径。建议所有用户尽快更新。**
+
+- 修复 ChatGPT 更新后 CodexQ 无法找到 app-server，导致额度与 Token 活动不可用的问题。
+- 优先识别新版 `codex-cli/bin/codex` 布局，同时保留旧版 ChatGPT/Codex 路径兼容。
+- 增加新旧 CLI 路径及优先级回归测试，防止后续版本再次出现同类问题。
+
 ## [1.1.5] - 2026-09-23
 
 - 新增 GPT-6 Sol 与 GPT-6 Luna Token 成本估算，覆盖标准输入、缓存输入、缓存写入与输出价格。

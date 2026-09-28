@@ -45,9 +45,17 @@ struct AppServerClient: Sendable {
             URL(fileURLWithPath: "/Applications", isDirectory: true),
             homeDirectory.appendingPathComponent("Applications", isDirectory: true)
         ]
+        let resourceExecutablePaths = [
+            "codex-cli/bin/codex",
+            "codex"
+        ]
         return ["ChatGPT", "Codex"].flatMap { appName in
-            applicationDirectories.map {
-                $0.appendingPathComponent("\(appName).app/Contents/Resources/codex")
+            resourceExecutablePaths.flatMap { executablePath in
+                applicationDirectories.map {
+                    $0.appendingPathComponent(
+                        "\(appName).app/Contents/Resources/\(executablePath)"
+                    )
+                }
             }
         }
     }
