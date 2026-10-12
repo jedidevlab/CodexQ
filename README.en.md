@@ -98,6 +98,14 @@ Build an ad-hoc signed archive:
 ./script/package_release.sh 1.2.1 x86_64
 ```
 
+After publishing and verifying the GitHub Release, install the archive for this Mac:
+
+```bash
+./script/install_release.sh "dist/CodexQ-1.2.1-$(uname -m).zip"
+```
+
+The installer verifies the bundle version, architecture, and signature, replaces the old app, and starts the new one. If startup fails, it restores the previous app. User settings and history remain in place.
+
 The archive is written to:
 
 ```text

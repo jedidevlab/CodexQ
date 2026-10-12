@@ -104,6 +104,14 @@ swift test
 ./script/package_release.sh 1.2.1 x86_64
 ```
 
+发布并核对 GitHub Release 后，在维护者的 Mac 上安装本机架构的安装包：
+
+```bash
+./script/install_release.sh "dist/CodexQ-1.2.1-$(uname -m).zip"
+```
+
+安装脚本会验证版本、架构和签名，关闭旧进程，替换应用包并启动新版本；如启动失败，会恢复旧应用。用户设置和历史记录不会删除。
+
 生成文件位于：
 
 ```text
