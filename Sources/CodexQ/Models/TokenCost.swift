@@ -3,6 +3,7 @@ import Foundation
 enum TokenServiceTier: String, Codable, Hashable, Sendable {
     case standard
     case priority
+    case ultrafast
 }
 
 struct TokenUsageRecord: Equatable, Hashable, Sendable {
@@ -164,8 +165,10 @@ struct TokenPricing: Equatable, Sendable {
 }
 
 enum TokenPricingCatalog {
-    static let effectiveDate = "2026-09-23"
+    static let effectiveDate = "2026-10-08"
     static let longContextThreshold: Int64 = 272_000
+    private static let gpt6AstraUltrafastEffectiveAt = date("2026-09-29T00:00:00Z")
+    private static let gpt61SolUltrafastEffectiveAt = date("2026-10-08T00:00:00Z")
 
     static func pricing(for model: String) -> TokenPricing? {
         pricing(for: model, at: nil)
@@ -212,6 +215,7 @@ enum TokenPricingCatalog {
         }
 
         add(["gpt-6-astra"], input: 10, cached: 1, cacheWrite: 12.5, output: 50, priorityMultiplier: 2, longContext: true, priorityLongContext: true)
+        add(["gpt-6.1-sol"], input: 2, cached: 0.1, cacheWrite: 2.5, output: 10, priorityMultiplier: 2, longContext: true, priorityLongContext: true)
         add(["gpt-6-sol"], input: 2, cached: 0.2, cacheWrite: 2.5, output: 10, priorityMultiplier: 2, longContext: true, priorityLongContext: true)
         add(["gpt-6-luna"], input: 0.1, cached: 0.01, cacheWrite: 0.125, output: 0.5, priorityMultiplier: 2, longContext: true, priorityLongContext: true)
         add(["gpt-5.6", "gpt-5.6-sol"], input: 4, cached: 0.4, cacheWrite: 5, output: 20, priorityMultiplier: 2, longContext: true)
@@ -274,6 +278,20 @@ enum TokenPricingCatalog {
     }()
 
     private static let historicalCatalog: [String: [HistoricalPricing]] = [
+        "gpt-6.1-sol": [
+            HistoricalPricing(
+                effectiveAt: date("2026-09-29T00:00:00Z"),
+                pricing: TokenPricing(
+                    inputPerMillion: 2,
+                    cachedInputPerMillion: 0.1,
+                    cacheWritePerMillion: 2.5,
+                    outputPerMillion: 10,
+                    priorityMultiplier: 2,
+                    appliesLongContextPremium: true,
+                    supportsPriorityLongContext: true
+                )
+            )
+        ],
         "gpt-5.6": gpt56SolHistoricalPricing,
         "gpt-5.6-sol": gpt56SolHistoricalPricing,
         "gpt-5.6-terra": [
@@ -381,6 +399,21 @@ enum TokenPricingCatalog {
 
     static func estimatedCost(for record: TokenUsageRecord) -> Double? {
         guard let pricing = pricing(for: record.model, at: record.timestamp) else { return nil }
+        let serviceTierMultiplier: Double
+        switch record.serviceTier {
+        case .standard:
+            serviceTierMultiplier = 1
+        case .priority:
+            serviceTierMultiplier = pricing.priorityMultiplier
+        case .ultrafast:
+            switch record.model.lowercased() {
+            case "gpt-6-astra" where record.timestamp >= gpt6AstraUltrafastEffectiveAt,
+                 "gpt-6.1-sol" where record.timestamp >= gpt61SolUltrafastEffectiveAt:
+                serviceTierMultiplier = 6
+            default:
+                return nil
+            }
+        }
         let cached = min(record.cachedInputTokens, record.inputTokens)
         let cacheWrite = min(
             record.cacheWriteInputTokens,
@@ -393,9 +426,9 @@ enum TokenPricingCatalog {
             && record.inputTokens > longContextThreshold
         let supportsRequestedTier = !hasLongContextPremium
             || pricing.supportsPriorityLongContext
-        let priorityMultiplier = record.serviceTier == .priority && supportsRequestedTier
-            ? pricing.priorityMultiplier
-            : 1.0
+        let tierMultiplier = record.serviceTier == .priority && !supportsRequestedTier
+            ? 1.0
+            : serviceTierMultiplier
         let inputMultiplier = hasLongContextPremium ? 2.0 : 1.0
         let outputMultiplier = hasLongContextPremium ? 1.5 : 1.0
         let inputCost = (
@@ -406,7 +439,7 @@ enum TokenPricingCatalog {
         let outputCost = Double(record.outputTokens)
             * pricing.outputPerMillion
             * outputMultiplier
-        return (inputCost + outputCost) * priorityMultiplier / 1_000_000
+        return (inputCost + outputCost) * tierMultiplier / 1_000_000
     }
 }
 

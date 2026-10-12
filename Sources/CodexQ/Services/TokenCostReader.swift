@@ -466,6 +466,7 @@ enum TokenCostSessionParser {
         let value = (settings?["service_tier"] ?? payload["service_tier"]) as? String
         switch value?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
         case "priority", "fast": return .priority
+        case "ultrafast": return .ultrafast
         default: return .standard
         }
     }

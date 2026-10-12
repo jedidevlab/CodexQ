@@ -11,9 +11,9 @@
 
 CodexQ is a native macOS menu bar utility. It brings ChatGPT (formerly Codex) five-hour and weekly quota, plan type, remaining capacity, projected run-out time, Token activity, and Token cost estimates into one floating panel.
 
-## Current version: v1.2 — **Important update: supports the new ChatGPT app-server path**
+## Current version: v1.2.1 — **GPT‑6.1 Sol and Ultrafast cost estimates**
 
-> **Upgrade as soon as possible:** The latest ChatGPT app moved its app-server executable. Older CodexQ versions show “ChatGPT/Codex app-server not found,” which disables quota and Token activity updates.
+This release estimates GPT‑6.1 Sol Token cost using official prices and recognizes the Ultrafast tier for GPT‑6 Astra and GPT‑6.1 Sol. These API price estimates are not ChatGPT subscription charges.
 
 ## Your usage pace at a glance
 
@@ -33,8 +33,8 @@ Download the archive for your Mac from [GitHub Releases](https://github.com/jedi
 
 | Mac | Archive |
 | --- | --- |
-| Apple Silicon | `CodexQ-1.2-arm64.zip` |
-| Intel | `CodexQ-1.2-x86_64.zip` |
+| Apple Silicon | `CodexQ-1.2.1-arm64.zip` |
+| Intel | `CodexQ-1.2.1-x86_64.zip` |
 
 Unzip the archive, then move `CodexQ.app` to Applications.
 
@@ -94,15 +94,15 @@ swift test
 Build an ad-hoc signed archive:
 
 ```bash
-./script/package_release.sh 1.2 arm64
-./script/package_release.sh 1.2 x86_64
+./script/package_release.sh 1.2.1 arm64
+./script/package_release.sh 1.2.1 x86_64
 ```
 
 The archive is written to:
 
 ```text
-dist/CodexQ-1.2-arm64.zip
-dist/CodexQ-1.2-x86_64.zip
+dist/CodexQ-1.2.1-arm64.zip
+dist/CodexQ-1.2.1-x86_64.zip
 ```
 
 The helper script builds a local `.app` bundle in `dist/CodexQ.app` for development use. Generated build artifacts are excluded from Git.

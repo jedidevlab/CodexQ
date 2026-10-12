@@ -72,6 +72,82 @@ struct TokenCostTests {
         #expect(TokenPricingCatalog.estimatedCost(for: record) == 2)
     }
 
+    @Test("GPT-6.1 Sol 使用官方标准价并保留发布前的未计价状态")
+    func pricesGPT61SolFromReleaseDate() throws {
+        let record = TokenUsageRecord(
+            timestamp: try date("2026-09-29T00:00:00Z"),
+            model: "gpt-6.1-sol",
+            inputTokens: 200_000,
+            cachedInputTokens: 50_000,
+            cacheWriteInputTokens: 50_000,
+            outputTokens: 20_000,
+            totalTokens: 220_000
+        )
+        let beforeRelease = TokenUsageRecord(
+            timestamp: try date("2026-09-28T23:59:59Z"),
+            model: record.model,
+            inputTokens: record.inputTokens,
+            cachedInputTokens: record.cachedInputTokens,
+            cacheWriteInputTokens: record.cacheWriteInputTokens,
+            outputTokens: record.outputTokens,
+            totalTokens: record.totalTokens
+        )
+
+        #expect(TokenPricingCatalog.estimatedCost(for: record) == 0.53)
+        #expect(TokenPricingCatalog.estimatedCost(for: beforeRelease) == nil)
+    }
+
+    @Test("GPT-6.1 Sol 长上下文 Fast 和 Ultrafast 按官方费率估算")
+    func pricesGPT61SolServiceTiers() throws {
+        let timestamp = try date("2026-10-08T00:00:00Z")
+        func record(_ tier: TokenServiceTier, at date: Date = timestamp) -> TokenUsageRecord {
+            TokenUsageRecord(
+                timestamp: date,
+                model: "gpt-6.1-sol",
+                inputTokens: 300_000,
+                cachedInputTokens: 0,
+                cacheWriteInputTokens: 0,
+                outputTokens: 10_000,
+                totalTokens: 310_000,
+                serviceTier: tier
+            )
+        }
+
+        #expect(TokenPricingCatalog.estimatedCost(for: record(.standard)) == 1.35)
+        #expect(TokenPricingCatalog.estimatedCost(for: record(.priority)) == 2.7)
+        #expect(TokenPricingCatalog.estimatedCost(for: record(.ultrafast)) == 8.1)
+        #expect(TokenPricingCatalog.estimatedCost(for: record(
+            .ultrafast,
+            at: try date("2026-10-07T23:59:59Z")
+        )) == nil)
+    }
+
+    @Test("Ultrafast 仅对官方已开放的模型与日期估价")
+    func limitsUltrafastPricingToPublishedModels() throws {
+        func record(model: String, at timestamp: Date) -> TokenUsageRecord {
+            TokenUsageRecord(
+                timestamp: timestamp,
+                model: model,
+                inputTokens: 100_000,
+                cachedInputTokens: 0,
+                cacheWriteInputTokens: 0,
+                outputTokens: 0,
+                totalTokens: 100_000,
+                serviceTier: .ultrafast
+            )
+        }
+
+        #expect(TokenPricingCatalog.estimatedCost(for: record(
+            model: "gpt-6-astra", at: try date("2026-09-29T00:00:00Z")
+        )) == 6)
+        #expect(TokenPricingCatalog.estimatedCost(for: record(
+            model: "gpt-6-astra", at: try date("2026-09-28T23:59:59Z")
+        )) == nil)
+        #expect(TokenPricingCatalog.estimatedCost(for: record(
+            model: "gpt-6-luna", at: try date("2026-10-08T00:00:00Z")
+        )) == nil)
+    }
+
     @Test("GPT-6 Sol 和 Luna 按官方标准价计算全部 Token 类型")
     func pricesGPT6SolAndLunaTokenCategories() throws {
         let timestamp = try date("2026-09-23T00:00:00Z")
@@ -404,7 +480,7 @@ struct TokenCostTests {
     @Test("官方文档列价的文本模型和快照都有本地价格")
     func officialTextModelsAndSnapshotsHaveLocalPricing() {
         let models = [
-            "gpt-6-astra", "gpt-6-sol", "gpt-6-luna",
+            "gpt-6-astra", "gpt-6.1-sol", "gpt-6-sol", "gpt-6-luna",
             "gpt-5.6", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
             "gpt-5.5", "gpt-5.5-2026-04-23", "gpt-5.5-pro", "gpt-5.5-pro-2026-04-23",
             "gpt-5.4", "gpt-5.4-2026-03-05", "gpt-5.4-mini", "gpt-5.4-mini-2026-03-17",
@@ -796,6 +872,26 @@ struct TokenCostTests {
         #expect(records[0].outputTokens == 15)
         #expect(records[0].totalTokens == 75)
         #expect(records[0].serviceTier == .priority)
+    }
+
+    @Test("会话日志中的 Ultrafast 档位传入成本记录")
+    func parsesUltrafastSessionTier() throws {
+        let temporary = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("jsonl")
+        let fixture = """
+        {"timestamp":"2026-10-08T01:00:00.000Z","type":"turn_context","payload":{"model":"gpt-6.1-sol"}}
+        {"timestamp":"2026-10-08T01:00:01.000Z","type":"event_msg","payload":{"type":"thread_settings_applied","thread_settings":{"service_tier":"ultrafast"}}}
+        {"timestamp":"2026-10-08T01:00:02.000Z","type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":100000,"cached_input_tokens":0,"cache_write_input_tokens":0,"output_tokens":0,"total_tokens":100000}}}}
+        """
+        try fixture.write(to: temporary, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: temporary) }
+
+        let records = try TokenCostSessionParser.records(in: temporary)
+
+        #expect(records.count == 1)
+        #expect(records.first?.serviceTier == .ultrafast)
+        #expect(records.first.flatMap(TokenPricingCatalog.estimatedCost(for:)) == 1.2)
     }
 
     @Test("成本读取器只用本机会话用量并从认证信息恢复当前订阅周期")

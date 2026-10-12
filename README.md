@@ -15,9 +15,9 @@ CodexQ 是一款原生 macOS 菜单栏工具。它把 ChatGPT（原 Codex）5 �
   <img src="docs/images/codexq-usage-overview.png" alt="CodexQ 用量、Token 活动和成本概览" width="275">
 </p>
 
-## 当前版本：v1.2 — **重要更新：适配 ChatGPT 新版 app-server 路径**
+## 当前版本：v1.2.1 — **新增 GPT‑6.1 Sol 与 Ultrafast 成本估算**
 
-> **建议尽快更新：** ChatGPT 新版已调整 app-server 路径，旧版 CodexQ 会显示“未找到 ChatGPT/Codex app-server”，导致额度与 Token 活动不可用。
+本版本按官方价格估算 GPT‑6.1 Sol 的 Token 成本，并识别 GPT‑6 Astra 与 GPT‑6.1 Sol 的 Ultrafast 档位。成本是 API 价格估算，不是 ChatGPT 订阅账单。
 
 ## 一眼掌握使用节奏
 
@@ -37,8 +37,8 @@ CodexQ 是一款原生 macOS 菜单栏工具。它把 ChatGPT（原 Codex）5 �
 
 | Mac | 安装包 |
 | --- | --- |
-| Apple Silicon | `CodexQ-1.2-arm64.zip` |
-| Intel | `CodexQ-1.2-x86_64.zip` |
+| Apple Silicon | `CodexQ-1.2.1-arm64.zip` |
+| Intel | `CodexQ-1.2.1-x86_64.zip` |
 
 解压后，将 `CodexQ.app` 移入“应用程序”文件夹。
 
@@ -100,15 +100,15 @@ swift test
 生成 ad-hoc 签名的安装包：
 
 ```bash
-./script/package_release.sh 1.2 arm64
-./script/package_release.sh 1.2 x86_64
+./script/package_release.sh 1.2.1 arm64
+./script/package_release.sh 1.2.1 x86_64
 ```
 
 生成文件位于：
 
 ```text
-dist/CodexQ-1.2-arm64.zip
-dist/CodexQ-1.2-x86_64.zip
+dist/CodexQ-1.2.1-arm64.zip
+dist/CodexQ-1.2.1-x86_64.zip
 ```
 
 开发运行脚本会在 `dist/CodexQ.app` 生成本地 `.app` bundle；构建产物不会提交到 Git。
