@@ -317,15 +317,21 @@ private struct TokenActivitySquare: View {
 
 }
 
+// Keep every level legible over the material; soften the blue hues, not their opacity.
 enum TokenActivityHeatmapPalette {
     static func hex(level: Int?, colorScheme: ColorScheme) -> UInt32 {
         let normalizedLevel = min(4, max(0, level ?? 0))
         switch colorScheme {
         case .dark:
-            return [0x303030, 0x013566, 0x004F99, 0x0285FF, 0x66B5FF][normalizedLevel]
+            return [0x404D59, 0x28557C, 0x347CB5, 0x5BA3D9, 0x97CAEF][normalizedLevel]
         default:
-            return [0xF3F3F3, 0xCCE6FF, 0x66B5FF, 0x0285FF, 0x004F99][normalizedLevel]
+            return [0xBBC5CC, 0xA3CAEC, 0x70A9DA, 0x3F87C3, 0x255D95][normalizedLevel]
         }
+    }
+
+    static func opacity(level: Int?, colorScheme: ColorScheme) -> Double {
+        // A consistent high opacity prevents low-usage days disappearing into the backdrop.
+        0.94
     }
 
     static func color(level: Int?, colorScheme: ColorScheme) -> Color {
@@ -335,7 +341,7 @@ enum TokenActivityHeatmapPalette {
             red: Double((value >> 16) & 0xFF) / 255,
             green: Double((value >> 8) & 0xFF) / 255,
             blue: Double(value & 0xFF) / 255,
-            opacity: 1
+            opacity: opacity(level: level, colorScheme: colorScheme)
         )
     }
 }

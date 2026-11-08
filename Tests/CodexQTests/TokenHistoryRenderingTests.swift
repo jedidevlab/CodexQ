@@ -5,15 +5,43 @@ import Testing
 
 @Suite("TokenHistoryRenderingTests", .serialized)
 struct TokenHistoryRenderingTests {
-    @Test("热力图浅色与深色五级颜色和 ChatGPT 一致")
-    func heatmapPaletteMatchesChatGPT() {
+    @Test("热力图使用适配背景的蓝色色阶")
+    func heatmapPaletteBlendsWithBackdrop() {
         #expect((0...4).map {
             TokenActivityHeatmapPalette.hex(level: $0, colorScheme: .light)
-        } == [0xF3F3F3, 0xCCE6FF, 0x66B5FF, 0x0285FF, 0x004F99])
+        } == [0xBBC5CC, 0xA3CAEC, 0x70A9DA, 0x3F87C3, 0x255D95])
         #expect((0...4).map {
             TokenActivityHeatmapPalette.hex(level: $0, colorScheme: .dark)
-        } == [0x303030, 0x013566, 0x004F99, 0x0285FF, 0x66B5FF])
-        #expect(TokenActivityHeatmapPalette.hex(level: nil, colorScheme: .light) == 0xF3F3F3)
+        } == [0x404D59, 0x28557C, 0x347CB5, 0x5BA3D9, 0x97CAEF])
+        #expect(TokenActivityHeatmapPalette.hex(level: nil, colorScheme: .light) == 0xBBC5CC)
+        for scheme in [ColorScheme.light, .dark] {
+            let opacities = (0...4).map {
+                TokenActivityHeatmapPalette.opacity(level: $0, colorScheme: scheme)
+            }
+            #expect(opacities == opacities.sorted())
+            #expect(opacities.allSatisfy { $0 >= 0.9 })
+            #expect(opacities.last! < 1)
+        }
+    }
+
+    @Test("浅蓝与无数据底格在浅色背景上仍有可辨色差")
+    func lowUsageRemainsVisibleOverBackdrop() {
+        func components(_ hex: UInt32) -> [Double] {
+            [16, 8, 0].map { Double((hex >> $0) & 0xFF) }
+        }
+        let background = components(0xDCE4E5)
+        let colors = (0...4).map { level in
+            let rgb = components(TokenActivityHeatmapPalette.hex(level: level, colorScheme: .light))
+            let alpha = TokenActivityHeatmapPalette.opacity(level: level, colorScheme: .light)
+            return zip(rgb, background).map { $0 * alpha + $1 * (1 - alpha) }
+        }
+        func distance(_ lhs: [Double], _ rhs: [Double]) -> Double {
+            zip(lhs, rhs).map { pow($0 - $1, 2) }.reduce(0, +).squareRoot()
+        }
+        #expect(distance(colors[0], background) > 35)
+        for index in 1..<colors.count {
+            #expect(distance(colors[index - 1], colors[index]) > 35)
+        }
     }
 
     @Test("历史入口标题悬浮时使用可点击指针")

@@ -724,16 +724,16 @@ struct TokenActivityViewTests {
         #expect(resetSource.contains("summary.availableCount > 0 ? Color.accentColor : Color.secondary"))
     }
 
-    @Test("活动热力图沿用 ChatGPT 五级明暗配色")
-    func activityHeatmapMatchesChatGPTPalette() throws {
+    @Test("活动热力图使用清晰的柔和蓝色色阶")
+    func activityHeatmapUsesMutedPalette() throws {
         let source = try String(
             contentsOfFile: "Sources/CodexQ/Views/TokenActivitySection.swift",
             encoding: .utf8
         )
 
         #expect(source.contains("Color.primary.opacity(0.72)"))
-        #expect(source.contains("0xF3F3F3, 0xCCE6FF, 0x66B5FF, 0x0285FF, 0x004F99"))
-        #expect(source.contains("0x303030, 0x013566, 0x004F99, 0x0285FF, 0x66B5FF"))
+        #expect(source.contains("0xBBC5CC, 0xA3CAEC, 0x70A9DA, 0x3F87C3, 0x255D95"))
+        #expect(source.contains("0x404D59, 0x28557C, 0x347CB5, 0x5BA3D9, 0x97CAEF"))
         #expect(source.contains("RoundedRectangle(cornerRadius: 4)"))
     }
 
