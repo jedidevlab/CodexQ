@@ -11,9 +11,7 @@ final class StatusBarController: NSObject {
         backing: .buffered,
         defer: false
     )
-    private let store = QuotaStore(
-        costSyncChangeEvents: { CostSyncFolderChangeStream.shared.events() }
-    )
+    private let store = QuotaStore()
     private var hostingController: NSHostingController<AnyView>?
     private var cancellables = Set<AnyCancellable>()
     private var autoCloseTask: Task<Void, Never>?
@@ -44,9 +42,6 @@ final class StatusBarController: NSObject {
                 store: store,
                 contentDidChange: { [weak self] in
                     self?.refitPanelImmediately()
-                },
-                contentWillChange: { [weak self] in
-                    self?.preparePanelForInteractiveRefit()
                 },
                 interactionDidChange: { [weak self] interaction, isActive in
                     self?.interactionDidChange(interaction, isActive: isActive)
@@ -117,18 +112,6 @@ final class StatusBarController: NSObject {
             }
             .store(in: &cancellables)
 
-        store.$tokenCost
-            .sink { [weak self] _ in
-                self?.schedulePanelRefit()
-            }
-            .store(in: &cancellables)
-
-        store.$tokenCostErrorMessage
-            .sink { [weak self] _ in
-                self?.schedulePanelRefit()
-            }
-            .store(in: &cancellables)
-
         store.$isTokenActivityRefreshing
             .removeDuplicates()
             .sink { [weak self] _ in
@@ -178,7 +161,7 @@ final class StatusBarController: NSObject {
 
     private func showSettingsWindow() {
         let controller = settingsWindowController
-            ?? SettingsWindowController(store: store, settings: .shared)
+            ?? SettingsWindowController(settings: .shared)
         settingsWindowController = controller
         panel.orderOut(nil)
         controller.present()
@@ -267,11 +250,6 @@ final class StatusBarController: NSObject {
             }
             self.fitPanel(anchorRect: anchorRect, visibleFrame: visibleFrame)
         }
-    }
-
-    private func preparePanelForInteractiveRefit() {
-        guard panel.isVisible else { return }
-        panel.disableScreenUpdatesUntilFlush()
     }
 
     private func refitPanelImmediately() {

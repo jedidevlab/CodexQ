@@ -14,12 +14,11 @@ struct TokenHistoryView: View {
                 summaryStrip(snapshot.summary)
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
-                        ResponsiveTokenHistoryCharts(
+                        TokenUsageHistoryChart(
                             buckets: snapshot.buckets,
                             selectedBucketStart: $selectedBucketStart
                         )
-                        TokenModelBreakdownChart(models: snapshot.models)
-                        footerNotes(snapshot)
+                        qualityRow(snapshot)
                     }
                     .padding(.bottom, 12)
                 }
@@ -57,12 +56,8 @@ struct TokenHistoryView: View {
 
     private var titleRow: some View {
         HStack(alignment: .firstTextBaseline, spacing: 12) {
-            Text("Token 使用与成本")
+            Text("Token 活动")
                 .font(.largeTitle.weight(.bold))
-            Text("API 价格估算，非实际订阅账单")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
             Spacer(minLength: 12)
             if store.isLoading, store.snapshot != nil {
                 ProgressView().controlSize(.small)
@@ -169,11 +164,6 @@ struct TokenHistoryView: View {
                 accent: .blue
             )
             HistorySummaryCard(
-                title: "估算成本",
-                value: currency(summary.estimatedCostUSD),
-                accent: .green
-            )
-            HistorySummaryCard(
                 title: "日均 Token",
                 value: TokenCountFormatter.compactNumber(
                     Int64(summary.averageDailyTokens.rounded()),
@@ -181,36 +171,13 @@ struct TokenHistoryView: View {
                 ),
                 accent: .indigo
             )
-            HistorySummaryCard(
-                title: "日均成本",
-                value: currency(summary.averageDailyCostUSD),
-                accent: .orange
-            )
         }
-    }
-
-    private func footerNotes(_ snapshot: TokenHistorySnapshot) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            qualityRow(snapshot)
-            if snapshot.summary.unpricedTokens > 0 {
-                Text("未计价 Token：\(TokenCountFormatter.compactNumber(snapshot.summary.unpricedTokens))。这部分 Token 缺少对应 API 价格，会计入 Token 总量，但不计入估算成本。")
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func qualityRow(_ snapshot: TokenHistorySnapshot) -> some View {
         HStack(spacing: 8) {
-            Label(scopeLabel(snapshot.coverage.dataScope), systemImage: "externaldrive")
+            Label("账号 Token 活动", systemImage: "chart.bar.xaxis")
             Text("官方活动覆盖 \(snapshot.coverage.activityDaysAvailable)/\(snapshot.coverage.calendarDaysInRange) 天")
-            if snapshot.coverage.skippedSessionFileCount > 0 {
-                Text("跳过 \(snapshot.coverage.skippedSessionFileCount) 个会话文件")
-            }
-            if let message = snapshot.coverage.syncMessage {
-                Text(message)
-            }
             if let warning = snapshot.warningMessage {
                 Text(warning).foregroundStyle(.orange)
             }
@@ -242,20 +209,6 @@ struct TokenHistoryView: View {
         return cycle.isInferred ? "\(range) · 按当前续费日推算" : range
     }
 
-    private func scopeLabel(_ scope: TokenCostDataScope) -> String {
-        switch scope {
-        case .local: return "本机成本记录"
-        case .singleDevice: return "单设备账本"
-        case .multiDevice(let count): return "\(count) 台设备账本"
-        case .syncDelayed: return "同步延迟，显示缓存"
-        case .syncBlocked: return "同步受阻，显示本机"
-        case .partial(let count): return "\(count) 台设备，部分数据"
-        }
-    }
-
-    private func currency(_ value: Double) -> String {
-        String(format: "$%.2f", value)
-    }
 }
 
 struct TokenHistoryCardSurface: View {

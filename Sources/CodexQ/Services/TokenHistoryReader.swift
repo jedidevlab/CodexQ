@@ -2,18 +2,18 @@ import Foundation
 
 struct TokenHistoryReader: Sendable {
     let readActivity: @Sendable () async throws -> TokenActivitySnapshot
-    let readCostRecords: @Sendable () async throws -> TokenCostRecordSet
+    let readSubscriptionAnchor: @Sendable () async -> SubscriptionAnchor?
 
     init(
         readActivity: @escaping @Sendable () async throws -> TokenActivitySnapshot = {
             try await AppServerClient().readTokenActivity()
         },
-        readCostRecords: @escaping @Sendable () async throws -> TokenCostRecordSet = {
-            try await TokenCostReader.shared.readRecordSet()
+        readSubscriptionAnchor: @escaping @Sendable () async -> SubscriptionAnchor? = {
+            SubscriptionAnchorReader.read()
         }
     ) {
         self.readActivity = readActivity
-        self.readCostRecords = readCostRecords
+        self.readSubscriptionAnchor = readSubscriptionAnchor
     }
 
     func read(
@@ -21,56 +21,37 @@ struct TokenHistoryReader: Sendable {
         now: Date,
         calendar: Calendar
     ) async throws -> TokenHistorySnapshot {
-        async let activityResult = Self.loadActivity(using: readActivity)
-        async let recordSetResult = readCostRecords()
-
-        let recordSet = try await recordSetResult
-        let loadedActivity = await activityResult
+        async let activityResult = readActivity()
+        async let anchorResult = readSubscriptionAnchor()
+        let activity = try await activityResult
+        let anchor = await anchorResult
         try Task.checkCancellation()
 
-        let activity: TokenActivitySnapshot?
-        let warningMessage: String?
-        switch loadedActivity {
-        case .success(let value):
-            activity = value
-            warningMessage = nil
-        case .failure(let message):
-            activity = nil
-            warningMessage = "账号 Token 活动暂不可用：\(message)"
-        case .cancelled:
-            throw CancellationError()
-        }
-
-        let dataInterval = Self.dataInterval(
-            records: recordSet.records,
-            selection: selection,
-            now: now,
-            calendar: calendar
-        )
         var utcCalendar = Calendar(identifier: .gregorian)
         utcCalendar.timeZone = TimeZone(secondsFromGMT: 0)!
-        let cycles = recordSet.subscriptionAnchor.map {
+        let cycles = anchor.map {
             TokenHistoryAggregator.subscriptionCycles(
                 anchor: $0,
-                dataInterval: dataInterval,
+                dataInterval: Self.dataInterval(activity: activity, now: now, calendar: calendar),
                 now: now,
                 calendar: utcCalendar
             )
         } ?? []
+
         guard let snapshot = TokenHistoryAggregator.snapshot(
-            records: recordSet.records,
+            records: [],
             activity: activity,
             selection: selection,
             subscriptionCycles: cycles,
-            dataScope: recordSet.dataScope,
-            skippedSessionFileCount: recordSet.skippedSessionFileCount,
-            syncMessage: recordSet.syncMessage,
+            dataScope: .account,
+            skippedSessionFileCount: 0,
+            syncMessage: nil,
             now: now,
             calendar: calendar
         ) else {
             throw ReaderError.invalidSelection
         }
-        return snapshot.withWarningMessage(warningMessage)
+        return snapshot
     }
 
     enum ReaderError: LocalizedError {
@@ -81,51 +62,93 @@ struct TokenHistoryReader: Sendable {
         }
     }
 
-    private enum ActivityResult: Sendable {
-        case success(TokenActivitySnapshot)
-        case failure(String)
-        case cancelled
-    }
-
-    private static func loadActivity(
-        using provider: @Sendable () async throws -> TokenActivitySnapshot
-    ) async -> ActivityResult {
-        do {
-            return .success(try await provider())
-        } catch is CancellationError {
-            return .cancelled
-        } catch {
-            return .failure(error.localizedDescription)
-        }
-    }
-
     private static func dataInterval(
-        records: [TokenUsageRecord],
-        selection: TokenHistorySelection,
+        activity: TokenActivitySnapshot,
         now: Date,
         calendar: Calendar
     ) -> DateInterval {
-        guard let first = records.map(\.timestamp).min(),
-              let last = records.map(\.timestamp).max() else {
-            return selection.interval(calendar: calendar, subscriptionPeriods: [])
-                ?? DateInterval(start: now, duration: 1)
+        let dates = activity.days.compactMap { day -> Date? in
+            let parts = day.startDate.split(separator: "-").compactMap { Int($0) }
+            guard parts.count == 3 else { return nil }
+            return calendar.date(from: DateComponents(
+                year: parts[0],
+                month: parts[1],
+                day: parts[2]
+            ))
         }
-        return DateInterval(start: first, end: max(last.addingTimeInterval(1), first.addingTimeInterval(1)))
+        guard let first = dates.min(), let last = dates.max() else {
+            return DateInterval(start: now, duration: 1)
+        }
+        let end = calendar.date(byAdding: .day, value: 1, to: last)
+            ?? last.addingTimeInterval(86_400)
+        return DateInterval(start: first, end: end)
     }
 }
 
-private extension TokenHistorySnapshot {
-    func withWarningMessage(_ value: String?) -> TokenHistorySnapshot {
-        TokenHistorySnapshot(
-            selection: selection,
-            interval: interval,
-            granularity: granularity,
-            buckets: buckets,
-            summary: summary,
-            models: models,
-            coverage: coverage,
-            subscriptionCycles: subscriptionCycles,
-            warningMessage: value
-        )
+private enum SubscriptionAnchorReader {
+    private struct AuthFile: Decodable {
+        struct Tokens: Decodable {
+            let idToken: String
+
+            enum CodingKeys: String, CodingKey {
+                case idToken = "id_token"
+            }
+        }
+
+        let tokens: Tokens
+    }
+
+    private struct IDTokenPayload: Decodable {
+        struct Claims: Decodable {
+            let subscriptionStart: String?
+            let subscriptionUntil: String?
+
+            enum CodingKeys: String, CodingKey {
+                case subscriptionStart = "chatgpt_subscription_active_start"
+                case subscriptionUntil = "chatgpt_subscription_active_until"
+            }
+        }
+
+        let auth: Claims
+
+        enum CodingKeys: String, CodingKey {
+            case auth = "https://api.openai.com/auth"
+        }
+    }
+
+    static func read() -> SubscriptionAnchor? {
+        let url = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".codex/auth.json")
+        guard let data = try? Data(contentsOf: url),
+              let auth = try? JSONDecoder().decode(AuthFile.self, from: data),
+              let payload = jwtPayload(auth.tokens.idToken),
+              let claims = try? JSONDecoder().decode(IDTokenPayload.self, from: payload),
+              let startValue = claims.auth.subscriptionStart,
+              let endValue = claims.auth.subscriptionUntil,
+              let start = isoDate(startValue),
+              let end = isoDate(endValue),
+              end > start else {
+            return nil
+        }
+        let cadence: SubscriptionAnchor.Cadence = end.timeIntervalSince(start) > 300 * 86_400
+            ? .year
+            : .month
+        return SubscriptionAnchor(start: start, end: end, cadence: cadence)
+    }
+
+    private static func isoDate(_ value: String) -> Date? {
+        let fractional = ISO8601DateFormatter()
+        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return fractional.date(from: value) ?? ISO8601DateFormatter().date(from: value)
+    }
+
+    private static func jwtPayload(_ token: String) -> Data? {
+        let parts = token.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count > 1 else { return nil }
+        var value = String(parts[1])
+            .replacingOccurrences(of: "-", with: "+")
+            .replacingOccurrences(of: "_", with: "/")
+        value += String(repeating: "=", count: (4 - value.count % 4) % 4)
+        return Data(base64Encoded: value)
     }
 }

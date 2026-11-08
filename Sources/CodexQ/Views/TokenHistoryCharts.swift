@@ -498,7 +498,7 @@ private struct TokenBucketTooltip: View {
             Text(bucket.start.formatted(date: .abbreviated, time: .omitted))
                 .fontWeight(.semibold)
             Text("Token：\(TokenCountFormatter.compactNumber(bucket.totalTokens))")
-            Text("设备记录：\(TokenCountFormatter.compactNumber(bucket.deviceTokens))")
+            Text("模型记录：\(TokenCountFormatter.compactNumber(bucket.deviceTokens))")
             if bucket.supplementTokens > 0 {
                 Text("官方差额：\(TokenCountFormatter.compactNumber(bucket.supplementTokens))")
             }

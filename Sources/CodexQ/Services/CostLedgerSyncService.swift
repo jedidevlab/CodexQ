@@ -106,6 +106,7 @@ final class CostLedgerSyncService {
         let serviceTier: TokenServiceTier
 
         init?(_ record: TokenUsageRecord) {
+            guard !record.isAccountAggregate else { return nil }
             guard let eventID = record.eventID, !eventID.isEmpty else { return nil }
             self.eventID = eventID
             timestamp = record.timestamp

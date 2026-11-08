@@ -140,7 +140,8 @@ struct TokenCostSection: View {
                         .monospacedDigit()
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
-                    Text(TokenCountFormatter.compactNumber(summary.totalTokens, fractionLength: 1))
+                    Text(summary.totalTokens == 0 && !summary.unquantifiedModels.isEmpty
+                         ? "Token 未提供" : TokenCountFormatter.compactNumber(summary.totalTokens, fractionLength: 1))
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -172,7 +173,8 @@ struct TokenCostSection: View {
         .accessibilityLabel(title(for: summary.kind))
         .accessibilityValue(
             "\(TokenCostFormatter.amount(summary))，"
-                + TokenCountFormatter.string(summary.totalTokens)
+                + (summary.totalTokens == 0 && !summary.unquantifiedModels.isEmpty
+                   ? "Token 未提供" : TokenCountFormatter.string(summary.totalTokens))
         )
     }
 
@@ -211,6 +213,7 @@ struct TokenCostSection: View {
         guard let scope = snapshot?.dataScope else { return "本机数据" }
         switch scope {
         case .local: return "本机数据"
+        case .account: return "账号与本机数据"
         case .singleDevice: return "仅此设备"
         case .multiDevice: return "多设备数据"
         case .syncDelayed: return "多设备 · 同步延迟"
@@ -242,7 +245,7 @@ struct TokenCostSection: View {
 
 }
 
-private struct TokenCostDetailCard: View {
+struct TokenCostDetailCard: View {
     let summary: TokenCostPeriodSummary
     let subscriptionPeriod: DateInterval?
     let dataScope: TokenCostDataScope
@@ -261,17 +264,55 @@ private struct TokenCostDetailCard: View {
             }
 
             if summary.models.isEmpty {
-                Text("该时段暂无本机用量")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, minHeight: 28)
+                if summary.unquantifiedModels.isEmpty {
+                    Text("该时段暂无本机用量")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, minHeight: 28)
+                }
             } else {
                 ForEach(summary.models) { model in
                     modelRow(model)
                 }
             }
 
-            costBreakdown
+            if !summary.unquantifiedModels.isEmpty {
+                Divider().opacity(0.55)
+                Text("账号模型 · Token 明细未提供")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                if summary.unquantifiedModels.count > 6 {
+                    // Keep the newest model visible even while the remaining list scrolls.
+                    if let first = summary.unquantifiedModels.first { unquantifiedModelRow(first) }
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 6) {
+                            ForEach(Array(summary.unquantifiedModels.dropFirst()), id: \.self) { model in
+                                unquantifiedModelRow(model)
+                            }
+                        }
+                    }
+                    .frame(height: 100)
+                } else {
+                    ForEach(summary.unquantifiedModels, id: \.self) { model in
+                        unquantifiedModelRow(model)
+                    }
+                }
+                Text("账号接口没有 Token 数，不能从额度占比推算；零值不代表未使用，金额只含已知成本。")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if !summary.models.isEmpty || summary.supplement != nil {
+                costBreakdown
+            }
+
+            if summary.unpricedTokens > 0 {
+                Text("未计价 Token：\(TokenCountFormatter.string(summary.unpricedTokens))。缺少逐次请求明细或价格；金额旁的 + 表示仅计入已知成本。")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
             Text(footerText)
                 .font(.system(size: 9))
@@ -284,6 +325,15 @@ private struct TokenCostDetailCard: View {
             RoundedRectangle(cornerRadius: 9)
                 .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
         }
+    }
+
+    private func unquantifiedModelRow(_ model: String) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(model).font(.caption.weight(.semibold)).lineLimit(1)
+            Spacer(minLength: 6)
+            Text("Token 未提供").font(.caption2).foregroundStyle(.secondary)
+        }
+        .help("账号接口列出的模型名称不代表每个模型都已在该时段产生用量。")
     }
 
     private func modelRow(_ model: TokenCostModelSummary) -> some View {
@@ -318,7 +368,9 @@ private struct TokenCostDetailCard: View {
             .frame(height: 4)
         }
         .help(
-            "输入 \(TokenCountFormatter.compactNumber(model.inputTokens)) · "
+            model.unpricedTokens > 0
+                ? "含未计价 Token；账号日汇总没有逐次请求的输入、缓存和输出明细。"
+                : "输入 \(TokenCountFormatter.compactNumber(model.inputTokens)) · "
                 + "缓存 \(TokenCountFormatter.compactNumber(model.cachedInputTokens)) · "
                 + "输出 \(TokenCountFormatter.compactNumber(model.outputTokens))"
         )
@@ -328,11 +380,15 @@ private struct TokenCostDetailCard: View {
         VStack(spacing: 4) {
             Divider()
                 .opacity(0.55)
-            costRow(
-                label: "设备记录",
-                tokens: summary.recordedTokens,
-                amount: summary.recordedEstimatedCostUSD
-            )
+            if !summary.models.isEmpty {
+                costRow(
+                    label: "模型记录",
+                    tokens: summary.recordedTokens,
+                    amount: summary.recordedTokens == summary.unpricedTokens && summary.unpricedTokens > 0
+                        ? nil : summary.recordedEstimatedCostUSD,
+                    hasUnpricedTokens: summary.unpricedTokens > 0
+                )
+            }
             if let supplement = summary.supplement {
                 costRow(
                     label: "官方差额",
@@ -347,7 +403,8 @@ private struct TokenCostDetailCard: View {
     private func costRow(
         label: String,
         tokens: Int64,
-        amount: Double,
+        amount: Double?,
+        hasUnpricedTokens: Bool = false,
         showsSupplementInfo: Bool = false
     ) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
@@ -369,7 +426,7 @@ private struct TokenCostDetailCard: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("官方差额说明")
                             .font(.caption.weight(.semibold))
-                        Text("官方 Token 数据高于设备记录时，对没有明细的差额按设备记录平均单价估算。")
+                        Text("官方 Token 数据高于模型记录时，对没有明细的差额按已计价记录的平均单价估算；没有可用单价时标为未计价。差额不能分配给某个具体模型。")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -379,7 +436,7 @@ private struct TokenCostDetailCard: View {
                 }
             }
             Spacer()
-            Text(TokenCostFormatter.amount(amount))
+            Text(TokenCostFormatter.amount(amount) + (hasUnpricedTokens && amount != nil ? "+" : ""))
                 .monospacedDigit()
         }
         .font(.caption2)
@@ -399,6 +456,8 @@ private struct TokenCostDetailCard: View {
 
     private var footerText: String {
         switch dataScope {
+        case .account:
+            return "含账号日汇总，补入部分未计价；已知成本按 API 价估算，非实际账单"
         case .local, .syncBlocked:
             return "本机数据，按官方 API 价估算，非实际账单"
         case .singleDevice:

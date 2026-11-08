@@ -33,7 +33,6 @@ enum QuotaBarLayout {
 struct QuotaPopoverView: View {
     @ObservedObject var store: QuotaStore
     let contentDidChange: () -> Void
-    let contentWillChange: () -> Void
     let interactionDidChange: (PopoverInteraction, Bool) -> Void
     let showSettings: () -> Void
     let showTokenHistory: () -> Void
@@ -92,20 +91,8 @@ struct QuotaPopoverView: View {
             TokenActivitySection(
                 snapshot: store.tokenActivity,
                 errorMessage: store.tokenActivityErrorMessage,
-                isRefreshing: store.isTokenActivityRefreshing,
+                isRefreshing: store.isRefreshing || store.isTokenActivityRefreshing,
                 now: relativeTimeNow,
-                showHistory: showTokenHistory
-            )
-
-            InsetSeparator()
-
-            TokenCostSection(
-                snapshot: store.tokenCost,
-                errorMessage: store.tokenCostErrorMessage,
-                isRefreshing: store.isTokenActivityRefreshing,
-                isPresented: store.isPopoverPresented,
-                contentWillChange: contentWillChange,
-                contentDidChange: contentDidChange,
                 showHistory: showTokenHistory
             )
 
@@ -147,8 +134,8 @@ struct QuotaPopoverView: View {
                     FooterIconButtonLabel(systemName: "chart.bar")
                 }
                 .buttonStyle(.borderless)
-                .help("Token 使用与成本")
-                .accessibilityLabel("Token 使用与成本")
+                .help("Token 活动")
+                .accessibilityLabel("Token 活动")
 
                 Button {
                     Task { await store.refreshFromButton() }
@@ -346,13 +333,11 @@ private struct DisabledContinuousQuotaBar: View {
 }
 
 struct SettingsWindowView: View {
-    @ObservedObject var store: QuotaStore
     @ObservedObject var settings: AppSettings
 
     var body: some View {
         EmbeddedSettingsView(
             settings: settings,
-            costSyncMessage: store.tokenCost?.syncMessage,
             settingsDidChange: {}
         )
         .padding(20)
@@ -362,7 +347,6 @@ struct SettingsWindowView: View {
 
 private struct EmbeddedSettingsView: View {
     @ObservedObject var settings: AppSettings
-    let costSyncMessage: String?
     let settingsDidChange: () -> Void
 
     var body: some View {
@@ -397,23 +381,6 @@ private struct EmbeddedSettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
-            HStack(spacing: 8) {
-                Toggle("启用 iCloud 多设备成本同步", isOn: costSyncBinding)
-                Button("选择文件夹") {
-                    chooseCostSyncFolder()
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-            }
-
-            ScrollingFolderPathText(path: settings.icloudCostSyncFolderPath)
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-            CostSyncImpactCard(
-                message: settings.icloudCostSyncEnabled
-                    ? costSyncMessage ?? settings.icloudCostSyncSetupError
-                    : settings.icloudCostSyncSetupError
-            )
         }
         .font(.caption)
         .toggleStyle(.checkbox)
@@ -444,164 +411,6 @@ private struct EmbeddedSettingsView: View {
         )
     }
 
-    private var costSyncBinding: Binding<Bool> {
-        Binding(
-            get: { settings.icloudCostSyncEnabled },
-            set: { isEnabled in
-                if isEnabled {
-                    chooseCostSyncFolder()
-                } else {
-                    settings.disableICloudCostSync()
-                    settingsDidChange()
-                }
-            }
-        )
-    }
-
-    private func chooseCostSyncFolder() {
-        guard let folderURL = ICloudDriveFolderPicker.chooseFolder() else { return }
-        Task {
-            do {
-                try await settings.enableICloudCostSync(folderURL: folderURL)
-                settingsDidChange()
-            } catch {
-                settingsDidChange()
-            }
-        }
-    }
-}
-
-private struct ScrollingFolderPathText: View {
-    let path: String?
-
-    @State private var containerWidth: CGFloat = 0
-    @State private var textWidth: CGFloat = 0
-    @State private var isShowingEnd = false
-
-    private var displayText: String {
-        path ?? "尚未选择文件夹"
-    }
-
-    private var overflowDistance: CGFloat {
-        max(0, textWidth - containerWidth)
-    }
-
-    private var shouldScroll: Bool {
-        overflowDistance > 1
-    }
-
-    private var scrollDuration: TimeInterval {
-        TimeInterval(min(12, max(3, overflowDistance / 24)))
-    }
-
-    var body: some View {
-        GeometryReader { containerProxy in
-            Text(displayText)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .fixedSize(horizontal: true, vertical: false)
-                .offset(x: shouldScroll && isShowingEnd ? -overflowDistance : 0)
-                .background(
-                    GeometryReader { textProxy in
-                        Color.clear
-                            .preference(key: FolderPathTextWidthKey.self, value: textProxy.size.width)
-                    }
-                )
-                .onAppear {
-                    containerWidth = containerProxy.size.width
-                    updateScroll()
-                }
-                .onChange(of: containerProxy.size.width) { _, newWidth in
-                    containerWidth = newWidth
-                    updateScroll()
-                }
-                .onChange(of: displayText) {
-                    isShowingEnd = false
-                    updateScroll()
-                }
-        }
-        .frame(height: 16)
-        .clipped()
-        .onPreferenceChange(FolderPathTextWidthKey.self) { newWidth in
-            Task { @MainActor in
-                textWidth = newWidth
-                updateScroll()
-            }
-        }
-        .id(displayText)
-    }
-
-    private func updateScroll() {
-        guard shouldScroll else {
-            isShowingEnd = false
-            return
-        }
-
-        DispatchQueue.main.async {
-            withAnimation(
-                .easeInOut(duration: scrollDuration)
-                    .delay(0.8)
-                    .repeatForever(autoreverses: true)
-            ) {
-                isShowingEnd = true
-            }
-        }
-    }
-}
-
-private struct FolderPathTextWidthKey: PreferenceKey {
-    static let defaultValue: CGFloat = 0
-
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
-    }
-}
-
-private struct CostSyncImpactCard: View {
-    let message: String?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            syncImpactRow(
-                icon: "chart.bar.fill",
-                title: "Token 活动不受影响",
-                detail: "始终读取当前账号的 app-server 数据。"
-            )
-            syncImpactRow(
-                icon: "dollarsign.circle",
-                title: "Token 成本",
-                detail: "关闭仅统计本机；开启合并统计多设备。"
-            )
-            if let message {
-                Text(message)
-                    .font(.system(size: 9))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-            }
-        }
-        .padding(7)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 7))
-        .overlay {
-            RoundedRectangle(cornerRadius: 7)
-                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
-        }
-    }
-
-    private func syncImpactRow(icon: String, title: String, detail: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Image(systemName: icon)
-                .font(.system(size: 13, weight: .semibold))
-                .frame(width: 16)
-                .foregroundStyle(.secondary)
-            Text(title)
-                .font(.caption.weight(.semibold))
-            Text(detail)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-        }
-    }
 }
 
 private struct QuotaRow: View {

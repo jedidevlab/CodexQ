@@ -11,6 +11,7 @@ struct TokenCostRecordSet: Sendable {
     let dataScope: TokenCostDataScope
     let syncMessage: String?
     let subscriptionAnchor: SubscriptionAnchor?
+    var unquantifiedAccountDays: [AccountModelUsagePresence] = []
 }
 
 actor TokenCostReader {
@@ -46,11 +47,12 @@ actor TokenCostReader {
         let skippedCount: Int
     }
 
-    private let sessionsDirectory: URL
+    private let sessionDirectories: [URL]
     private let authURL: URL
     private let fileManager: FileManager
     private let costLedgerSyncService: CostLedgerSyncService
     private let costSyncConfiguration: @Sendable () -> CostSyncConfiguration?
+    private let readAccountModelUsage: (@Sendable (Date) async throws -> AccountModelUsageResult)?
     private var cache: [URL: CachedFile] = [:]
 
     init(
@@ -59,12 +61,16 @@ actor TokenCostReader {
         costLedgerCacheURL: URL? = nil,
         costSyncConfiguration: @escaping @Sendable () -> CostSyncConfiguration? = {
             CostSyncPreferences.configuration()
-        }
+        },
+        readAccountModelUsage: (@Sendable (Date) async throws -> AccountModelUsageResult)? = nil
     ) {
-        sessionsDirectory = homeDirectory.appendingPathComponent(".codex/sessions", isDirectory: true)
+        sessionDirectories = ["sessions", "archived_sessions"].map {
+            homeDirectory.appendingPathComponent(".codex/\($0)", isDirectory: true)
+        }
         authURL = homeDirectory.appendingPathComponent(".codex/auth.json")
         self.fileManager = fileManager
         self.costSyncConfiguration = costSyncConfiguration
+        self.readAccountModelUsage = readAccountModelUsage
         costLedgerSyncService = CostLedgerSyncService(
             homeDirectory: homeDirectory,
             fileManager: fileManager,
@@ -94,7 +100,8 @@ actor TokenCostReader {
             skippedSessionFileCount: result.skippedSessionFileCount,
             dataScope: result.dataScope,
             syncMessage: result.syncMessage,
-            sourceRecordCount: result.localRecordCount
+            sourceRecordCount: result.localRecordCount,
+            unquantifiedAccountDays: result.unquantifiedAccountDays
         )
     }
 
@@ -104,11 +111,11 @@ actor TokenCostReader {
         do {
             listing = try sessionFiles()
         } catch ReaderError.sessionsUnavailable {
-            guard configuration != nil else { throw ReaderError.sessionsUnavailable }
+            guard configuration != nil || readAccountModelUsage != nil else { throw ReaderError.sessionsUnavailable }
             listing = SessionFileListing(files: [], skippedCount: 0)
         }
         let files = listing.files
-        guard !files.isEmpty || configuration != nil else {
+        guard !files.isEmpty || configuration != nil || readAccountModelUsage != nil else {
             throw ReaderError.sessionsUnavailable
         }
 
@@ -175,6 +182,7 @@ actor TokenCostReader {
         var costRecords = uniqueRecords
         var dataScope: TokenCostDataScope = .local
         var syncMessage: String?
+        var unquantifiedAccountDays: [AccountModelUsagePresence] = []
         if let configuration {
             let service = costLedgerSyncService
             do {
@@ -220,13 +228,42 @@ actor TokenCostReader {
                 syncMessage = error.localizedDescription
             }
         }
+        if let readAccountModelUsage {
+            do {
+                let account = try await readAccountModelUsage(now)
+                unquantifiedAccountDays = account.unquantifiedDays
+                try Task.checkCancellation()
+                // Merge AFTER syncing: account aggregates must not become device ledger entries.
+                costRecords = try AccountModelUsageMerger.merge(account.days, into: costRecords)
+                var messages = [syncMessage, account.warning].compactMap { $0 }
+                if !unquantifiedAccountDays.isEmpty {
+                    if dataScope == .local { dataScope = .account }
+                    let models = Array(Set(unquantifiedAccountDays.map(\.model))).sorted()
+                    messages.append("账号已识别模型：" + models.joined(separator: "、") + "；Token 数未提供")
+                }
+                if costRecords.contains(where: \.isAccountAggregate) {
+                    if dataScope == .local { dataScope = .account }
+                    messages.append("含账号模型 Token 明细（UTC 日汇总）；补入部分未计价")
+                }
+                syncMessage = messages.isEmpty ? nil : messages.joined(separator: "；")
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                let message = ((error as? AccountModelUsageReader.ReadError) ?? .unavailable).localizedDescription
+                syncMessage = [syncMessage, message].compactMap { $0 }.joined(separator: "；")
+                if costRecords.isEmpty, configuration == nil {
+                    throw (error as? AccountModelUsageReader.ReadError) ?? .unavailable
+                }
+            }
+        }
         return TokenCostRecordSet(
             records: costRecords,
             localRecordCount: uniqueRecords.count,
             skippedSessionFileCount: skippedSessionFileCount,
             dataScope: dataScope,
             syncMessage: syncMessage,
-            subscriptionAnchor: try? subscriptionAnchor()
+            subscriptionAnchor: try? subscriptionAnchor(),
+            unquantifiedAccountDays: unquantifiedAccountDays
         )
     }
 
@@ -244,23 +281,34 @@ actor TokenCostReader {
     }
 
     private func sessionFiles() throws -> SessionFileListing {
-        guard let enumerator = fileManager.enumerator(
-            at: sessionsDirectory,
-            includingPropertiesForKeys: [.isRegularFileKey],
-            options: [.skipsHiddenFiles]
-        ) else {
+        let directories = sessionDirectories.filter { fileManager.fileExists(atPath: $0.path) }
+        guard !directories.isEmpty else {
             throw ReaderError.sessionsUnavailable
         }
         var skippedCount = 0
         var files: [URL] = []
-        for item in enumerator {
-            guard let url = item as? URL, url.pathExtension == "jsonl" else { continue }
-            guard let values = try? url.resourceValues(forKeys: [.isRegularFileKey]),
-                  values.isRegularFile == true else {
+        for directory in directories {
+            guard let enumerator = fileManager.enumerator(
+                at: directory,
+                includingPropertiesForKeys: [.isRegularFileKey],
+                options: [.skipsHiddenFiles],
+                errorHandler: { _, _ in
+                    skippedCount += 1
+                    return true
+                }
+            ) else {
                 skippedCount += 1
                 continue
             }
-            files.append(url)
+            for item in enumerator {
+                guard let url = item as? URL, url.pathExtension == "jsonl" else { continue }
+                guard let values = try? url.resourceValues(forKeys: [.isRegularFileKey]),
+                      values.isRegularFile == true else {
+                    skippedCount += 1
+                    continue
+                }
+                files.append(url)
+            }
         }
         return SessionFileListing(
             files: files.sorted { $0.path < $1.path },
@@ -325,6 +373,7 @@ enum TokenCostSessionParser {
                   let payload = object["payload"] as? [String: Any] else { continue }
             if type == "turn_context" {
                 model = modelName(in: payload) ?? model
+                serviceTier = tier(in: payload) ?? serviceTier
                 continue
             }
             if type == "session_meta", !sawSessionMeta {
@@ -343,7 +392,9 @@ enum TokenCostSessionParser {
             }
             guard type == "event_msg", let eventType = payload["type"] as? String else { continue }
             if eventType == "thread_settings_applied" {
-                serviceTier = tier(in: payload)
+                let settings = payload["thread_settings"] as? [String: Any]
+                model = settings.flatMap(modelName(in:)) ?? modelName(in: payload) ?? model
+                serviceTier = tier(in: payload) ?? serviceTier
                 continue
             }
             if eventType == "task_started" {
@@ -461,10 +512,13 @@ enum TokenCostSessionParser {
         }
     }
 
-    private static func tier(in payload: [String: Any]) -> TokenServiceTier {
+    private static func tier(in payload: [String: Any]) -> TokenServiceTier? {
         let settings = payload["thread_settings"] as? [String: Any]
-        let value = (settings?["service_tier"] ?? payload["service_tier"]) as? String
+        guard let rawValue = settings?["service_tier"] ?? payload["service_tier"] else { return nil }
+        if rawValue is NSNull { return .standard }
+        let value = rawValue as? String
         switch value?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case nil, "": return nil
         case "priority", "fast": return .priority
         case "ultrafast": return .ultrafast
         default: return .standard

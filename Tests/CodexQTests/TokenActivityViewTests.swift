@@ -25,7 +25,6 @@ struct TokenActivityViewTests {
                 await activityGate.wait()
                 return .init(peakDailyTokens: 0, days: [])
             },
-            readTokenCost: { emptyTokenCostSnapshot() },
             loadCachedSnapshot: { nil },
             saveCachedSnapshot: { _ in },
             notifyQuotaCrossings: { _, _ in }
@@ -62,7 +61,6 @@ struct TokenActivityViewTests {
                 for await _ in release.stream { break }
                 throw ActivityFixtureError.unavailable
             },
-            readTokenCost: { emptyTokenCostSnapshot() },
             loadCachedSnapshot: { nil },
             saveCachedSnapshot: { _ in },
             notifyQuotaCrossings: { _, _ in }
@@ -87,6 +85,7 @@ struct TokenActivityViewTests {
         #expect(await activityCallCount.value == 1)
     }
 
+    #if false
     @Test("挂起的 Token 活动不阻塞并发 Token 成本结果")
     @MainActor
     func suspendedActivityDoesNotDelayTokenCost() async {
@@ -193,6 +192,8 @@ struct TokenActivityViewTests {
         withExtendedLifetime(cancellable) {}
     }
 
+    #endif
+
     @Test("Token 活动失败不回滚额度缓存和通知")
     @MainActor
     func activityFailurePreservesQuotaSideEffects() async {
@@ -205,7 +206,6 @@ struct TokenActivityViewTests {
         let store = QuotaStore(
             readRateLimits: { quota },
             readTokenActivity: { throw ActivityFixtureError.unavailable },
-            readTokenCost: { emptyTokenCostSnapshot() },
             loadCachedSnapshot: { nil },
             saveCachedSnapshot: { _ in cacheSaveCount += 1 },
             notifyQuotaCrossings: { _, _ in notificationCallCount += 1 }
@@ -250,7 +250,6 @@ struct TokenActivityViewTests {
                 return quota
             },
             readTokenActivity: { activity },
-            readTokenCost: { emptyTokenCostSnapshot() },
             loadCachedSnapshot: { nil },
             saveCachedSnapshot: { _ in },
             notifyQuotaCrossings: { _, _ in }
@@ -266,6 +265,7 @@ struct TokenActivityViewTests {
         #expect(await fallbackCalls.value == 1)
     }
 
+    #if false
     @Test("临时失败保留上次成功的 Token 活动和成本")
     @MainActor
     func transientTokenFailuresKeepPreviousSnapshots() async {
@@ -401,6 +401,8 @@ struct TokenActivityViewTests {
         #expect(store.tokenCost == updatedCost)
     }
 
+    #endif
+
     @Test("重置明细瞬时缺失时保留同次数下尚未到期的最近明细")
     @MainActor
     func transientMissingResetCreditDetailsPreserveRecentDetails() async {
@@ -426,7 +428,6 @@ struct TokenActivityViewTests {
         let store = QuotaStore(
             readRateLimits: { incompleteSnapshot },
             readTokenActivity: { .init(peakDailyTokens: 0, days: []) },
-            readTokenCost: { emptyTokenCostSnapshot() },
             loadCachedSnapshot: {
                 CachedQuotaSnapshot(snapshot: cachedSnapshot, updatedAt: now)
             },
@@ -462,7 +463,6 @@ struct TokenActivityViewTests {
                 return quota
             },
             readTokenActivity: { throw ActivityFixtureError.unavailable },
-            readTokenCost: { emptyTokenCostSnapshot() },
             loadCachedSnapshot: { nil },
             saveCachedSnapshot: { _ in },
             notifyQuotaCrossings: { _, _ in }
@@ -509,7 +509,6 @@ struct TokenActivityViewTests {
                 }
                 return .init(peakDailyTokens: 0, days: [])
             },
-            readTokenCost: { emptyTokenCostSnapshot() },
             loadCachedSnapshot: { nil },
             saveCachedSnapshot: { _ in },
             notifyQuotaCrossings: { _, _ in }
@@ -530,18 +529,17 @@ struct TokenActivityViewTests {
         secondGate.open()
     }
 
-    @Test("弹窗依次展示 Token 活动、Token 成本和限额重置")
-    func popoverOrdersTokenActivityAndCostBeforeResetCredits() throws {
+    @Test("弹窗保留 Token 活动并移除成本栏目")
+    func popoverKeepsTokenActivityAndRemovesCost() throws {
         let source = try String(
             contentsOfFile: "Sources/CodexQ/Views/QuotaPopoverView.swift",
             encoding: .utf8
         )
         let activityIndex = try #require(source.range(of: "TokenActivitySection("))
-        let costIndex = try #require(source.range(of: "TokenCostSection("))
         let resetCreditsIndex = try #require(source.range(of: "ResetCreditsSection("))
 
-        #expect(activityIndex.lowerBound < costIndex.lowerBound)
-        #expect(costIndex.lowerBound < resetCreditsIndex.lowerBound)
+        #expect(activityIndex.lowerBound < resetCreditsIndex.lowerBound)
+        #expect(!source.contains("TokenCostSection("))
     }
 
     @Test("弹窗顶部显示 app-server 返回的套餐类型")
@@ -726,16 +724,17 @@ struct TokenActivityViewTests {
         #expect(resetSource.contains("summary.availableCount > 0 ? Color.accentColor : Color.secondary"))
     }
 
-    @Test("活动日历的次级标签与空方块保持可读")
-    func activitySecondaryContentKeepsReadableContrast() throws {
+    @Test("活动热力图沿用 ChatGPT 五级明暗配色")
+    func activityHeatmapMatchesChatGPTPalette() throws {
         let source = try String(
             contentsOfFile: "Sources/CodexQ/Views/TokenActivitySection.swift",
             encoding: .utf8
         )
 
         #expect(source.contains("Color.primary.opacity(0.72)"))
-        #expect(source.contains("Color.secondary.opacity(0.12)"))
-        #expect(source.contains("Color.secondary.opacity(0.18)"))
+        #expect(source.contains("0xF3F3F3, 0xCCE6FF, 0x66B5FF, 0x0285FF, 0x004F99"))
+        #expect(source.contains("0x303030, 0x013566, 0x004F99, 0x0285FF, 0x66B5FF"))
+        #expect(source.contains("RoundedRectangle(cornerRadius: 4)"))
     }
 
     @Test("热力图按弹窗宽度自动扩展并铺满")
@@ -802,56 +801,28 @@ struct TokenActivityViewTests {
         #expect(settingsSource.contains("HStack(spacing: 4)"))
     }
 
-    @Test("展开模型明细时仍保留 Token 活动区")
-    func modelDetailKeepsTokenActivityVisible() throws {
+    @Test("弹窗只保留官方 Token 活动区")
+    func popoverOnlyKeepsOfficialTokenActivity() throws {
         let source = try String(
             contentsOfFile: "Sources/CodexQ/Views/QuotaPopoverView.swift",
             encoding: .utf8
         )
 
         #expect(source.contains("TokenActivitySection("))
-        #expect(!source.contains("pinnedCostKind"))
+        #expect(!source.contains("TokenCostSection("))
+        #expect(!source.contains("tokenCost"))
     }
 
-    @Test("iCloud 同步设置明确区分活动与成本，并始终提供文件夹选择")
-    func costSyncSettingsExplainDataImpact() throws {
+    @Test("设置页不再展示成本同步选项")
+    func settingsRemoveCostSyncControls() throws {
         let source = try String(
             contentsOfFile: "Sources/CodexQ/Views/QuotaPopoverView.swift",
             encoding: .utf8
         )
-        let impactRowSource = try sourceSection(
-            source,
-            from: "private func syncImpactRow",
-            to: "private struct QuotaRow"
-        )
-        let syncControlsSource = try sourceSection(
-            source,
-            from: "HStack(spacing: 8) {\n                Toggle(\"启用 iCloud 多设备成本同步\"",
-            to: "ScrollingFolderPathText(path: settings.icloudCostSyncFolderPath)"
-        )
 
-        #expect(source.contains("Toggle(\"启用 iCloud 多设备成本同步\""))
-        #expect(source.contains("ScrollingFolderPathText(path: settings.icloudCostSyncFolderPath)"))
-        #expect(syncControlsSource.contains("Button(\"选择文件夹\")"))
-        #expect(source.contains("path ?? \"尚未选择文件夹\""))
-        #expect(source.contains(".repeatForever(autoreverses: true)"))
-        #expect(source.contains("\"chart.bar.fill\""))
-        #expect(source.contains("\"Token 活动不受影响\""))
-        #expect(source.contains("\"始终读取当前账号的 app-server 数据。\""))
-        #expect(source.contains("\"dollarsign.circle\""))
-        #expect(source.contains("\"Token 成本\""))
-        #expect(source.contains("\"关闭仅统计本机；开启合并统计多设备。\""))
-        #expect(source.contains(".buttonStyle(.bordered)"))
-        #expect(source.contains(".controlSize(.small)"))
-        #expect(source.contains("ICloudDriveFolderPicker.chooseFolder()"))
-        #expect(!source.contains("costSyncDidChange"))
-        #expect(impactRowSource.contains(
-            "HStack(alignment: .firstTextBaseline, spacing: 8)"
-        ))
-        #expect(!impactRowSource.contains("VStack(alignment: .leading, spacing: 2)"))
-        #expect(impactRowSource.contains("Text(title)"))
-        #expect(impactRowSource.contains("Text(detail)"))
-        #expect(impactRowSource.contains(".lineLimit(1)"))
+        #expect(!source.contains("iCloud 多设备成本同步"))
+        #expect(!source.contains("icloudCostSyncFolderPath"))
+        #expect(!source.contains("ICloudDriveFolderPicker"))
     }
 
     @Test("鼠标停留与展开状态会上报并在关闭后复位")
@@ -961,7 +932,9 @@ struct TokenActivityViewTests {
         let emptyIndex = try #require(activitySource.range(of: "暂无 Token 使用记录"))
         let gridIndex = try #require(activitySource.range(of: "DailyTokenActivityGrid("))
 
-        #expect(popoverSource.contains("isRefreshing: store.isTokenActivityRefreshing"))
+        #expect(popoverSource.contains(
+            "isRefreshing: store.isRefreshing || store.isTokenActivityRefreshing"
+        ))
         #expect(activitySource.contains("hasRecordedTokens"))
         #expect(gridIndex.lowerBound < emptyIndex.lowerBound)
         #expect(!activitySource.contains("Token 活动刷新失败，显示上次数据"))

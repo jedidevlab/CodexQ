@@ -9,15 +9,11 @@
   <a href="https://github.com/jedidevlab/CodexQ/releases/latest">下载最新版</a>
 </p>
 
-CodexQ 是一款原生 macOS 菜单栏工具。它把 ChatGPT（原 Codex）5 小时与周限额、套餐类型、剩余额度、预计耗尽时间、每日 Token 活动和 Token 成本集中在一个浮动面板中显示。
+CodexQ 是一款原生 macOS 菜单栏工具。它把 ChatGPT（原 Codex）5 小时与周限额、套餐类型、剩余额度、预计耗尽时间和每日 Token 活动集中在一个浮动面板中显示。
 
-<p align="center">
-  <img src="docs/images/codexq-usage-overview.png" alt="CodexQ 用量、Token 活动和成本概览" width="275">
-</p>
+## 当前版本：v1.2.2 — **精简为可靠的 Token 活动统计**
 
-## 当前版本：v1.2.1 — **新增 GPT‑6.1 Sol 与 Ultrafast 成本估算**
-
-本版本按官方价格估算 GPT‑6.1 Sol 的 Token 成本，并识别 GPT‑6 Astra 与 GPT‑6.1 Sol 的 Ultrafast 档位。成本是 API 价格估算，不是 ChatGPT 订阅账单。
+ChatGPT 目前不再稳定提供可用于成本估算的逐模型 Token 数，因此本版本移除了 Token 成本、模型补算和 iCloud 成本同步入口，只保留账号级官方 Token 活动。已有本地历史和设置不会被删除。
 
 ## 一眼掌握使用节奏
 
@@ -25,8 +21,8 @@ CodexQ 是一款原生 macOS 菜单栏工具。它把 ChatGPT（原 Codex）5 �
 - **套餐识别**：直接显示 app-server 返回的套餐类型，并使用紧凑的原生标题样式。
 - **耗尽预测**：根据当前使用节奏判断额度是否够用，并显示预计耗尽时间。
 - **Token 活动**：查看按弹窗宽度自动扩展的每日热力图、最近完整日与累计 Token 用量。
-- **Token 成本**：默认按本机会话估算昨日、本订阅周期与累计成本；也可以通过用户选择的 iCloud Drive 文件夹合并多台 Mac 的设备记录。
-- **历史分析**：点击 `Token 活动` 或 `Token 成本` 标题会打开同一个统计窗口，可按日、月、年、订阅周期、累计或自定义范围查看 Token 趋势、估算成本趋势和模型分布。
+- **一致配色**：热力图的五级颜色与 ChatGPT“设置 → 个人资料 → Token 活动”保持一致，并分别适配浅色与深色外观。
+- **历史分析**：点击 `Token 活动` 标题打开统计窗口，可按日、月、年、订阅周期、累计或自定义范围查看 Token 趋势。
 - **可靠刷新**：额度与 Token 活动共用一次 app-server 会话；短暂刷新失败时保留上次成功数据并明确提示。
 - **及时提醒**：支持自动刷新、登录时启动，以及 20% / 10% / 5% 额度预警。
 - **原生体验**：使用 SwiftUI 与 AppKit 构建，常驻菜单栏，不打断当前工作。
@@ -37,8 +33,8 @@ CodexQ 是一款原生 macOS 菜单栏工具。它把 ChatGPT（原 Codex）5 �
 
 | Mac | 安装包 |
 | --- | --- |
-| Apple Silicon | `CodexQ-1.2.1-arm64.zip` |
-| Intel | `CodexQ-1.2.1-x86_64.zip` |
+| Apple Silicon | `CodexQ-1.2.2-arm64.zip` |
+| Intel | `CodexQ-1.2.2-x86_64.zip` |
 
 解压后，将 `CodexQ.app` 移入“应用程序”文件夹。
 
@@ -53,26 +49,11 @@ CodexQ 是一款原生 macOS 菜单栏工具。它把 ChatGPT（原 Codex）5 �
 - 已安装 ChatGPT app，支持 `/Applications` 或 `~/Applications`（同时兼容旧版 Codex app）
 - 本地构建需要 Swift 6 工具链
 
-## iCloud 同步
-
-在弹窗底部打开设置，勾选 `iCloud 同步`，再选择 iCloud Drive 中的专用文件夹。其他 Mac 使用同一 Codex 账号并选择同一文件夹后，Token 成本会合并各设备记录。
-
-- Token 活动来自账号数据，不受该开关影响。
-- 关闭同步时，Token 成本只统计当前 Mac。
-- 开启同步时，每台 Mac 写入自己的脱敏设备记录，只包含模型、时间和 Token 数，不复制原始会话或登录信息。
-- 多设备合并按稳定事件标识去重，同一会话事件即使被多个文件看到也只计算一次。
-- 多台 Mac 同时加入时会采用文件夹中已落盘的同账号同步清单，避免重复初始化。
-- 如果官方 Token 总数高于设备记录，CodexQ 会把差额单独显示为“官方差额”，并按设备记录的平均单价估算。
-- 多设备备用缓存无法更新时会明确提示，不会静默使用缺少设备的旧汇总。
-- 同步文件经过字段脱敏，但 CodexQ 不会额外加密；不要选择公开共享文件夹。
-
 ## Token 历史数据说明
 
 - Token 活动来自账号级 app-server 日数据；历史可用范围取决于服务端保留的每日覆盖。
-- 成本来自本机会话，或开启 iCloud 同步后的多设备脱敏账本；历史可用范围取决于仍保留的会话和账本记录。
-- 官方日 Token 高于设备记录时，历史窗口按天显示 `官方差额`；设备记录更高时不会被下调。
-- 未知或没有历史价格的模型仍计入 Token，但明确标为 `未计价 Token`，不会伪装成零成本。
-- 成本按记录发生时间对应的官方 API 价格估算，不是 ChatGPT 订阅的实际账单。
+- CodexQ 不再使用积分、额度百分比或模型名称推算 Token，也不再扫描本机会话来估算 API 成本。
+- 旧版产生的成本历史与同步设置保留在原位置，但本版本不再读取、展示或更新它们。
 
 ## 本地运行
 
@@ -100,14 +81,14 @@ swift test
 生成 ad-hoc 签名的安装包：
 
 ```bash
-./script/package_release.sh 1.2.1 arm64
-./script/package_release.sh 1.2.1 x86_64
+./script/package_release.sh 1.2.2 arm64
+./script/package_release.sh 1.2.2 x86_64
 ```
 
 发布并核对 GitHub Release 后，在维护者的 Mac 上安装本机架构的安装包：
 
 ```bash
-./script/install_release.sh "dist/CodexQ-1.2.1-$(uname -m).zip"
+./script/install_release.sh "dist/CodexQ-1.2.2-$(uname -m).zip"
 ```
 
 安装脚本会验证版本、架构和签名，关闭旧进程，替换应用包并启动新版本；如启动失败，会恢复旧应用。用户设置和历史记录不会删除。
@@ -115,8 +96,8 @@ swift test
 生成文件位于：
 
 ```text
-dist/CodexQ-1.2.1-arm64.zip
-dist/CodexQ-1.2.1-x86_64.zip
+dist/CodexQ-1.2.2-arm64.zip
+dist/CodexQ-1.2.2-x86_64.zip
 ```
 
 开发运行脚本会在 `dist/CodexQ.app` 生成本地 `.app` bundle；构建产物不会提交到 Git。

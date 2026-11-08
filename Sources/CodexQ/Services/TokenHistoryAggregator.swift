@@ -190,6 +190,7 @@ enum TokenHistoryAggregator {
         var totalTokens: Int64 = 0
         var estimatedCostUSD = 0.0
         var hasPrice = false
+        var hasUnpricedTokens = false
     }
 
     private static func aggregate(
@@ -238,6 +239,8 @@ enum TokenHistoryAggregator {
             if let cost = TokenPricingCatalog.estimatedCost(for: record) {
                 value.estimatedCostUSD += cost
                 value.hasPrice = true
+            } else {
+                value.hasUnpricedTokens = true
             }
             values[record.model] = value
         }
@@ -245,7 +248,7 @@ enum TokenHistoryAggregator {
             TokenHistoryModelSummary(
                 model: model,
                 totalTokens: value.totalTokens,
-                estimatedCostUSD: value.hasPrice ? value.estimatedCostUSD : nil
+                estimatedCostUSD: value.hasPrice && !value.hasUnpricedTokens ? value.estimatedCostUSD : nil
             )
         }
         .sorted {

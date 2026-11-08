@@ -3,9 +3,9 @@ import SwiftUI
 
 @MainActor
 final class SettingsWindowController: NSWindowController {
-    init(store: QuotaStore, settings: AppSettings) {
+    init(settings: AppSettings) {
         let hostingController = NSHostingController(
-            rootView: SettingsWindowView(store: store, settings: settings)
+            rootView: SettingsWindowView(settings: settings)
         )
         let contentSize = hostingController.sizeThatFits(
             in: NSSize(width: 380, height: 600)

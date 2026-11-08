@@ -9,11 +9,11 @@
   <a href="https://github.com/jedidevlab/CodexQ/releases/latest">Download latest</a>
 </p>
 
-CodexQ is a native macOS menu bar utility. It brings ChatGPT (formerly Codex) five-hour and weekly quota, plan type, remaining capacity, projected run-out time, Token activity, and Token cost estimates into one floating panel.
+CodexQ is a native macOS menu bar utility. It brings ChatGPT (formerly Codex) five-hour and weekly quota, plan type, remaining capacity, projected run-out time, and Token activity into one floating panel.
 
-## Current version: v1.2.1 — **GPT‑6.1 Sol and Ultrafast cost estimates**
+## Current version: v1.2.2 — **Focused on reliable Token activity**
 
-This release estimates GPT‑6.1 Sol Token cost using official prices and recognizes the Ultrafast tier for GPT‑6 Astra and GPT‑6.1 Sol. These API price estimates are not ChatGPT subscription charges.
+ChatGPT no longer exposes stable per-model Token counts suitable for cost estimates. This release removes Token cost, model top-ups, and iCloud cost-sync entry points while retaining official account-level Token activity. Existing local history and settings are not deleted.
 
 ## Your usage pace at a glance
 
@@ -21,8 +21,8 @@ This release estimates GPT‑6.1 Sol Token cost using official prices and recogn
 - **Plan identification:** show the plan type returned by app-server in a compact native header.
 - **Run-out projection:** see whether your current pace is sustainable and when the quota may run out.
 - **Token activity:** review three months of daily activity plus the latest completed day and lifetime Token usage.
-- **Token cost:** estimate yesterday, the current subscription period, and lifetime cost from local sessions, with optional multi-Mac merging through device records in a user-selected iCloud Drive folder.
-- **History analysis:** click either the `Token Activity` or `Token Cost` title to open the same statistics window, with day, month, year, subscription-cycle, cumulative, and custom-range queries plus Token, estimated-cost, and model charts.
+- **Matching colors:** use the same five heatmap levels as ChatGPT’s Settings → Profile → Token activity view in both light and dark appearances.
+- **History analysis:** click `Token Activity` to open day, month, year, subscription-cycle, cumulative, and custom-range Token trends.
 - **Reliable refresh:** quota and Token activity share one app-server session; temporary refresh failures retain the last successful data with a clear status.
 - **Timely alerts:** enable automatic refresh, launch at login, and quota warnings at 20%, 10%, or 5%.
 - **Native experience:** built with SwiftUI and AppKit to stay available without interrupting your work.
@@ -33,8 +33,8 @@ Download the archive for your Mac from [GitHub Releases](https://github.com/jedi
 
 | Mac | Archive |
 | --- | --- |
-| Apple Silicon | `CodexQ-1.2.1-arm64.zip` |
-| Intel | `CodexQ-1.2.1-x86_64.zip` |
+| Apple Silicon | `CodexQ-1.2.2-arm64.zip` |
+| Intel | `CodexQ-1.2.2-x86_64.zip` |
 
 Unzip the archive, then move `CodexQ.app` to Applications.
 
@@ -49,24 +49,11 @@ If macOS blocks the first launch, try opening the app once, then go to System Se
 - ChatGPT app installed in `/Applications` or `~/Applications` (the legacy Codex app is also supported)
 - Swift 6 toolchain for local builds
 
-## iCloud Cost Sync
-
-Open settings from the bottom of the popover, enable `iCloud Cost Sync`, and select a dedicated folder in iCloud Drive. Other Macs using the same Codex account can select the same folder to merge their device records.
-
-- Token activity is account data and is unaffected by this setting.
-- With sync off, Token cost includes only the current Mac.
-- With sync on, each Mac writes its own sanitized device records with only model names, timestamps, and Token counts; CodexQ does not copy raw sessions or login information.
-- Multi-device merging deduplicates stable event identifiers, so the same session event is counted once even if it appears in more than one file.
-- If official Token totals are higher than device records, CodexQ shows the missing portion separately as the official difference and estimates it from the average device-record rate.
-- Sanitized sync files are not additionally encrypted by CodexQ. Do not choose a publicly shared folder.
-
 ## Token History Data Notes
 
 - Token activity is account-level daily data from app-server; historical availability depends on its retained daily coverage.
-- Cost comes from local sessions or the sanitized multi-device ledger when iCloud sync is enabled; availability depends on retained session and ledger records.
-- When official daily Token usage is higher than device records, the history window shows the positive official difference per day; higher device totals are never reduced.
-- Unknown or historically unpriced models remain in Token totals and are labeled as unpriced instead of being presented as zero-cost usage.
-- Costs use timestamp-aware official API prices where catalog history exists. They are estimates, not the actual ChatGPT subscription bill.
+- CodexQ no longer infers Tokens from credits, quota percentages, or model names, and no longer scans local sessions for API-cost estimates.
+- Cost history and sync preferences created by earlier releases remain in place, but this release no longer reads, displays, or updates them.
 
 ## Build and Run
 
@@ -94,14 +81,14 @@ swift test
 Build an ad-hoc signed archive:
 
 ```bash
-./script/package_release.sh 1.2.1 arm64
-./script/package_release.sh 1.2.1 x86_64
+./script/package_release.sh 1.2.2 arm64
+./script/package_release.sh 1.2.2 x86_64
 ```
 
 After publishing and verifying the GitHub Release, install the archive for this Mac:
 
 ```bash
-./script/install_release.sh "dist/CodexQ-1.2.1-$(uname -m).zip"
+./script/install_release.sh "dist/CodexQ-1.2.2-$(uname -m).zip"
 ```
 
 The installer verifies the bundle version, architecture, and signature, replaces the old app, and starts the new one. If startup fails, it restores the previous app. User settings and history remain in place.
@@ -109,8 +96,8 @@ The installer verifies the bundle version, architecture, and signature, replaces
 The archive is written to:
 
 ```text
-dist/CodexQ-1.2.1-arm64.zip
-dist/CodexQ-1.2.1-x86_64.zip
+dist/CodexQ-1.2.2-arm64.zip
+dist/CodexQ-1.2.2-x86_64.zip
 ```
 
 The helper script builds a local `.app` bundle in `dist/CodexQ.app` for development use. Generated build artifacts are excluded from Git.

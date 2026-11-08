@@ -574,8 +574,8 @@ struct TokenCostTests {
         #expect(TokenPricingCatalog.estimatedCost(for: launchSnapshot) == 20)
     }
 
-    @Test("非 OpenAI 或无官方价格的模型完全不纳入成本")
-    func excludesModelsWithoutOfficialPricing() throws {
+    @Test("无官方价格的模型保留 Token 和模型明细，但不计入已知成本")
+    func preservesTokensWithoutOfficialPricing() throws {
         let now = try date("2026-07-23T12:00:00Z")
         let snapshot = TokenCostCalculator.snapshot(
             records: [
@@ -588,14 +588,29 @@ struct TokenCostTests {
             subscriptionPeriod: nil
         )
 
-        #expect(snapshot.today.totalTokens == 100)
-        #expect(snapshot.today.models.map(\.model) == ["gpt-5.6-sol"])
-        #expect(snapshot.lifetime.totalTokens == 100)
-        #expect(TokenCostFormatter.amount(snapshot.lifetime) == "$0.00")
+        #expect(snapshot.today.totalTokens == 1600)
+        #expect(snapshot.today.unpricedTokens == 1500)
+        #expect(snapshot.today.models.map(\.model) == ["MiniMax-M3", "codex-auto-review", "gpt-5.6-sol"])
+        #expect(snapshot.lifetime.totalTokens == 1600)
+        #expect(snapshot.lifetime.estimatedCostUSD == TokenPricingCatalog.estimatedCost(
+            for: record(model: "gpt-5.6-sol", at: now, tokens: 100)
+        ))
+        #expect(TokenCostFormatter.amount(snapshot.lifetime) == "$0.00+")
     }
 
-    @Test("同一 OpenAI 模型缺少历史定价的记录不纳入成本")
-    func excludesRecordsWithoutHistoricalPricing() throws {
+    @Test("Work Mode 内部模型名归并到公开 GPT-6.1 Sol 名称和价格")
+    func canonicalizesWorkModeModelAlias() throws {
+        let timestamp = try date("2026-10-23T01:00:00Z")
+        let record = TokenUsageRecord(timestamp: timestamp, model: "gpt-6.1-sol-wm",
+            inputTokens: 1_000_000, cachedInputTokens: 0, cacheWriteInputTokens: 0,
+            outputTokens: 1_000_000, totalTokens: 2_000_000)
+        #expect(record.model == "gpt-6.1-sol")
+        #expect(TokenPricingCatalog.estimatedCost(for: record) == 19)
+        #expect(TokenPricingCatalog.pricing(for: "gpt-6.1-sol-wm", at: timestamp) != nil)
+    }
+
+    @Test("同一模型缺少历史定价的记录保留 Token 并标记未计价部分")
+    func preservesRecordsWithoutHistoricalPricing() throws {
         let snapshot = TokenCostCalculator.snapshot(
             records: [
                 record(
@@ -615,8 +630,9 @@ struct TokenCostTests {
         )
 
         #expect(snapshot.lifetime.estimatedCostUSD == 2.5)
-        #expect(snapshot.lifetime.totalTokens == 1_000_000)
-        #expect(TokenCostFormatter.amount(snapshot.lifetime) == "$2.50")
+        #expect(snapshot.lifetime.totalTokens == 2_000_000)
+        #expect(snapshot.lifetime.unpricedTokens == 1_000_000)
+        #expect(TokenCostFormatter.amount(snapshot.lifetime) == "$2.50+")
     }
 
     @Test("今日、昨日、订阅周期和累计使用各自准确分组")
@@ -1141,11 +1157,12 @@ struct TokenCostTests {
         #expect(!source.contains("多设备脱敏账本，按官方 API 价估算"))
         #expect(source.contains("summary.recordedEstimatedCostUSD"))
         #expect(source.contains("summary.supplement"))
-        #expect(source.contains("设备记录"))
+        #expect(source.contains("模型记录"))
         #expect(source.contains("官方差额"))
         #expect(source.contains("Image(systemName: \"info.circle\")"))
         #expect(source.contains(".popover(isPresented: $isSupplementExplanationPresented"))
-        #expect(source.contains("官方 Token 数据高于设备记录时"))
+        #expect(source.contains("官方 Token 数据高于模型记录时"))
+        #expect(source.contains("没有可用单价时标为未计价"))
         #expect(source.contains("TokenCountFormatter.compactNumber(summary.totalTokens, fractionLength: 1)"))
     }
 

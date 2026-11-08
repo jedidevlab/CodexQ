@@ -15,7 +15,7 @@ final class TokenHistoryWindowController: NSWindowController {
             backing: .buffered,
             defer: false
         )
-        window.title = "Token 使用与成本"
+        window.title = "Token 活动"
         window.contentViewController = hostingController
         window.minSize = NSSize(width: 840, height: 600)
         window.isReleasedWhenClosed = false

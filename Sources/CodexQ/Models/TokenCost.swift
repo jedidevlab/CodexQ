@@ -1,5 +1,16 @@
 import Foundation
 
+enum TokenModelName {
+    /// ChatGPT Work may expose an internal route suffix for the public model.
+    /// Keep the alias list explicit so unrelated future model names are not rewritten.
+    static func canonical(_ model: String) -> String {
+        switch model.lowercased() {
+        case "gpt-6.1-sol-wm": return "gpt-6.1-sol"
+        default: return model
+        }
+    }
+}
+
 enum TokenServiceTier: String, Codable, Hashable, Sendable {
     case standard
     case priority
@@ -16,6 +27,8 @@ struct TokenUsageRecord: Equatable, Hashable, Sendable {
     let outputTokens: Int64
     let totalTokens: Int64
     let serviceTier: TokenServiceTier
+    /// Account daily totals lack per-request context lengths and service tiers.
+    let isAccountAggregate: Bool
 
     init(
         eventID: String? = nil,
@@ -26,22 +39,25 @@ struct TokenUsageRecord: Equatable, Hashable, Sendable {
         cacheWriteInputTokens: Int64,
         outputTokens: Int64,
         totalTokens: Int64,
-        serviceTier: TokenServiceTier = .standard
+        serviceTier: TokenServiceTier = .standard,
+        isAccountAggregate: Bool = false
     ) {
         self.eventID = eventID
         self.timestamp = timestamp
-        self.model = model
+        self.model = TokenModelName.canonical(model)
         self.inputTokens = inputTokens
         self.cachedInputTokens = cachedInputTokens
         self.cacheWriteInputTokens = cacheWriteInputTokens
         self.outputTokens = outputTokens
         self.totalTokens = totalTokens
         self.serviceTier = serviceTier
+        self.isAccountAggregate = isAccountAggregate
     }
 }
 
 enum TokenCostDataScope: Equatable, Sendable {
     case local
+    case account
     case singleDevice
     case multiDevice(deviceCount: Int)
     case syncDelayed
@@ -95,9 +111,11 @@ struct TokenCostPeriodSummary: Equatable, Sendable, Identifiable {
     let models: [TokenCostModelSummary]
     let accountTokens: Int64?
     let supplement: TokenCostSupplement?
+    let unquantifiedModels: [String]
 
     var id: Kind { kind }
     var recordedTokens: Int64 { models.reduce(0) { $0 + $1.totalTokens } }
+    var unpricedTokens: Int64 { models.reduce(0) { $0 + $1.unpricedTokens } }
     var totalTokens: Int64 { max(recordedTokens, accountTokens ?? recordedTokens) }
     var recordedEstimatedCostUSD: Double {
         models.reduce(0) { $0 + $1.estimatedCostUSD }
@@ -110,18 +128,21 @@ struct TokenCostPeriodSummary: Equatable, Sendable, Identifiable {
         kind: Kind,
         models: [TokenCostModelSummary],
         accountTokens: Int64? = nil,
-        supplement: TokenCostSupplement? = nil
+        supplement: TokenCostSupplement? = nil,
+        unquantifiedModels: [String] = []
     ) {
         self.kind = kind
         self.models = models
         self.accountTokens = accountTokens
         self.supplement = supplement
+        self.unquantifiedModels = unquantifiedModels
     }
 }
 
 struct TokenCostSupplement: Equatable, Sendable {
     let tokens: Int64
-    let estimatedCostUSD: Double
+    /// nil means no priced records are available to estimate this difference.
+    let estimatedCostUSD: Double?
 }
 
 struct TokenCostModelSummary: Equatable, Sendable, Identifiable {
@@ -132,6 +153,7 @@ struct TokenCostModelSummary: Equatable, Sendable, Identifiable {
     let outputTokens: Int64
     let totalTokens: Int64
     let estimatedCostUSD: Double
+    var unpricedTokens: Int64 = 0
 
     var id: String { model }
 }
@@ -175,7 +197,7 @@ enum TokenPricingCatalog {
     }
 
     static func pricing(for model: String, at timestamp: Date?) -> TokenPricing? {
-        let key = model.lowercased()
+        let key = TokenModelName.canonical(model).lowercased()
         if let timestamp, let history = historicalCatalog[key] {
             return history.last { $0.effectiveAt <= timestamp }?.pricing
         }
@@ -398,6 +420,7 @@ enum TokenPricingCatalog {
     }
 
     static func estimatedCost(for record: TokenUsageRecord) -> Double? {
+        guard !record.isAccountAggregate else { return nil }
         guard let pricing = pricing(for: record.model, at: record.timestamp) else { return nil }
         let serviceTierMultiplier: Double
         switch record.serviceTier {
@@ -406,7 +429,7 @@ enum TokenPricingCatalog {
         case .priority:
             serviceTierMultiplier = pricing.priorityMultiplier
         case .ultrafast:
-            switch record.model.lowercased() {
+            switch TokenModelName.canonical(record.model).lowercased() {
             case "gpt-6-astra" where record.timestamp >= gpt6AstraUltrafastEffectiveAt,
                  "gpt-6.1-sol" where record.timestamp >= gpt61SolUltrafastEffectiveAt:
                 serviceTierMultiplier = 6
@@ -452,35 +475,50 @@ enum TokenCostCalculator {
         skippedSessionFileCount: Int = 0,
         dataScope: TokenCostDataScope = .local,
         syncMessage: String? = nil,
-        sourceRecordCount: Int? = nil
+        sourceRecordCount: Int? = nil,
+        unquantifiedAccountDays: [AccountModelUsagePresence] = []
     ) -> TokenCostSnapshot {
         let todayStart = calendar.startOfDay(for: now)
         let tomorrow = calendar.date(byAdding: .day, value: 1, to: todayStart) ?? now
         let yesterdayStart = calendar.date(byAdding: .day, value: -1, to: todayStart)
             ?? todayStart
 
+        func accountModels(from start: Date? = nil, to end: Date? = nil) -> [String] {
+            Array(Set(unquantifiedAccountDays.filter {
+                (start == nil || $0.date >= start!) && (end == nil || $0.date < end!)
+            }.map(\.model))).sorted {
+                if $0 == "other" { return false }
+                if $1 == "other" { return true }
+                return $0.compare($1, options: .numeric) == .orderedDescending
+            }
+        }
+
         return TokenCostSnapshot(
             today: summary(
                 kind: .today,
-                records: records.filter { $0.timestamp >= todayStart && $0.timestamp < tomorrow }
+                records: records.filter { $0.timestamp >= todayStart && $0.timestamp < tomorrow },
+                unquantifiedModels: accountModels(from: todayStart, to: tomorrow)
             ),
             yesterday: summary(
                 kind: .yesterday,
                 records: records.filter {
                     $0.timestamp >= yesterdayStart && $0.timestamp < todayStart
-                }
+                },
+                unquantifiedModels: accountModels(from: yesterdayStart, to: todayStart)
             ),
             subscription: subscriptionPeriod.map { period in
                 summary(
                     kind: .subscription,
                     records: records.filter {
                         $0.timestamp >= period.start && $0.timestamp < period.end
-                    }
+                    },
+                    unquantifiedModels: accountModels(from: period.start, to: period.end)
                 )
             },
             lifetime: summary(
                 kind: .lifetime,
-                records: records
+                records: records,
+                unquantifiedModels: accountModels()
             ),
             subscriptionPeriod: subscriptionPeriod,
             skippedSessionFileCount: skippedSessionFileCount,
@@ -492,7 +530,8 @@ enum TokenCostCalculator {
 
     private static func summary(
         kind: TokenCostPeriodSummary.Kind,
-        records: [TokenUsageRecord]
+        records: [TokenUsageRecord],
+        unquantifiedModels: [String] = []
     ) -> TokenCostPeriodSummary {
         struct Accumulator {
             var input: Int64 = 0
@@ -501,18 +540,22 @@ enum TokenCostCalculator {
             var output: Int64 = 0
             var total: Int64 = 0
             var cost: Double = 0
+            var unpriced: Int64 = 0
         }
 
         var byModel: [String: Accumulator] = [:]
         for record in records {
-            guard let cost = TokenPricingCatalog.estimatedCost(for: record) else { continue }
             var value = byModel[record.model, default: Accumulator()]
             value.input += record.inputTokens
             value.cached += record.cachedInputTokens
             value.cacheWrite += record.cacheWriteInputTokens
             value.output += record.outputTokens
             value.total += record.totalTokens
-            value.cost += cost
+            if let cost = TokenPricingCatalog.estimatedCost(for: record) {
+                value.cost += cost
+            } else {
+                value.unpriced += record.totalTokens
+            }
             byModel[record.model] = value
         }
 
@@ -524,14 +567,15 @@ enum TokenCostCalculator {
                 cacheWriteInputTokens: value.cacheWrite,
                 outputTokens: value.output,
                 totalTokens: value.total,
-                estimatedCostUSD: value.cost
+                estimatedCostUSD: value.cost,
+                unpricedTokens: value.unpriced
             )
         }
         .sorted {
             if $0.totalTokens == $1.totalTokens { return $0.model < $1.model }
             return $0.totalTokens > $1.totalTokens
         }
-        return TokenCostPeriodSummary(kind: kind, models: models)
+        return TokenCostPeriodSummary(kind: kind, models: models, unquantifiedModels: unquantifiedModels)
     }
 }
 
@@ -590,24 +634,26 @@ enum TokenCostReconciler {
     ) -> TokenCostPeriodSummary {
         guard let accountTokens else { return recorded }
         let missingTokens = max(0, accountTokens - recorded.recordedTokens)
-        let rate = unitCost(of: recorded) ?? fallbackRate ?? 0
+        let rate = unitCost(of: recorded) ?? fallbackRate
         let supplement = missingTokens > 0
             ? TokenCostSupplement(
                 tokens: missingTokens,
-                estimatedCostUSD: Double(missingTokens) * rate
+                estimatedCostUSD: rate.map { Double(missingTokens) * $0 }
             )
             : nil
         return TokenCostPeriodSummary(
             kind: recorded.kind,
             models: recorded.models,
             accountTokens: accountTokens,
-            supplement: supplement
+            supplement: supplement,
+            unquantifiedModels: recorded.unquantifiedModels
         )
     }
 
     private static func unitCost(of summary: TokenCostPeriodSummary) -> Double? {
-        guard summary.recordedTokens > 0 else { return nil }
-        return summary.recordedEstimatedCostUSD / Double(summary.recordedTokens)
+        let pricedTokens = summary.recordedTokens - summary.unpricedTokens
+        guard pricedTokens > 0 else { return nil }
+        return summary.recordedEstimatedCostUSD / Double(pricedTokens)
     }
 
     private static func accountTokens(
@@ -676,7 +722,20 @@ enum SubscriptionPeriodResolver {
 
 enum TokenCostFormatter {
     static func amount(_ summary: TokenCostPeriodSummary) -> String {
+        let hasUnpricedSupplement = summary.supplement.map { $0.estimatedCostUSD == nil } ?? false
+        if !summary.unquantifiedModels.isEmpty || hasUnpricedSupplement {
+            guard summary.recordedTokens > summary.unpricedTokens
+                    || (summary.supplement?.estimatedCostUSD ?? 0) > 0 else { return "未计价" }
+            return dollarAmount(summary.estimatedCostUSD) + "+"
+        }
         guard !summary.models.isEmpty || summary.supplement != nil else { return "$0.00" }
+        if summary.unpricedTokens > 0 {
+            guard summary.recordedTokens > summary.unpricedTokens
+                    || (summary.supplement?.estimatedCostUSD ?? 0) > 0 else {
+                return "未计价"
+            }
+            return dollarAmount(summary.estimatedCostUSD) + "+"
+        }
         return dollarAmount(summary.estimatedCostUSD)
     }
 
@@ -686,7 +745,8 @@ enum TokenCostFormatter {
     }
 
     static func amount(_ model: TokenCostModelSummary) -> String {
-        dollarAmount(model.estimatedCostUSD)
+        if model.unpricedTokens == model.totalTokens, model.unpricedTokens > 0 { return "未计价" }
+        return dollarAmount(model.estimatedCostUSD) + (model.unpricedTokens > 0 ? "+" : "")
     }
 
     private static func dollarAmount(_ value: Double) -> String {

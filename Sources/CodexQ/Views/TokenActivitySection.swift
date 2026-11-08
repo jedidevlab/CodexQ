@@ -12,8 +12,8 @@ struct TokenActivitySection: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 TokenHistoryNavigationButton(title: "Token 活动", action: showHistory)
-                    .help("点击查看 Token 使用与成本历史")
-                    .accessibilityLabel("打开 Token 使用与成本历史")
+                    .help("点击查看 Token 活动历史")
+                    .accessibilityLabel("打开 Token 活动历史")
                 Spacer(minLength: 6)
                 if let snapshot {
                     let latestDay = TokenActivityPresentation.latestRecordedDay(
@@ -301,19 +301,11 @@ private struct TokenActivitySquare: View {
     let level: Int?
     let accessibilityLabel: String
     let accessibilityValue: String
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        RoundedRectangle(cornerRadius: 3)
-            .fill(fillColor)
-            .overlay {
-                if level == nil {
-                    RoundedRectangle(cornerRadius: 3)
-                        .strokeBorder(
-                            Color.secondary.opacity(0.18),
-                            lineWidth: 0.5
-                        )
-                }
-            }
+        RoundedRectangle(cornerRadius: 4)
+            .fill(TokenActivityHeatmapPalette.color(level: level, colorScheme: colorScheme))
             .frame(
                 width: TokenActivityGridLayout.squareSize,
                 height: TokenActivityGridLayout.squareSize
@@ -323,16 +315,27 @@ private struct TokenActivitySquare: View {
             .accessibilityValue(accessibilityValue)
     }
 
-    private var fillColor: Color {
-        guard let level else {
-            return Color.secondary.opacity(0.12)
+}
+
+enum TokenActivityHeatmapPalette {
+    static func hex(level: Int?, colorScheme: ColorScheme) -> UInt32 {
+        let normalizedLevel = min(4, max(0, level ?? 0))
+        switch colorScheme {
+        case .dark:
+            return [0x303030, 0x013566, 0x004F99, 0x0285FF, 0x66B5FF][normalizedLevel]
+        default:
+            return [0xF3F3F3, 0xCCE6FF, 0x66B5FF, 0x0285FF, 0x004F99][normalizedLevel]
         }
-        switch level {
-        case 0: return Color.secondary.opacity(0.22)
-        case 1: return Color.accentColor.opacity(0.25)
-        case 2: return Color.accentColor.opacity(0.42)
-        case 3: return Color.accentColor.opacity(0.65)
-        default: return Color.accentColor.opacity(0.9)
-        }
+    }
+
+    static func color(level: Int?, colorScheme: ColorScheme) -> Color {
+        let value = hex(level: level, colorScheme: colorScheme)
+        return Color(
+            .sRGB,
+            red: Double((value >> 16) & 0xFF) / 255,
+            green: Double((value >> 8) & 0xFF) / 255,
+            blue: Double(value & 0xFF) / 255,
+            opacity: 1
+        )
     }
 }
