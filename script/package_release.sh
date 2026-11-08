@@ -48,6 +48,8 @@ BUILD_BINARY="$(swift build -c release --arch "$ARCH" --show-bin-path)/$APP_NAME
 rm -rf "$APP_BUNDLE" "$LEGACY_APP_BUNDLE" "$ICONSET" "$ZIP_PATH"
 mkdir -p "$APP_MACOS" "$APP_RESOURCES" "$ICONSET"
 cp "$BUILD_BINARY" "$APP_BINARY"
+# Remove debug symbol entries containing local build and source paths before distribution.
+/usr/bin/strip -S "$APP_BINARY"
 chmod +x "$APP_BINARY"
 cp "$ROOT_DIR/Sources/CodexQ/Resources/MenuBarIcon.png" "$APP_RESOURCES/MenuBarIcon.png"
 
